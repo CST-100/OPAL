@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/executions">EXECUTIONS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">START NEW EXECUTION</div>
+    <div class="panel-body">
+        <form id="new-execution-form" onsubmit="startExecution(event)">
+            <div class="form-group">
+                <label class="form-label" for="procedure">PROCEDURE *</label>
+                <select id="procedure" name="procedure_id" class="form-select" required>
+                    <option value="">Select procedure...</option>
+                    {% for p in procedures %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="work-order">WORK ORDER NUMBER</label>
+                <input type="text" id="work-order" name="work_order_number" class="form-input" placeholder="Optional - for grouping related executions">
+            </div>
+
+            {% if not procedures %}
+            <div class="text-yellow" style="margin-bottom: var(--space-md);">
+                No procedures with published versions available. Create and publish a procedure first.
+            </div>
+            {% endif %}
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/executions" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary" {% if not procedures %}disabled{% endif %}>START</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+async function startExecution(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-execution-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        procedure_id: parseInt(form.procedure_id.value),
+        work_order_number: form.work_order_number.value || null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/procedure-instances', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const instance = await response.json();
+            window.location.href = '/executions/' + instance.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to start execution';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

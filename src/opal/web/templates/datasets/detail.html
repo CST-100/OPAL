@@ -1,0 +1,314 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/datasets">DATASETS</a></span>
+<span class="breadcrumb-item">{{ dataset.id }}</span>
+{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div style="display: flex; gap: var(--space-md);">
+    <!-- Dataset Info Panel -->
+    <div style="width: 300px;">
+        <div class="panel">
+            <div class="panel-header">{{ dataset.name }}</div>
+            <div class="panel-body">
+                {% if dataset.description %}
+                <p style="margin-bottom: var(--space-md);">{{ dataset.description }}</p>
+                {% endif %}
+
+                <table class="data-table" style="margin-bottom: var(--space-md);">
+                    <tr>
+                        <th>ID</th>
+                        <td>{{ dataset.id }}</td>
+                    </tr>
+                    <tr>
+                        <th>POINTS</th>
+                        <td>{{ data_points | length }}</td>
+                    </tr>
+                    <tr>
+                        <th>CREATED</th>
+                        <td class="timestamp">{{ dataset.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    </tr>
+                    {% if dataset.procedure_id %}
+                    <tr>
+                        <th>PROCEDURE</th>
+                        <td><a href="/procedures/{{ dataset.procedure_id }}">View</a></td>
+                    </tr>
+                    {% endif %}
+                </table>
+
+                <div class="form-label">SCHEMA FIELDS</div>
+                <table class="data-table" style="margin-bottom: var(--space-md);">
+                    <thead>
+                        <tr>
+                            <th>NAME</th>
+                            <th>TYPE</th>
+                            <th>UNIT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for field in dataset.schema.fields %}
+                        <tr>
+                            <td>{{ field.name }}</td>
+                            <td>{{ field.type }}</td>
+                            <td>{{ field.unit if field.unit else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+                    <a href="/datasets" class="btn">BACK</a>
+                    <button class="btn" onclick="openAddPointModal()">ADD POINT</button>
+                    <button class="btn text-red" onclick="deleteDataset()">DELETE</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart and Data Panel -->
+    <div style="flex: 1;">
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>CHART</span>
+                <select id="chart-field" class="form-select" style="width: 150px;" onchange="updateChart()">
+                    {% for field in dataset.schema.fields %}
+                    {% if field.type == 'number' %}
+                    <option value="{{ field.name }}">{{ field.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="panel-body">
+                <div style="height: 300px;">
+                    <canvas id="dataChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">DATA POINTS ({{ data_points | length }})</div>
+            <div class="panel-body" style="max-height: 400px; overflow-y: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 160px;">RECORDED</th>
+                            {% for field in dataset.schema.fields %}
+                            <th>{{ field.name | upper }}</th>
+                            {% endfor %}
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for point in data_points %}
+                        <tr>
+                            <td class="timestamp">{{ point.recorded_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                            {% for field in dataset.schema.fields %}
+                            <td>{{ point.values.get(field.name, '-') }}{% if field.unit %} {{ field.unit }}{% endif %}</td>
+                            {% endfor %}
+                            <td>
+                                <button class="btn" style="padding: 2px 6px; font-size: 0.75rem;" onclick="deletePoint({{ point.id }})">X</button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="{{ dataset.schema.fields | length + 2 }}" class="text-muted">No data points</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Point Modal -->
+<div id="add-point-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000;">
+    <div class="panel" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px;">
+        <div class="panel-header">ADD DATA POINT</div>
+        <div class="panel-body">
+            <form id="add-point-form" onsubmit="addPoint(event)">
+                {% for field in dataset.schema.fields %}
+                <div class="form-group">
+                    <label class="form-label">{{ field.name | upper }}{% if field.unit %} ({{ field.unit }}){% endif %}</label>
+                    {% if field.type == 'number' %}
+                    <input type="number" step="any" name="{{ field.name }}" class="form-input">
+                    {% elif field.type == 'boolean' %}
+                    <select name="{{ field.name }}" class="form-select">
+                        <option value="">-</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                    {% elif field.type == 'date' %}
+                    <input type="datetime-local" name="{{ field.name }}" class="form-input">
+                    {% else %}
+                    <input type="text" name="{{ field.name }}" class="form-input">
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                    <button type="button" class="btn" onclick="closeAddPointModal()">CANCEL</button>
+                    <button type="submit" class="btn btn-primary">ADD</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const datasetId = {{ dataset.id }};
+const dataPoints = {{ data_points_json | safe }};
+const schema = {{ dataset.schema | tojson | safe }};
+let chart = null;
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+function initChart() {
+    const ctx = document.getElementById('dataChart').getContext('2d');
+    const fieldSelect = document.getElementById('chart-field');
+    if (!fieldSelect || fieldSelect.options.length === 0) {
+        // No numeric fields
+        return;
+    }
+
+    const field = fieldSelect.value;
+    const labels = dataPoints.map(p => new Date(p.recorded_at).toLocaleString());
+    const values = dataPoints.map(p => p.values[field]);
+
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: field,
+                data: values,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1,
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    ticks: { color: '#aaa' },
+                    grid: { color: '#333' }
+                },
+                y: {
+                    ticks: { color: '#aaa' },
+                    grid: { color: '#333' }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#aaa' }
+                }
+            }
+        }
+    });
+}
+
+function updateChart() {
+    if (!chart) return;
+    const field = document.getElementById('chart-field').value;
+    const values = dataPoints.map(p => p.values[field]);
+    chart.data.datasets[0].label = field;
+    chart.data.datasets[0].data = values;
+    chart.update();
+}
+
+function openAddPointModal() {
+    document.getElementById('add-point-modal').style.display = 'block';
+}
+
+function closeAddPointModal() {
+    document.getElementById('add-point-modal').style.display = 'none';
+}
+
+async function addPoint(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-point-form');
+    const values = {};
+
+    schema.fields.forEach(field => {
+        const input = form.elements[field.name];
+        if (input && input.value !== '') {
+            if (field.type === 'number') {
+                values[field.name] = parseFloat(input.value);
+            } else if (field.type === 'boolean') {
+                values[field.name] = input.value === 'true';
+            } else {
+                values[field.name] = input.value;
+            }
+        }
+    });
+
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/points`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ values }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to add point');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function deletePoint(pointId) {
+    if (!confirm('Delete this data point?')) return;
+
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/points/${pointId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to delete point');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function deleteDataset() {
+    if (!confirm('Are you sure you want to delete this dataset and all its data points?')) return;
+
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+
+        if (response.ok) {
+            window.location.href = '/datasets';
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to delete dataset');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initChart);
+</script>
+{% endblock %}

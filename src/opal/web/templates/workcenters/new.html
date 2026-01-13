@@ -1,0 +1,98 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/workcenters">WORKCENTERS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">NEW WORKCENTER</div>
+    <div class="panel-body">
+        <form id="workcenter-form" onsubmit="createWorkcenter(event)">
+            <div class="form-group">
+                <label class="form-label" for="code">CODE *</label>
+                <input type="text" id="code" name="code" class="form-input mono" required maxlength="50" placeholder="AB1, CR, etc.">
+                <small class="text-muted">Short unique code for the workcenter</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required maxlength="255">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="location">LOCATION</label>
+                <input type="text" id="location" name="location" class="form-input" maxlength="255" placeholder="Physical location or building">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-input" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="is_active" name="is_active" checked>
+                    Active
+                </label>
+            </div>
+
+            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                <a href="/workcenters" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE WORKCENTER</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function createWorkcenter(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('workcenter-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        code: form.code.value,
+        name: form.name.value,
+        location: form.location.value || null,
+        description: form.description.value || null,
+        is_active: form.is_active.checked,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/workcenters', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            window.location.href = '/workcenters/' + result.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create workcenter';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

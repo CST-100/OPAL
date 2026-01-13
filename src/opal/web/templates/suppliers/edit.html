@@ -1,0 +1,123 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/suppliers">SUPPLIERS</a></span>
+<span class="breadcrumb-item"><a href="/suppliers/{{ supplier.id }}">{{ supplier.name }}</a></span>
+<span class="breadcrumb-item">EDIT</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">EDIT SUPPLIER #{{ supplier.id }}</div>
+    <div class="panel-body">
+        <form id="supplier-form" onsubmit="updateSupplier(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required maxlength="255" value="{{ supplier.name }}">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="code">CODE</label>
+                <input type="text" id="code" name="code" class="form-input mono" maxlength="50" value="{{ supplier.code or '' }}" placeholder="SUP001">
+                <small class="text-muted">Short unique code for quick reference</small>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="email">EMAIL</label>
+                    <input type="email" id="email" name="email" class="form-input" maxlength="255" value="{{ supplier.email or '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="phone">PHONE</label>
+                    <input type="tel" id="phone" name="phone" class="form-input" maxlength="50" value="{{ supplier.phone or '' }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="website">WEBSITE</label>
+                <input type="url" id="website" name="website" class="form-input" maxlength="255" value="{{ supplier.website or '' }}" placeholder="https://...">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="address">ADDRESS</label>
+                <textarea id="address" name="address" class="form-input" rows="3">{{ supplier.address or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-input" rows="2">{{ supplier.description or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="notes">NOTES</label>
+                <textarea id="notes" name="notes" class="form-input" rows="2">{{ supplier.notes or '' }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="is_active" name="is_active" {{ 'checked' if supplier.is_active else '' }}>
+                    Active
+                </label>
+            </div>
+
+            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                <a href="/suppliers/{{ supplier.id }}" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function updateSupplier(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('supplier-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        name: form.name.value,
+        code: form.code.value || null,
+        email: form.email.value || null,
+        phone: form.phone.value || null,
+        website: form.website.value || null,
+        address: form.address.value || null,
+        description: form.description.value || null,
+        notes: form.notes.value || null,
+        is_active: form.is_active.checked,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/suppliers/{{ supplier.id }}', {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            window.location.href = '/suppliers/{{ supplier.id }}';
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to update supplier';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

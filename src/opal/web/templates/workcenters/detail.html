@@ -1,0 +1,66 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/workcenters">WORKCENTERS</a></span>
+<span class="breadcrumb-item">{{ workcenter.code }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px;">
+    <div class="panel-header">
+        WORKCENTER: {{ workcenter.code }}
+        <a href="/workcenters/{{ workcenter.id }}/edit" class="btn" style="float: right;">EDIT</a>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <tr>
+                <th style="width: 150px;">ID</th>
+                <td class="id-cell mono">{{ workcenter.id }}</td>
+            </tr>
+            <tr>
+                <th>CODE</th>
+                <td class="mono" style="font-size: 1.2em;">{{ workcenter.code }}</td>
+            </tr>
+            <tr>
+                <th>NAME</th>
+                <td>{{ workcenter.name }}</td>
+            </tr>
+            <tr>
+                <th>LOCATION</th>
+                <td>{{ workcenter.location or '-' }}</td>
+            </tr>
+            <tr>
+                <th>STATUS</th>
+                <td>
+                    {% if workcenter.is_active %}
+                    <span class="status-badge status-active">ACTIVE</span>
+                    {% else %}
+                    <span class="status-badge status-inactive">INACTIVE</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+
+        {% if workcenter.description %}
+        <div style="margin-top: var(--space-md);">
+            <div class="form-label">DESCRIPTION</div>
+            <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                {{ workcenter.description }}
+            </div>
+        </div>
+        {% endif %}
+
+        <table class="data-table" style="margin-top: var(--space-lg);">
+            <tr>
+                <th style="width: 150px;">CREATED</th>
+                <td class="timestamp">{{ workcenter.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            <tr>
+                <th>UPDATED</th>
+                <td class="timestamp">{{ workcenter.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}

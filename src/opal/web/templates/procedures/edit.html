@@ -1,0 +1,77 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
+<span class="breadcrumb-item"><a href="/procedures/{{ procedure.id }}">{{ procedure.name }}</a></span>
+<span class="breadcrumb-item">EDIT</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">EDIT PROCEDURE</div>
+    <div class="panel-body">
+        <form id="edit-procedure-form" onsubmit="updateProcedure(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" value="{{ procedure.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="4">{{ procedure.description or '' }}</textarea>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/procedures/{{ procedure.id }}" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">SAVE</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+async function updateProcedure(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('edit-procedure-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        name: form.name.value,
+        description: form.description.value || null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/procedures/{{ procedure.id }}', {
+            method: 'PATCH',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            window.location.href = '/procedures/{{ procedure.id }}';
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to update procedure';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

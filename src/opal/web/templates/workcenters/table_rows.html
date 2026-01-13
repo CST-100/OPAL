@@ -1,0 +1,23 @@
+{% if workcenters %}
+{% for wc in workcenters %}
+<tr>
+    <td class="id-cell"><a href="/workcenters/{{ wc.id }}">{{ wc.id }}</a></td>
+    <td class="mono">{{ wc.code }}</td>
+    <td><a href="/workcenters/{{ wc.id }}">{{ wc.name }}</a></td>
+    <td>{{ wc.location or '-' }}</td>
+    <td>
+        {% if wc.is_active %}
+        <span class="status-badge status-active">ACTIVE</span>
+        {% else %}
+        <span class="status-badge status-inactive">INACTIVE</span>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="5" class="empty-state">
+        <p class="text-muted">No workcenters found</p>
+    </td>
+</tr>
+{% endif %}

@@ -1,0 +1,47 @@
+{% if records %}
+{% for rec in records %}
+<tr>
+    <td class="mono">
+        {% if rec.opal_number %}
+        <a href="/inventory/opal/{{ rec.opal_number }}" style="font-weight: bold; color: var(--color-primary);">
+            {{ rec.opal_number }}
+        </a>
+        {% else %}
+        <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        <a href="/parts/{{ rec.part_id }}">{{ rec.part.name }}</a>
+        {% if rec.part.external_pn %}
+        <br><span class="text-muted" style="font-size: 0.85em;">{{ rec.part.external_pn }}</span>
+        {% endif %}
+    </td>
+    <td class="mono">{{ rec.location }}</td>
+    <td class="mono" style="text-align: right;">{{ rec.quantity }}</td>
+    <td>
+        {% if rec.source_type %}
+            {% set source = rec.source_type.value if rec.source_type.value is defined else rec.source_type %}
+            {% if source == 'purchase' %}
+            <span class="status-badge status-in_progress">PO</span>
+            {% elif source == 'production' %}
+            <span class="status-badge status-completed">PROD</span>
+            {% elif source == 'manual' %}
+            <span class="status-badge status-pending">MANUAL</span>
+            {% else %}
+            <span class="text-muted">{{ source }}</span>
+            {% endif %}
+        {% else %}
+        <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="mono">{{ rec.lot_number or '-' }}</td>
+    <td class="timestamp">{{ rec.created_at.strftime('%Y-%m-%d %H:%M') if rec.created_at else '-' }}</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="7" class="empty-state">
+        <p class="text-muted">No inventory records found</p>
+    </td>
+</tr>
+{% endif %}

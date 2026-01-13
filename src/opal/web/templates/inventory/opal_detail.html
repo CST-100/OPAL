@@ -1,0 +1,143 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/inventory">INVENTORY</a></span>
+<span class="breadcrumb-item">{{ opal_number }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <span style="font-size: 1.3em;">{{ opal_number }}</span>
+        <span class="text-muted" style="margin-left: var(--space-md);">Physical Item Traceability</span>
+    </div>
+    <div class="panel-body">
+        <!-- Item Info -->
+        <div class="detail-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
+            <div>
+                <label class="detail-label">PART</label>
+                <div class="detail-value">
+                    <a href="/parts/{{ record.part_id }}">{{ record.part.name }}</a>
+                    {% if record.part.external_pn %}
+                    <br><span class="text-muted">{{ record.part.external_pn }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <label class="detail-label">CURRENT LOCATION</label>
+                <div class="detail-value mono">{{ record.location }}</div>
+            </div>
+            <div>
+                <label class="detail-label">QUANTITY</label>
+                <div class="detail-value mono" style="font-size: 1.2em;">{{ record.quantity }}</div>
+            </div>
+            <div>
+                <label class="detail-label">LOT NUMBER</label>
+                <div class="detail-value mono">{{ record.lot_number or '-' }}</div>
+            </div>
+            <div>
+                <label class="detail-label">SOURCE</label>
+                <div class="detail-value">
+                    {% if record.source_type %}
+                        {% set source = record.source_type.value if record.source_type.value is defined else record.source_type %}
+                        {% if source == 'purchase' %}
+                        <span class="status-badge status-in_progress">From Purchase Order</span>
+                        {% elif source == 'production' %}
+                        <span class="status-badge status-completed">Produced</span>
+                        {% elif source == 'manual' %}
+                        <span class="status-badge status-pending">Manual Entry</span>
+                        {% else %}
+                        {{ source }}
+                        {% endif %}
+                    {% else %}
+                    <span class="text-muted">Unknown</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <label class="detail-label">RECEIVED</label>
+                <div class="detail-value timestamp">{{ record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else '-' }}</div>
+            </div>
+        </div>
+
+        <!-- Source Link -->
+        {% if record.source_purchase_line_id %}
+        <div style="background: var(--color-bg-secondary); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-xl);">
+            <strong>Source PO:</strong>
+            <a href="/purchases/{{ history[0].details.po_id if history and history[0].details.po_id else '' }}">
+                {{ history[0].details.po_number if history and history[0].details.po_number else 'View PO' }}
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- History Timeline -->
+        <h3 style="margin-bottom: var(--space-md);">TRACEABILITY HISTORY</h3>
+        <div class="timeline">
+            {% for event in history %}
+            <div class="timeline-item" style="display: flex; gap: var(--space-md); padding: var(--space-md); border-left: 3px solid var(--color-border); margin-left: var(--space-md); margin-bottom: var(--space-sm);">
+                <div style="min-width: 160px;">
+                    <span class="timestamp">{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '-' }}</span>
+                </div>
+                <div>
+                    {% if event.event == 'created' %}
+                    <strong style="color: var(--color-success);">RECEIVED</strong>
+                    <br>
+                    <span class="text-muted">
+                        Quantity: {{ event.details.quantity }}
+                        {% if event.details.source_type == 'purchase' %}
+                        from PO {{ event.details.po_number or '' }}
+                        {% elif event.details.source_type == 'production' %}
+                        (produced)
+                        {% elif event.details.source_type == 'manual' %}
+                        (manual entry)
+                        {% endif %}
+                    </span>
+
+                    {% elif event.event == 'consumed' %}
+                    <strong style="color: var(--color-warning);">CONSUMED</strong>
+                    <br>
+                    <span class="text-muted">
+                        Quantity: {{ event.details.quantity }}
+                        {% if event.details.procedure_instance_id %}
+                        in <a href="/executions/{{ event.details.procedure_instance_id }}">Execution #{{ event.details.procedure_instance_id }}</a>
+                        {% endif %}
+                        {% if event.details.usage_type == 'tooling' %}
+                        (tooling - returned)
+                        {% endif %}
+                    </span>
+
+                    {% elif event.event == 'transferred' %}
+                    <strong style="color: var(--color-info);">TRANSFERRED</strong>
+                    <br>
+                    <span class="text-muted">{{ event.details }}</span>
+
+                    {% else %}
+                    <strong>{{ event.event|upper }}</strong>
+                    <br>
+                    <span class="text-muted">{{ event.details }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if not history %}
+            <p class="text-muted">No history available</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.detail-label {
+    display: block;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+}
+.detail-value {
+    font-size: 1em;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">DATASETS</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>DATASETS</span>
+        <a href="/datasets/new" class="btn btn-primary">NEW DATASET</a>
+    </div>
+    <div class="panel-body">
+        <div class="filter-bar" style="margin-bottom: var(--space-md);">
+            <input type="text" id="search" placeholder="Search datasets..." class="form-input" style="width: 200px;"
+                   hx-get="/datasets/table" hx-trigger="keyup changed delay:300ms" hx-target="#datasets-table"
+                   hx-include="[name='procedure_id']">
+            <select name="procedure_id" class="form-select" style="width: 200px;"
+                    hx-get="/datasets/table" hx-trigger="change" hx-target="#datasets-table"
+                    hx-include="#search">
+                <option value="">All procedures</option>
+                {% for p in procedures %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">ID</th>
+                    <th>NAME</th>
+                    <th style="width: 200px;">PROCEDURE</th>
+                    <th style="width: 100px;">POINTS</th>
+                    <th style="width: 160px;">UPDATED</th>
+                </tr>
+            </thead>
+            <tbody id="datasets-table" hx-get="/datasets/table" hx-trigger="load">
+                <tr><td colspan="5" class="text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

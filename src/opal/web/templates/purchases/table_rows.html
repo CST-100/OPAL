@@ -1,0 +1,31 @@
+{% if purchases %}
+{% for po in purchases %}
+<tr>
+    <td class="mono"><a href="/purchases/{{ po.id }}">{{ po.reference or ('PO-' ~ po.id) }}</a></td>
+    <td>
+        {% if po.supplier_rel %}
+        <a href="/suppliers/{{ po.supplier_rel.id }}">{{ po.supplier_rel.name }}</a>
+        {% else %}
+        {{ po.supplier }}
+        {% endif %}
+    </td>
+    <td>
+        <span class="status status-{% if po.status|status_value == 'received' %}ok{% elif po.status|status_value == 'cancelled' %}error{% elif po.status|status_value == 'ordered' or po.status|status_value == 'partial' %}info{% elif po.status|status_value == 'on_hold' %}warn{% else %}warn{% endif %}">
+            {{ po.status|status_value|upper }}
+        </span>
+        {% if po.is_overdue %}
+        <span class="status status-error" style="margin-left: 4px;">OVERDUE</span>
+        {% endif %}
+    </td>
+    <td class="mono {% if po.is_overdue %}text-red{% endif %}">{{ po.target_date.strftime('%Y-%m-%d') if po.target_date else '-' }}</td>
+    <td class="mono" style="text-align: center;">{{ po.lines | length }}</td>
+    <td class="timestamp">{{ po.created_at.strftime('%Y-%m-%dT%H:%M') }}Z</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="6" class="empty-state">
+        <p class="text-muted">No purchase orders</p>
+    </td>
+</tr>
+{% endif %}

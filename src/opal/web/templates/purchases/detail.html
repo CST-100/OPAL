@@ -1,0 +1,386 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/purchases">PURCHASES</a></span>
+<span class="breadcrumb-item">{{ purchase.reference or ('PO-' ~ purchase.id) }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            {{ purchase.reference or ('PO-' ~ purchase.id) }}
+            {% if purchase.is_overdue %}
+            <span class="status status-error" style="float: right; margin-left: var(--space-sm);">OVERDUE</span>
+            {% endif %}
+            <span class="status status-{% if purchase.status|status_value == 'received' %}ok{% elif purchase.status|status_value == 'cancelled' %}error{% elif purchase.status|status_value in ['ordered', 'partial'] %}info{% elif purchase.status|status_value == 'on_hold' %}warn{% else %}warn{% endif %}" style="float: right;">
+                {{ purchase.status|status_value|upper }}
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 140px;">REFERENCE</th>
+                    <td class="mono">{{ purchase.reference or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>SUPPLIER</th>
+                    <td>
+                        {% if purchase.supplier_rel %}
+                        <a href="/suppliers/{{ purchase.supplier_rel.id }}">{{ purchase.supplier_rel.name }}</a>
+                        {% else %}
+                        {{ purchase.supplier }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if purchase.supplier_reference %}
+                <tr>
+                    <th>SUPPLIER REF</th>
+                    <td class="mono">{{ purchase.supplier_reference }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <th>STATUS</th>
+                    <td>{{ purchase.status|status_value|upper }}</td>
+                </tr>
+                <tr>
+                    <th>TARGET DATE</th>
+                    <td class="mono {% if purchase.is_overdue %}text-red{% endif %}">{{ purchase.target_date.strftime('%Y-%m-%d') if purchase.target_date else '-' }}</td>
+                </tr>
+                {% if purchase.destination %}
+                <tr>
+                    <th>DESTINATION</th>
+                    <td class="mono">{{ purchase.destination }}</td>
+                </tr>
+                {% endif %}
+            </table>
+
+            <div style="margin-top: var(--space-lg);">
+                <div class="form-label">DATES</div>
+                <table class="data-table">
+                    <tr>
+                        <th style="width: 140px;">CREATED</th>
+                        <td class="timestamp">{{ purchase.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                        <td>{% if purchase.created_by %}by {{ purchase.created_by.name }}{% endif %}</td>
+                    </tr>
+                    <tr>
+                        <th>ORDERED</th>
+                        <td class="timestamp">{{ purchase.ordered_at.strftime('%Y-%m-%dT%H:%M:%S') + 'Z' if purchase.ordered_at else '-' }}</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <th>RECEIVED</th>
+                        <td class="timestamp">{{ purchase.received_at.strftime('%Y-%m-%dT%H:%M:%S') + 'Z' if purchase.received_at else '-' }}</td>
+                        <td>{% if purchase.received_by %}by {{ purchase.received_by.name }}{% endif %}</td>
+                    </tr>
+                </table>
+            </div>
+            {% if purchase.notes %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">NOTES</div>
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                    {{ purchase.notes }}
+                </div>
+            </div>
+            {% endif %}
+
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); flex-wrap: wrap;">
+                {% if purchase.status|status_value == 'draft' %}
+                <button class="btn btn-primary" onclick="placeOrder()">PLACE ORDER</button>
+                <button class="btn text-red" onclick="cancelPO()">CANCEL PO</button>
+                {% elif purchase.status|status_value in ['ordered', 'partial'] %}
+                <button class="btn text-red" onclick="cancelPO()">CANCEL PO</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            LINE ITEMS
+            {% if purchase.status|status_value in ['draft', 'ordered'] %}
+            <button class="btn btn-primary" style="float: right;" onclick="showAddLine()">+ ADD LINE</button>
+            {% endif %}
+        </div>
+        <div class="panel-body">
+            {% if purchase.lines %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">PART</th>
+                        <th>NAME</th>
+                        <th style="width: 80px; text-align: right;">ORDERED</th>
+                        <th style="width: 80px; text-align: right;">RECEIVED</th>
+                        <th style="width: 100px;">STATUS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in purchase.lines %}
+                    <tr>
+                        <td class="id-cell"><a href="/parts/{{ line.part_id }}">{{ line.part_id }}</a></td>
+                        <td><a href="/parts/{{ line.part_id }}">{{ line.part.name }}</a></td>
+                        <td class="mono" style="text-align: right;">{{ line.qty_ordered }}</td>
+                        <td class="mono" style="text-align: right;">{{ line.qty_received }}</td>
+                        <td>
+                            {% if line.qty_received >= line.qty_ordered %}
+                            <span class="status status-ok">COMPLETE</span>
+                            {% elif line.qty_received > 0 %}
+                            <span class="status status-info">PARTIAL</span>
+                            {% else %}
+                            <span class="status status-warn">PENDING</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <p class="text-muted">No line items</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if purchase.status|status_value in ['ordered', 'partial'] %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">RECEIVE ITEMS</div>
+    <div class="panel-body">
+        <form id="receive-form" onsubmit="receiveItems(event)">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>LINE</th>
+                        <th>PART</th>
+                        <th style="width: 80px;">OUTSTANDING</th>
+                        <th style="width: 100px;">RECEIVE QTY</th>
+                        <th style="width: 150px;">LOCATION *</th>
+                        <th style="width: 100px;">LOT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in purchase.lines %}
+                    {% if line.qty_received < line.qty_ordered %}
+                    <tr>
+                        <td class="mono">{{ line.id }}</td>
+                        <td>{{ line.part.name }}</td>
+                        <td class="mono" style="text-align: right;">{{ line.qty_ordered - line.qty_received }}</td>
+                        <td><input type="number" name="recv_{{ line.id }}_qty" class="form-input" step="0.0001" min="0" max="{{ line.qty_ordered - line.qty_received }}"></td>
+                        <td><input type="text" name="recv_{{ line.id }}_loc" class="form-input" placeholder="Location"></td>
+                        <td><input type="text" name="recv_{{ line.id }}_lot" class="form-input" placeholder="Lot #"></td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div style="display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-md);">
+                <button type="button" class="btn" onclick="fillAllOutstanding()">FILL ALL</button>
+                <button type="submit" class="btn btn-primary">RECEIVE</button>
+            </div>
+        </form>
+        <div id="receive-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Line Modal -->
+<div id="add-line-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD LINE ITEM</div>
+            <div class="panel-body">
+                <form id="add-line-form" onsubmit="addLine(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="line-part">PART *</label>
+                        <select id="line-part" name="part_id" class="form-select" required>
+                            <option value="">Select part...</option>
+                            {% for p in parts %}
+                            <option value="{{ p.id }}">{{ p.id }} - {{ p.name }}{% if p.external_pn %} ({{ p.external_pn }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="line-qty">QUANTITY *</label>
+                        <input type="number" id="line-qty" name="qty_ordered" class="form-input" step="0.0001" min="0.0001" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="line-cost">UNIT COST</label>
+                        <input type="number" id="line-cost" name="unit_cost" class="form-input" step="0.01" min="0">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideAddLine()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">ADD</button>
+                    </div>
+                </form>
+                <div id="line-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+function showAddLine() {
+    document.getElementById('add-line-modal').style.display = 'block';
+}
+
+function hideAddLine() {
+    document.getElementById('add-line-modal').style.display = 'none';
+}
+
+async function placeOrder() {
+    if (!confirm('Place this purchase order? This will mark it as ordered.')) return;
+
+    try {
+        const response = await fetch('/api/purchases/{{ purchase.id }}', {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: 'ordered' }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to place order');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function cancelPO() {
+    if (!confirm('Cancel this purchase order? This action cannot be undone.')) return;
+
+    try {
+        const response = await fetch('/api/purchases/{{ purchase.id }}', {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: 'cancelled' }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to cancel order');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+function fillAllOutstanding() {
+    // Fill all qty fields with their max (outstanding) values
+    const form = document.getElementById('receive-form');
+    const qtyInputs = form.querySelectorAll('input[name$="_qty"]');
+
+    for (const input of qtyInputs) {
+        input.value = input.max;
+    }
+}
+
+async function addLine(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('add-line-form');
+    const errorDiv = document.getElementById('line-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        part_id: parseInt(form.part_id.value),
+        qty_ordered: parseFloat(form.qty_ordered.value),
+        unit_cost: form.unit_cost.value ? parseFloat(form.unit_cost.value) : null,
+    };
+
+    try {
+        const response = await fetch('/api/purchases/{{ purchase.id }}/lines', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to add line';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function receiveItems(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('receive-form');
+    const errorDiv = document.getElementById('receive-error');
+    errorDiv.style.display = 'none';
+
+    const lines = [];
+    const inputs = form.querySelectorAll('input[name^="recv_"]');
+    const lineData = {};
+
+    for (const input of inputs) {
+        const match = input.name.match(/recv_(\d+)_(qty|loc|lot)/);
+        if (match) {
+            const lineId = match[1];
+            const field = match[2];
+            if (!lineData[lineId]) lineData[lineId] = {};
+            lineData[lineId][field] = input.value;
+        }
+    }
+
+    for (const [lineId, data] of Object.entries(lineData)) {
+        if (data.qty && parseFloat(data.qty) > 0 && data.loc) {
+            lines.push({
+                line_id: parseInt(lineId),
+                qty_received: parseFloat(data.qty),
+                location: data.loc,
+                lot_number: data.lot || null,
+            });
+        }
+    }
+
+    if (lines.length === 0) {
+        errorDiv.textContent = 'Enter quantity and location for at least one line';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/purchases/{{ purchase.id }}/receive', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ lines: lines }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to receive items';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hideAddLine();
+});
+</script>
+{% endblock %}

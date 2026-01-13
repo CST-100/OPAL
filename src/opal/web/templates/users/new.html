@@ -1,0 +1,78 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/users">USERS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">NEW USER</div>
+    <div class="panel-body">
+        <form id="user-form" onsubmit="createUser(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required maxlength="255">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="email">EMAIL</label>
+                <input type="email" id="email" name="email" class="form-input" maxlength="255">
+                <small class="text-muted">Optional - for contact purposes</small>
+            </div>
+
+            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                <a href="/users" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE USER</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function createUser(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('user-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        name: form.name.value,
+        email: form.email.value || null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            window.location.href = '/users/' + result.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create user';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

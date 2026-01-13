@@ -1,0 +1,143 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 700px;">
+    <div class="panel-header">NEW RISK</div>
+    <div class="panel-body">
+        <form id="new-risk-form" onsubmit="createRisk(event)">
+            <div class="form-group">
+                <label class="form-label" for="title">TITLE *</label>
+                <input type="text" id="title" name="title" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="3"></textarea>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md);">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label" for="probability">PROBABILITY (1-5)</label>
+                    <select id="probability" name="probability" class="form-select">
+                        <option value="1">1 - Rare</option>
+                        <option value="2">2 - Unlikely</option>
+                        <option value="3" selected>3 - Possible</option>
+                        <option value="4">4 - Likely</option>
+                        <option value="5">5 - Almost Certain</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label" for="impact">IMPACT (1-5)</label>
+                    <select id="impact" name="impact" class="form-select">
+                        <option value="1">1 - Negligible</option>
+                        <option value="2">2 - Minor</option>
+                        <option value="3" selected>3 - Moderate</option>
+                        <option value="4">4 - Major</option>
+                        <option value="5">5 - Severe</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">CALCULATED SCORE</label>
+                <div id="score-display" style="font-size: 1.5rem; font-weight: bold;">9 (MEDIUM)</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="mitigation">MITIGATION PLAN</label>
+                <textarea id="mitigation" name="mitigation_plan" class="form-textarea" rows="4" placeholder="Describe how this risk will be mitigated..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="linked-issue">LINKED ISSUE (optional)</label>
+                <select id="linked-issue" name="linked_issue_id" class="form-select">
+                    <option value="">No linked issue...</option>
+                    {% for issue in issues %}
+                    <option value="{{ issue.id }}">#{{ issue.id }} - {{ issue.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/risks" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+function updateScore() {
+    const prob = parseInt(document.getElementById('probability').value);
+    const impact = parseInt(document.getElementById('impact').value);
+    const score = prob * impact;
+    let severity = 'LOW';
+    let color = 'var(--success)';
+    if (score > 12) {
+        severity = 'HIGH';
+        color = 'var(--error)';
+    } else if (score > 5) {
+        severity = 'MEDIUM';
+        color = 'var(--warning)';
+    }
+    document.getElementById('score-display').innerHTML = `<span style="color: ${color}">${score} (${severity})</span>`;
+}
+
+document.getElementById('probability').addEventListener('change', updateScore);
+document.getElementById('impact').addEventListener('change', updateScore);
+
+async function createRisk(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-risk-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        title: form.title.value,
+        description: form.description.value || null,
+        probability: parseInt(form.probability.value),
+        impact: parseInt(form.impact.value),
+        mitigation_plan: form.mitigation_plan.value || null,
+        linked_issue_id: form.linked_issue_id.value ? parseInt(form.linked_issue_id.value) : null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/risks', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const risk = await response.json();
+            window.location.href = '/risks/' + risk.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create risk';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

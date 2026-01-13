@@ -1,0 +1,457 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">PROJECT</span>
+<span class="breadcrumb-item">{% if existing_config %}EDIT{% else %}NEW{% endif %}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 900px;">
+    <div class="panel-header">
+        {% if existing_config %}EDIT PROJECT CONFIGURATION{% else %}NEW PROJECT CONFIGURATION{% endif %}
+    </div>
+    <div class="panel-body">
+        <form id="project-form" onsubmit="saveProject(event)">
+            <!-- Section 1: Basic Info -->
+            <div style="margin-bottom: var(--space-xl); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-lg);">
+                <h3 style="margin-bottom: var(--space-md); color: var(--accent-blue);">1. BASIC INFO</h3>
+
+                <div class="form-group">
+                    <label class="form-label" for="name">PROJECT NAME *</label>
+                    <input type="text" id="name" name="name" class="form-input" required
+                           value="{{ existing_config.name if existing_config else '' }}"
+                           placeholder="e.g., Rocket V1">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="description">DESCRIPTION</label>
+                    <textarea id="description" name="description" class="form-textarea" rows="2"
+                              placeholder="Brief project description">{{ existing_config.description if existing_config else '' }}</textarea>
+                </div>
+
+                {% if not existing_config %}
+                <div class="form-group">
+                    <label class="form-label" for="directory">PROJECT DIRECTORY</label>
+                    <input type="text" id="directory" name="directory" class="form-input mono"
+                           value="{{ default_directory }}"
+                           placeholder="/path/to/project">
+                    <small class="text-muted">Directory where opal.project.yaml will be created</small>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Section 2: Inventory Tiers -->
+            <div style="margin-bottom: var(--space-xl); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-lg);">
+                <h3 style="margin-bottom: var(--space-md); color: var(--accent-blue);">2. INVENTORY TIERS</h3>
+                <p class="text-muted" style="margin-bottom: var(--space-md);">
+                    Define classification tiers for inventory (e.g., Flight/Ground/Loose). Each tier has a code used in part numbers.
+                </p>
+
+                <table class="data-table" id="tiers-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">LEVEL</th>
+                            <th style="width: 150px;">NAME</th>
+                            <th style="width: 80px;">CODE</th>
+                            <th>DESCRIPTION</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tiers-body">
+                        {% for tier in tiers %}
+                        <tr data-tier-level="{{ tier.level }}">
+                            <td class="mono">{{ tier.level }}</td>
+                            <td><input type="text" class="form-input tier-name" value="{{ tier.name }}" required></td>
+                            <td><input type="text" class="form-input mono tier-code" value="{{ tier.code }}" maxlength="3" style="text-transform: uppercase;" required></td>
+                            <td><input type="text" class="form-input tier-desc" value="{{ tier.description }}"></td>
+                            <td>
+                                <button type="button" class="btn btn-sm" onclick="removeTier(this)" {% if loop.length <= 1 %}disabled{% endif %}>X</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="button" class="btn" onclick="addTier()" style="margin-top: var(--space-sm);">+ ADD TIER</button>
+            </div>
+
+            <!-- Section 3: Part Numbering -->
+            <div style="margin-bottom: var(--space-xl); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-lg);">
+                <h3 style="margin-bottom: var(--space-md); color: var(--accent-blue);">3. PART NUMBERING</h3>
+                <p class="text-muted" style="margin-bottom: var(--space-md);">
+                    Configure how part numbers are generated. The tier code is automatically included.
+                </p>
+
+                <div class="grid grid-3">
+                    <div class="form-group">
+                        <label class="form-label" for="pn-prefix">PREFIX</label>
+                        <input type="text" id="pn-prefix" name="pn_prefix" class="form-input mono"
+                               value="{{ existing_config.part_numbering.prefix if existing_config else '' }}"
+                               placeholder="e.g., RV1" oninput="updatePnPreview()">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="pn-separator">SEPARATOR</label>
+                        <select id="pn-separator" name="pn_separator" class="form-select" onchange="updatePnPreview()">
+                            <option value="-" {% if not existing_config or existing_config.part_numbering.separator == '-' %}selected{% endif %}>- (dash)</option>
+                            <option value="_" {% if existing_config and existing_config.part_numbering.separator == '_' %}selected{% endif %}>_ (underscore)</option>
+                            <option value="." {% if existing_config and existing_config.part_numbering.separator == '.' %}selected{% endif %}>. (dot)</option>
+                            <option value="" {% if existing_config and existing_config.part_numbering.separator == '' %}selected{% endif %}>(none)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="pn-digits">SEQUENCE DIGITS</label>
+                        <select id="pn-digits" name="pn_digits" class="form-select" onchange="updatePnPreview()">
+                            <option value="3" {% if existing_config and existing_config.part_numbering.sequence_digits == 3 %}selected{% endif %}>3 (001-999)</option>
+                            <option value="4" {% if not existing_config or existing_config.part_numbering.sequence_digits == 4 %}selected{% endif %}>4 (0001-9999)</option>
+                            <option value="5" {% if existing_config and existing_config.part_numbering.sequence_digits == 5 %}selected{% endif %}>5 (00001-99999)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="pn-format">FORMAT TEMPLATE</label>
+                    <input type="text" id="pn-format" name="pn_format" class="form-input mono"
+                           value="{{ existing_config.part_numbering.format if existing_config else '{prefix}{sep}{tier_code}{sep}{sequence}' }}"
+                           oninput="updatePnPreview()">
+                    <small class="text-muted">
+                        Variables: {prefix}, {sep}, {tier_code}, {tier_name}, {tier_level}, {sequence}
+                    </small>
+                </div>
+
+                <div style="margin-top: var(--space-md); padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                    <div class="form-label">PREVIEW</div>
+                    <div id="pn-preview" class="mono" style="font-size: 1.2em;">
+                        <!-- Preview will be rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Categories -->
+            <div style="margin-bottom: var(--space-xl); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-lg);">
+                <h3 style="margin-bottom: var(--space-md); color: var(--accent-blue);">4. CATEGORIES (Optional)</h3>
+                <p class="text-muted" style="margin-bottom: var(--space-md);">
+                    Define part categories for organization. These appear as dropdown options when creating parts.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label" for="categories-input">CATEGORIES</label>
+                    <div id="categories-tags" style="display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-sm);">
+                        {% for cat in categories %}
+                        <span class="badge" data-category="{{ cat }}">
+                            {{ cat }}
+                            <button type="button" onclick="removeCategory(this)" style="background: none; border: none; cursor: pointer; margin-left: 4px; color: inherit;">&times;</button>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    <div style="display: flex; gap: var(--space-sm);">
+                        <input type="text" id="category-input" class="form-input" placeholder="Enter category name">
+                        <button type="button" class="btn" onclick="addCategory()">ADD</button>
+                    </div>
+                    <small class="text-muted">Common categories: propulsion, structures, avionics, electrical, ground-support</small>
+                </div>
+            </div>
+
+            <!-- Section 5: Requirements (Optional) -->
+            <div style="margin-bottom: var(--space-xl);">
+                <h3 style="margin-bottom: var(--space-md); color: var(--accent-blue);">5. REQUIREMENTS (Optional)</h3>
+                <p class="text-muted" style="margin-bottom: var(--space-md);">
+                    Define project-level requirements that can be assigned to parts.
+                </p>
+
+                <table class="data-table" id="requirements-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">ID</th>
+                            <th style="width: 200px;">TITLE</th>
+                            <th>DESCRIPTION</th>
+                            <th style="width: 120px;">CATEGORY</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="requirements-body">
+                        {% for req in requirements %}
+                        <tr data-req-id="{{ req.id }}">
+                            <td><input type="text" class="form-input mono req-id" value="{{ req.id }}" required></td>
+                            <td><input type="text" class="form-input req-title" value="{{ req.title }}" required></td>
+                            <td><input type="text" class="form-input req-desc" value="{{ req.description }}"></td>
+                            <td><input type="text" class="form-input req-cat" value="{{ req.category }}"></td>
+                            <td>
+                                <button type="button" class="btn btn-sm" onclick="removeRequirement(this)">X</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <button type="button" class="btn" onclick="addRequirement()" style="margin-top: var(--space-sm);">+ ADD REQUIREMENT</button>
+            </div>
+
+            <!-- Submit -->
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: var(--space-lg);">
+                <a href="/" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">
+                    {% if existing_config %}SAVE CHANGES{% else %}CREATE PROJECT{% endif %}
+                </button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        <div id="form-success" class="text-green" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+let tierCounter = {{ tiers|length }};
+let reqCounter = {{ requirements|length }};
+
+function getTiers() {
+    const rows = document.querySelectorAll('#tiers-body tr');
+    const tiers = [];
+    rows.forEach((row, index) => {
+        tiers.push({
+            level: index + 1,
+            name: row.querySelector('.tier-name').value,
+            code: row.querySelector('.tier-code').value.toUpperCase(),
+            description: row.querySelector('.tier-desc').value,
+        });
+    });
+    return tiers;
+}
+
+function addTier() {
+    tierCounter++;
+    const tbody = document.getElementById('tiers-body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td class="mono">${tierCounter}</td>
+        <td><input type="text" class="form-input tier-name" value="" required></td>
+        <td><input type="text" class="form-input mono tier-code" value="" maxlength="3" style="text-transform: uppercase;" required></td>
+        <td><input type="text" class="form-input tier-desc" value=""></td>
+        <td>
+            <button type="button" class="btn btn-sm" onclick="removeTier(this)">X</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    renumberTiers();
+    updateRemoveButtons();
+}
+
+function removeTier(btn) {
+    const row = btn.closest('tr');
+    row.remove();
+    renumberTiers();
+    updateRemoveButtons();
+    updatePnPreview();
+}
+
+function renumberTiers() {
+    const rows = document.querySelectorAll('#tiers-body tr');
+    rows.forEach((row, index) => {
+        row.querySelector('td:first-child').textContent = index + 1;
+    });
+    tierCounter = rows.length;
+}
+
+function updateRemoveButtons() {
+    const rows = document.querySelectorAll('#tiers-body tr');
+    const buttons = document.querySelectorAll('#tiers-body .btn-sm');
+    buttons.forEach(btn => {
+        btn.disabled = rows.length <= 1;
+    });
+}
+
+function getCategories() {
+    const tags = document.querySelectorAll('#categories-tags .badge');
+    return Array.from(tags).map(tag => tag.dataset.category);
+}
+
+function addCategory() {
+    const input = document.getElementById('category-input');
+    const value = input.value.trim();
+    if (!value) return;
+
+    // Check for duplicates
+    const existing = getCategories();
+    if (existing.includes(value)) {
+        input.value = '';
+        return;
+    }
+
+    const container = document.getElementById('categories-tags');
+    const span = document.createElement('span');
+    span.className = 'badge';
+    span.dataset.category = value;
+    span.innerHTML = `${value} <button type="button" onclick="removeCategory(this)" style="background: none; border: none; cursor: pointer; margin-left: 4px; color: inherit;">&times;</button>`;
+    container.appendChild(span);
+    input.value = '';
+}
+
+function removeCategory(btn) {
+    btn.closest('.badge').remove();
+}
+
+// Allow Enter key to add category
+document.getElementById('category-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addCategory();
+    }
+});
+
+function getRequirements() {
+    const rows = document.querySelectorAll('#requirements-body tr');
+    const reqs = [];
+    rows.forEach(row => {
+        const id = row.querySelector('.req-id').value.trim();
+        const title = row.querySelector('.req-title').value.trim();
+        if (id && title) {
+            reqs.push({
+                id: id,
+                title: title,
+                description: row.querySelector('.req-desc').value,
+                category: row.querySelector('.req-cat').value,
+            });
+        }
+    });
+    return reqs;
+}
+
+function addRequirement() {
+    reqCounter++;
+    const tbody = document.getElementById('requirements-body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="form-input mono req-id" value="REQ-${String(reqCounter).padStart(3, '0')}" required></td>
+        <td><input type="text" class="form-input req-title" value="" required></td>
+        <td><input type="text" class="form-input req-desc" value=""></td>
+        <td><input type="text" class="form-input req-cat" value=""></td>
+        <td>
+            <button type="button" class="btn btn-sm" onclick="removeRequirement(this)">X</button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function removeRequirement(btn) {
+    btn.closest('tr').remove();
+}
+
+function updatePnPreview() {
+    const prefix = document.getElementById('pn-prefix').value || '';
+    const sep = document.getElementById('pn-separator').value;
+    const digits = parseInt(document.getElementById('pn-digits').value);
+    const format = document.getElementById('pn-format').value;
+
+    const tiers = getTiers();
+    if (tiers.length === 0) {
+        document.getElementById('pn-preview').innerHTML = '<span class="text-muted">Add tiers to see preview</span>';
+        return;
+    }
+
+    const previews = tiers.map((tier, index) => {
+        const sequence = String(index + 1).padStart(digits, '0');
+        let pn = format
+            .replaceAll('{prefix}', prefix)
+            .replaceAll('{sep}', sep)
+            .replaceAll('{tier_code}', tier.code || '?')
+            .replaceAll('{tier_name}', tier.name || '?')
+            .replaceAll('{tier_level}', tier.level)
+            .replaceAll('{sequence}', sequence);
+        return `<span style="color: var(--accent-${index === 0 ? 'blue' : index === 1 ? 'yellow' : 'gray'});">${pn}</span> (${tier.name || 'Tier ' + tier.level})`;
+    });
+
+    document.getElementById('pn-preview').innerHTML = previews.join('<br>');
+}
+
+// Update preview when tier data changes
+document.getElementById('tiers-body').addEventListener('input', updatePnPreview);
+
+// Initial preview
+updatePnPreview();
+
+async function saveProject(event) {
+    event.preventDefault();
+
+    const errorDiv = document.getElementById('form-error');
+    const successDiv = document.getElementById('form-success');
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    const data = {
+        name: document.getElementById('name').value,
+        description: document.getElementById('description').value,
+        {% if not existing_config %}
+        directory: document.getElementById('directory').value,
+        {% endif %}
+        tiers: getTiers(),
+        part_numbering: {
+            prefix: document.getElementById('pn-prefix').value,
+            separator: document.getElementById('pn-separator').value,
+            sequence_digits: parseInt(document.getElementById('pn-digits').value),
+            format: document.getElementById('pn-format').value,
+        },
+        categories: getCategories(),
+        requirements: getRequirements(),
+    };
+
+    // Validate
+    if (!data.name.trim()) {
+        errorDiv.textContent = 'Project name is required';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    if (data.tiers.length === 0) {
+        errorDiv.textContent = 'At least one tier is required';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    for (const tier of data.tiers) {
+        if (!tier.name.trim() || !tier.code.trim()) {
+            errorDiv.textContent = 'All tiers must have a name and code';
+            errorDiv.style.display = 'block';
+            return;
+        }
+    }
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/project/config', {
+            method: '{% if existing_config %}PUT{% else %}POST{% endif %}',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            successDiv.textContent = '{% if existing_config %}Project configuration updated{% else %}Project created{% endif %} successfully!';
+            successDiv.style.display = 'block';
+
+            {% if not existing_config %}
+            // Redirect to home after creation
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+            {% endif %}
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to save project configuration';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

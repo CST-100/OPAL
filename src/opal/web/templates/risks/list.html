@@ -1,0 +1,59 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">RISKS</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>RISK REGISTER</span>
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="/risks/matrix" class="btn">MATRIX VIEW</a>
+            <a href="/risks/new" class="btn btn-primary">NEW RISK</a>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="filter-bar" style="margin-bottom: var(--space-md);">
+            <input type="text" id="search" placeholder="Search risks..." class="form-input" style="width: 200px;"
+                   hx-get="/risks/table" hx-trigger="keyup changed delay:300ms" hx-target="#risks-table"
+                   hx-include="[name='status'], [name='severity']">
+            <select name="status" class="form-select" style="width: 150px;"
+                    hx-get="/risks/table" hx-trigger="change" hx-target="#risks-table"
+                    hx-include="[name='severity'], #search">
+                <option value="">All statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+            <select name="severity" class="form-select" style="width: 150px;"
+                    hx-get="/risks/table" hx-trigger="change" hx-target="#risks-table"
+                    hx-include="[name='status'], #search">
+                <option value="">All severities</option>
+                <option value="low">LOW (1-5)</option>
+                <option value="medium">MEDIUM (6-12)</option>
+                <option value="high">HIGH (13-25)</option>
+            </select>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">ID</th>
+                    <th>TITLE</th>
+                    <th style="width: 100px;">STATUS</th>
+                    <th style="width: 60px;">PROB</th>
+                    <th style="width: 60px;">IMPACT</th>
+                    <th style="width: 80px;">SCORE</th>
+                    <th style="width: 100px;">SEVERITY</th>
+                    <th style="width: 160px;">UPDATED</th>
+                </tr>
+            </thead>
+            <tbody id="risks-table" hx-get="/risks/table" hx-trigger="load">
+                <tr><td colspan="8" class="text-muted">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">NEW PROCEDURE</div>
+    <div class="panel-body">
+        <form id="new-procedure-form" onsubmit="createProcedure(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="4"></textarea>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/procedures" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+async function createProcedure(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-procedure-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        name: form.name.value,
+        description: form.description.value || null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/procedures', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const procedure = await response.json();
+            window.location.href = '/procedures/' + procedure.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create procedure';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% if issues %}
+{% for issue in issues %}
+<tr>
+    <td class="id-cell"><a href="/issues/{{ issue.id }}">{{ issue.id }}</a></td>
+    <td>
+        <span class="status status-{% if issue.issue_type == 'non_conformance' %}error{% elif issue.issue_type == 'bug' %}warn{% elif issue.issue_type == 'improvement' %}info{% else %}draft{% endif %}">
+            {{ issue.issue_type | upper | replace('_', ' ') }}
+        </span>
+    </td>
+    <td><a href="/issues/{{ issue.id }}">{{ issue.title }}</a></td>
+    <td>
+        <span class="status status-{% if issue.status == 'closed' or issue.status == 'resolved' %}ok{% elif issue.status == 'in_progress' %}info{% else %}warn{% endif %}">
+            {{ issue.status | upper | replace('_', ' ') }}
+        </span>
+    </td>
+    <td>
+        <span class="{% if issue.priority == 'critical' %}text-red{% elif issue.priority == 'high' %}text-yellow{% else %}text-secondary{% endif %}">
+            {{ issue.priority | upper }}
+        </span>
+    </td>
+    <td class="timestamp">{{ issue.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="6" class="empty-state">
+        <p class="text-muted">No issues found</p>
+    </td>
+</tr>
+{% endif %}

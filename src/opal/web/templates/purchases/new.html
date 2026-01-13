@@ -1,0 +1,209 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/purchases">PURCHASES</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 900px;">
+    <div class="panel-header">NEW PURCHASE ORDER</div>
+    <div class="panel-body">
+        <form id="new-po-form" onsubmit="createPO(event)">
+            <div class="grid grid-2" style="gap: var(--space-lg);">
+                <div>
+                    <div class="form-group">
+                        <label class="form-label" for="reference">PO REFERENCE</label>
+                        <input type="text" id="reference" name="reference" class="form-input mono" maxlength="64" placeholder="PO-0001 (auto-generated if blank)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="supplier_id">SUPPLIER</label>
+                        <select id="supplier_id" name="supplier_id" class="form-select" onchange="updateSupplierText()">
+                            <option value="">Select supplier or enter below...</option>
+                            {% for s in suppliers %}
+                            <option value="{{ s.id }}" {{ 'selected' if preselected_supplier_id == s.id else '' }}>
+                                {{ s.name }}{% if s.code %} ({{ s.code }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="supplier">SUPPLIER NAME *</label>
+                        <input type="text" id="supplier" name="supplier" class="form-input" required>
+                        <small class="text-muted">Auto-filled when supplier is selected, or enter manually</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="supplier_reference">SUPPLIER REF</label>
+                        <input type="text" id="supplier_reference" name="supplier_reference" class="form-input mono" maxlength="100" placeholder="Supplier's order number">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="form-group">
+                        <label class="form-label" for="target_date">TARGET DATE</label>
+                        <input type="date" id="target_date" name="target_date" class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="destination">DESTINATION</label>
+                        <input type="text" id="destination" name="destination" class="form-input" maxlength="255" placeholder="Default receiving location">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="notes">NOTES</label>
+                        <textarea id="notes" name="notes" class="form-textarea" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: var(--space-lg);">
+                <label class="form-label">LINE ITEMS</label>
+                <table class="data-table" id="lines-table">
+                    <thead>
+                        <tr>
+                            <th>PART</th>
+                            <th style="width: 100px;">QTY</th>
+                            <th style="width: 100px;">UNIT COST</th>
+                            <th style="width: 150px;">DESTINATION</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="lines-body">
+                    </tbody>
+                </table>
+                <button type="button" class="btn" onclick="addLine()" style="margin-top: var(--space-sm);">+ ADD LINE</button>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/purchases" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE PO</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+const parts = {{ parts | tojson | safe }};
+const suppliers = {{ suppliers | tojson | safe }};
+let lineCount = 0;
+
+function updateSupplierText() {
+    const select = document.getElementById('supplier_id');
+    const input = document.getElementById('supplier');
+    const selectedId = parseInt(select.value);
+
+    if (selectedId) {
+        const supplier = suppliers.find(s => s.id === selectedId);
+        if (supplier) {
+            input.value = supplier.name;
+        }
+    }
+}
+
+function addLine() {
+    const tbody = document.getElementById('lines-body');
+    const row = document.createElement('tr');
+    row.id = 'line-' + lineCount;
+    row.innerHTML = `
+        <td>
+            <select name="lines[${lineCount}][part_id]" class="form-select" required>
+                <option value="">Select part...</option>
+                ${parts.map(p => `<option value="${p.id}">${p.id} - ${p.name}${p.external_pn ? ' (' + p.external_pn + ')' : ''}</option>`).join('')}
+            </select>
+        </td>
+        <td><input type="number" name="lines[${lineCount}][qty_ordered]" class="form-input" step="0.0001" min="0.0001" required></td>
+        <td><input type="number" name="lines[${lineCount}][unit_cost]" class="form-input" step="0.01" min="0"></td>
+        <td><input type="text" name="lines[${lineCount}][destination]" class="form-input" placeholder="Location"></td>
+        <td><button type="button" class="btn text-red" onclick="removeLine(${lineCount})">X</button></td>
+    `;
+    tbody.appendChild(row);
+    lineCount++;
+}
+
+function removeLine(id) {
+    const row = document.getElementById('line-' + id);
+    if (row) row.remove();
+}
+
+async function createPO(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-po-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    // Collect lines
+    const lines = [];
+    const rows = document.querySelectorAll('#lines-body tr');
+    for (const row of rows) {
+        const partSelect = row.querySelector('select');
+        const qtyInput = row.querySelector('input[name*="qty_ordered"]');
+        const costInput = row.querySelector('input[name*="unit_cost"]');
+        const destInput = row.querySelector('input[name*="destination"]');
+
+        if (partSelect.value && qtyInput.value) {
+            lines.push({
+                part_id: parseInt(partSelect.value),
+                qty_ordered: parseFloat(qtyInput.value),
+                unit_cost: costInput.value ? parseFloat(costInput.value) : null,
+                destination: destInput.value || null,
+            });
+        }
+    }
+
+    const data = {
+        supplier: form.supplier.value,
+        supplier_id: form.supplier_id.value ? parseInt(form.supplier_id.value) : null,
+        supplier_reference: form.supplier_reference.value || null,
+        reference: form.reference.value || null,
+        target_date: form.target_date.value || null,
+        destination: form.destination.value || null,
+        notes: form.notes.value || null,
+        lines: lines,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/purchases', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const po = await response.json();
+            window.location.href = '/purchases/' + po.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create purchase order';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Add first line on load
+addLine();
+
+// If supplier is preselected, fill in the name
+{% if preselected_supplier_id %}
+updateSupplierText();
+{% endif %}
+</script>
+{% endblock %}

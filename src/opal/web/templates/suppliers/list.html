@@ -1,0 +1,59 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">SUPPLIERS</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        SUPPLIERS
+        <a href="/suppliers/new" class="btn btn-primary" style="float: right;">+ NEW SUPPLIER</a>
+    </div>
+    <div class="panel-body">
+        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
+            <input type="text"
+                   id="search-input"
+                   class="form-input"
+                   placeholder="Search suppliers..."
+                   style="max-width: 300px;"
+                   hx-get="/suppliers/table"
+                   hx-trigger="keyup changed delay:300ms, search"
+                   hx-target="#suppliers-table-body"
+                   hx-include="#status-filter"
+                   name="search">
+            <select id="status-filter"
+                    name="is_active"
+                    class="form-select"
+                    style="max-width: 150px;"
+                    hx-get="/suppliers/table"
+                    hx-trigger="change"
+                    hx-target="#suppliers-table-body"
+                    hx-include="#search-input">
+                <option value="">All status</option>
+                <option value="true" selected>Active</option>
+                <option value="false">Inactive</option>
+            </select>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th style="width: 100px;">CODE</th>
+                    <th>NAME</th>
+                    <th style="width: 200px;">EMAIL</th>
+                    <th style="width: 120px;">PHONE</th>
+                    <th style="width: 80px;">POs</th>
+                    <th style="width: 80px;">STATUS</th>
+                </tr>
+            </thead>
+            <tbody id="suppliers-table-body" hx-get="/suppliers/table?is_active=true" hx-trigger="load">
+                <tr>
+                    <td colspan="7" class="text-muted">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

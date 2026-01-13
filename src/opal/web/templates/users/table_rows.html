@@ -1,0 +1,23 @@
+{% if users_list %}
+{% for u in users_list %}
+<tr>
+    <td class="id-cell"><a href="/users/{{ u.id }}">{{ u.id }}</a></td>
+    <td><a href="/users/{{ u.id }}">{{ u.name }}</a></td>
+    <td class="mono">{{ u.email or '-' }}</td>
+    <td class="timestamp">{{ u.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+    <td>
+        {% if u.is_active %}
+        <span class="status-badge status-active">ACTIVE</span>
+        {% else %}
+        <span class="status-badge status-inactive">INACTIVE</span>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="5" class="empty-state">
+        <p class="text-muted">No users found</p>
+    </td>
+</tr>
+{% endif %}

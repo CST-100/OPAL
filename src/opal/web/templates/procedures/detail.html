@@ -1,0 +1,583 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
+<span class="breadcrumb-item">{{ procedure.name }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            {{ procedure.name }}
+            <span class="status status-{% if procedure.status.value == 'active' %}ok{% elif procedure.status.value == 'deprecated' %}error{% else %}warn{% endif %}" style="float: right;">
+                {{ procedure.status.value | upper }}
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 120px;">ID</th>
+                    <td class="id-cell">{{ procedure.id }}</td>
+                </tr>
+                <tr>
+                    <th>STATUS</th>
+                    <td>
+                        <select id="status-select" class="form-select" style="width: auto;" onchange="updateStatus(this.value)">
+                            {% for s in statuses %}
+                            <option value="{{ s }}" {% if procedure.status.value == s %}selected{% endif %}>{{ s | upper }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th>CURRENT VER</th>
+                    <td class="mono">{% if procedure.current_version_id %}v{{ current_version_num }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>CREATED</th>
+                    <td class="timestamp">{{ procedure.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+                <tr>
+                    <th>UPDATED</th>
+                    <td class="timestamp">{{ procedure.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+            </table>
+            {% if procedure.description %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">DESCRIPTION</div>
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);" data-markdown>{{ procedure.description }}</div>
+            </div>
+            {% endif %}
+            <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
+                <a href="/procedures/{{ procedure.id }}/edit" class="btn">EDIT</a>
+                <button class="btn btn-primary" onclick="publishVersion()">PUBLISH VERSION</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            VERSIONS
+        </div>
+        <div class="panel-body">
+            {% if versions %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">VERSION</th>
+                        <th>PUBLISHED</th>
+                        <th style="width: 60px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in versions %}
+                    <tr>
+                        <td class="mono">v{{ v.version_number }}{% if v.id == procedure.current_version_id %} <span class="status status-ok">CURRENT</span>{% endif %}</td>
+                        <td class="timestamp">{{ v.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                        <td><a href="/procedures/versions/{{ v.id }}" class="btn">VIEW</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <p class="text-muted">No versions published yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        OPERATIONS (DRAFT)
+        <button class="btn btn-primary" style="float: right;" onclick="showAddOp()">+ ADD OP</button>
+    </div>
+    <div class="panel-body">
+        {% if ops %}
+        <div id="ops-list">
+            {% for op_data in ops %}
+            {% set op = op_data.step %}
+            <div class="op-block" data-op-id="{{ op.id }}">
+                <div class="op-header">
+                    <span class="op-number mono">OP {{ op.step_number }}</span>
+                    <span class="op-title">{{ op.title }}</span>
+                    {% if op.estimated_duration_minutes %}
+                    <span class="op-duration mono">{{ op.estimated_duration_minutes }}m</span>
+                    {% endif %}
+                    <span class="op-progress">{{ op_data.sub_steps|length }} steps</span>
+                    <span class="op-actions">
+                        <button class="btn btn-sm" onclick="showAddStep({{ op.id }})">+ STEP</button>
+                        <button class="btn btn-sm" onclick="editStep({{ op.id }})">EDIT</button>
+                        <button class="btn btn-sm text-red" onclick="deleteStep({{ op.id }})">X</button>
+                    </span>
+                </div>
+                {% if op.instructions %}
+                <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+                {% endif %}
+                {% if op_data.sub_steps %}
+                <table class="data-table op-steps-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">#</th>
+                            <th>STEP</th>
+                            <th style="width: 80px;">DURATION</th>
+                            <th style="width: 100px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for step in op_data.sub_steps %}
+                        <tr data-step-id="{{ step.id }}">
+                            <td class="mono">{{ step.step_number }}</td>
+                            <td>{{ step.title }}</td>
+                            <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                            <td>
+                                <button class="btn btn-sm" onclick="editStep({{ step.id }})">EDIT</button>
+                                <button class="btn btn-sm text-red" onclick="deleteStep({{ step.id }})">X</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p class="text-muted">No operations defined yet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if contingency_ops %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        CONTINGENCY OPERATIONS
+        <button class="btn" style="float: right;" onclick="showAddOp(true)">+ ADD CONTINGENCY</button>
+    </div>
+    <div class="panel-body">
+        <div id="contingency-ops-list">
+            {% for op_data in contingency_ops %}
+            {% set op = op_data.step %}
+            <div class="op-block op-contingency" data-op-id="{{ op.id }}">
+                <div class="op-header">
+                    <span class="op-number mono">OP {{ op.step_number }}</span>
+                    <span class="status status-warn">CONTINGENCY</span>
+                    <span class="op-title">{{ op.title }}</span>
+                    {% if op.estimated_duration_minutes %}
+                    <span class="op-duration mono">{{ op.estimated_duration_minutes }}m</span>
+                    {% endif %}
+                    <span class="op-progress">{{ op_data.sub_steps|length }} steps</span>
+                    <span class="op-actions">
+                        <button class="btn btn-sm" onclick="showAddStep({{ op.id }})">+ STEP</button>
+                        <button class="btn btn-sm" onclick="editStep({{ op.id }})">EDIT</button>
+                        <button class="btn btn-sm text-red" onclick="deleteStep({{ op.id }})">X</button>
+                    </span>
+                </div>
+                {% if op.instructions %}
+                <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+                {% endif %}
+                {% if op_data.sub_steps %}
+                <table class="data-table op-steps-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">#</th>
+                            <th>STEP</th>
+                            <th style="width: 80px;">DURATION</th>
+                            <th style="width: 100px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for step in op_data.sub_steps %}
+                        <tr data-step-id="{{ step.id }}">
+                            <td class="mono">{{ step.step_number }}</td>
+                            <td>{{ step.title }}</td>
+                            <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                            <td>
+                                <button class="btn btn-sm" onclick="editStep({{ step.id }})">EDIT</button>
+                                <button class="btn btn-sm text-red" onclick="deleteStep({{ step.id }})">X</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        CONTINGENCY OPERATIONS
+        <button class="btn" style="float: right;" onclick="showAddOp(true)">+ ADD CONTINGENCY</button>
+    </div>
+    <div class="panel-body">
+        <div class="empty-state">
+            <p class="text-muted">No contingency operations defined</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        KIT (BILL OF MATERIALS)
+        <button class="btn btn-primary" style="float: right;" onclick="showAddKit()">+ ADD PART</button>
+    </div>
+    <div class="panel-body">
+        {% if kit_items %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">PART</th>
+                    <th>NAME</th>
+                    <th style="width: 120px;">PN</th>
+                    <th style="width: 100px; text-align: right;">QTY REQ</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in kit_items %}
+                <tr>
+                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
+                    <td class="mono">{{ item.part_external_pn or '-' }}</td>
+                    <td class="mono" style="text-align: right;">{{ item.quantity_required }}</td>
+                    <td><button class="btn text-red" onclick="removeKitItem({{ item.part_id }})">X</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p class="text-muted">No parts in kit</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Operation Modal -->
+<div id="add-op-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px;">
+        <div class="panel">
+            <div class="panel-header" id="add-op-title">ADD OPERATION</div>
+            <div class="panel-body">
+                <form id="add-op-form" onsubmit="addOp(event)">
+                    <input type="hidden" id="op-is-contingency" name="is_contingency" value="false">
+                    <div class="form-group">
+                        <label class="form-label" for="op-title">TITLE *</label>
+                        <input type="text" id="op-title" name="title" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="op-instructions">INSTRUCTIONS (Markdown supported)</label>
+                        <textarea id="op-instructions" name="instructions" class="form-textarea" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="op-duration">EST. DURATION (min)</label>
+                        <input type="number" id="op-duration" name="estimated_duration_minutes" class="form-input" min="1">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideAddOp()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">ADD</button>
+                    </div>
+                </form>
+                <div id="op-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Step Modal (under an OP) -->
+<div id="add-step-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 600px;">
+        <div class="panel">
+            <div class="panel-header">ADD STEP</div>
+            <div class="panel-body">
+                <form id="add-step-form" onsubmit="addStep(event)">
+                    <input type="hidden" id="step-parent-id" name="parent_step_id" value="">
+                    <div class="form-group">
+                        <label class="form-label" for="step-title">TITLE *</label>
+                        <input type="text" id="step-title" name="title" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="step-instructions">INSTRUCTIONS (Markdown supported)</label>
+                        <textarea id="step-instructions" name="instructions" class="form-textarea" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="step-duration">EST. DURATION (min)</label>
+                        <input type="number" id="step-duration" name="estimated_duration_minutes" class="form-input" min="1">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideAddStep()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">ADD</button>
+                    </div>
+                </form>
+                <div id="step-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Kit Modal -->
+<div id="add-kit-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD PART TO KIT</div>
+            <div class="panel-body">
+                <form id="add-kit-form" onsubmit="addKitItem(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="kit-part">PART *</label>
+                        <select id="kit-part" name="part_id" class="form-select" required>
+                            <option value="">Select part...</option>
+                            {% for p in parts %}
+                            <option value="{{ p.id }}">{{ p.id }} - {{ p.name }}{% if p.external_pn %} ({{ p.external_pn }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kit-qty">QUANTITY REQUIRED *</label>
+                        <input type="number" id="kit-qty" name="quantity_required" class="form-input" step="0.0001" min="0.0001" required>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideAddKit()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">ADD</button>
+                    </div>
+                </form>
+                <div id="kit-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const procedureId = {{ procedure.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function updateStatus(status) {
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: status }),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to update status');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function publishVersion() {
+    if (!confirm('Publish current steps as a new version?')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/publish`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to publish version');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// Operation functions
+function showAddOp(isContingency = false) {
+    document.getElementById('add-op-modal').style.display = 'block';
+    document.getElementById('op-is-contingency').value = isContingency ? 'true' : 'false';
+    document.getElementById('add-op-title').textContent = isContingency ? 'ADD CONTINGENCY OPERATION' : 'ADD OPERATION';
+}
+
+function hideAddOp() {
+    document.getElementById('add-op-modal').style.display = 'none';
+    document.getElementById('add-op-form').reset();
+}
+
+async function addOp(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-op-form');
+    const errorDiv = document.getElementById('op-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        title: form.title.value,
+        instructions: form.instructions.value || null,
+        estimated_duration_minutes: form.estimated_duration_minutes.value ? parseInt(form.estimated_duration_minutes.value) : null,
+        is_contingency: document.getElementById('op-is-contingency').value === 'true',
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to add operation';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Step functions (sub-steps under an OP)
+function showAddStep(parentOpId) {
+    document.getElementById('add-step-modal').style.display = 'block';
+    document.getElementById('step-parent-id').value = parentOpId;
+}
+
+function hideAddStep() {
+    document.getElementById('add-step-modal').style.display = 'none';
+    document.getElementById('add-step-form').reset();
+}
+
+async function addStep(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-step-form');
+    const errorDiv = document.getElementById('step-error');
+    errorDiv.style.display = 'none';
+
+    const parentId = document.getElementById('step-parent-id').value;
+    const data = {
+        title: form.title.value,
+        instructions: form.instructions.value || null,
+        estimated_duration_minutes: form.estimated_duration_minutes.value ? parseInt(form.estimated_duration_minutes.value) : null,
+        parent_step_id: parentId ? parseInt(parentId) : null,
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to add step';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+function editStep(stepId) {
+    window.location.href = `/procedures/${procedureId}/steps/${stepId}/edit`;
+}
+
+async function deleteStep(stepId) {
+    if (!confirm('Delete this step/operation? This will also delete any sub-steps.')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps/${stepId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to delete step');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// Kit functions
+function showAddKit() {
+    document.getElementById('add-kit-modal').style.display = 'block';
+}
+
+function hideAddKit() {
+    document.getElementById('add-kit-modal').style.display = 'none';
+    document.getElementById('add-kit-form').reset();
+}
+
+async function addKitItem(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-kit-form');
+    const errorDiv = document.getElementById('kit-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        part_id: parseInt(form.part_id.value),
+        quantity_required: parseFloat(form.quantity_required.value),
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/kit`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to add part to kit';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function removeKitItem(partId) {
+    if (!confirm('Remove this part from the kit?')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/kit/${partId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to remove part');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideAddOp();
+        hideAddStep();
+        hideAddKit();
+    }
+});
+</script>
+{% endblock %}

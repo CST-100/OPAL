@@ -1,0 +1,253 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
+<span class="breadcrumb-item"><a href="/procedures/{{ procedure.id }}">{{ procedure.name }}</a></span>
+<span class="breadcrumb-item">STEP {{ step.step_number }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="panel">
+        <div class="panel-header">EDIT STEP {{ step.step_number }}</div>
+        <div class="panel-body">
+            <form id="edit-step-form" onsubmit="updateStep(event)">
+                <div class="form-group">
+                    <label class="form-label" for="title">TITLE *</label>
+                    <input type="text" id="title" name="title" class="form-input" value="{{ step.title }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="instructions">INSTRUCTIONS (Markdown supported)</label>
+                    <textarea id="instructions" name="instructions" class="form-textarea" rows="6">{{ step.instructions or '' }}</textarea>
+                </div>
+
+                <div style="display: flex; gap: var(--space-md);">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label" for="duration">EST. DURATION (min)</label>
+                        <input type="number" id="duration" name="estimated_duration_minutes" class="form-input" min="1" value="{{ step.estimated_duration_minutes or '' }}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">&nbsp;</label>
+                        <label style="display: flex; align-items: center; gap: var(--space-sm);">
+                            <input type="checkbox" id="is_contingency" name="is_contingency" {% if step.is_contingency %}checked{% endif %} {% if step.parent_step_id %}disabled{% endif %}>
+                            <span>Contingency {% if step.parent_step_id %}(inherited){% endif %}</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                    <a href="/procedures/{{ procedure.id }}" class="btn">CANCEL</a>
+                    <button type="submit" class="btn btn-primary">SAVE</button>
+                </div>
+            </form>
+
+            <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            STEP PARTS
+            <button class="btn btn-primary" style="float: right;" onclick="showAddPart()">+ ADD PART</button>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
+                Parts required specifically for this step. Use "consume" for installed parts, "tooling" for GSE/fixtures.
+            </p>
+            <div id="step-kit-list">
+                {% if step_kit %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>PART</th>
+                            <th style="width: 80px;">QTY</th>
+                            <th style="width: 80px;">TYPE</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in step_kit %}
+                        <tr>
+                            <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
+                            <td class="mono">{{ item.quantity_required }}</td>
+                            <td>
+                                {% if item.usage_type == 'tooling' %}
+                                <span class="status status-info">TOOLING</span>
+                                {% else %}
+                                <span class="status status-ok">CONSUME</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm text-red" onclick="removePart({{ item.part_id }})">X</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <p class="text-muted">No step-specific parts defined</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Part Modal -->
+<div id="add-part-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD PART TO STEP</div>
+            <div class="panel-body">
+                <form id="add-part-form" onsubmit="addPart(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="part-id">PART *</label>
+                        <select id="part-id" name="part_id" class="form-select" required>
+                            <option value="">Select part...</option>
+                            {% for p in parts %}
+                            <option value="{{ p.id }}">{{ p.id }} - {{ p.name }}{% if p.external_pn %} ({{ p.external_pn }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="part-qty">QUANTITY *</label>
+                        <input type="number" id="part-qty" name="quantity_required" class="form-input" step="0.0001" min="0.0001" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="part-type">USAGE TYPE *</label>
+                        <select id="part-type" name="usage_type" class="form-select" required>
+                            <option value="consume">CONSUME - Part installed/used up</option>
+                            <option value="tooling">TOOLING - GSE/fixtures (reusable)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="part-notes">NOTES</label>
+                        <input type="text" id="part-notes" name="notes" class="form-input" placeholder="Optional notes">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideAddPart()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">ADD</button>
+                    </div>
+                </form>
+                <div id="part-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const procedureId = {{ procedure.id }};
+const stepId = {{ step.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function updateStep(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('edit-step-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        title: form.title.value,
+        instructions: form.instructions.value || null,
+        estimated_duration_minutes: form.estimated_duration_minutes.value ? parseInt(form.estimated_duration_minutes.value) : null,
+        is_contingency: form.is_contingency.checked,
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps/${stepId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            window.location.href = `/procedures/${procedureId}`;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to update step';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Step parts functions
+function showAddPart() {
+    document.getElementById('add-part-modal').style.display = 'block';
+}
+
+function hideAddPart() {
+    document.getElementById('add-part-modal').style.display = 'none';
+    document.getElementById('add-part-form').reset();
+}
+
+async function addPart(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-part-form');
+    const errorDiv = document.getElementById('part-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        part_id: parseInt(form.part_id.value),
+        quantity_required: parseFloat(form.quantity_required.value),
+        usage_type: form.usage_type.value,
+        notes: form.notes.value || null,
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps/${stepId}/kit`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to add part';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function removePart(partId) {
+    if (!confirm('Remove this part from the step?')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/steps/${stepId}/kit/${partId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to remove part');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideAddPart();
+    }
+});
+</script>
+{% endblock %}

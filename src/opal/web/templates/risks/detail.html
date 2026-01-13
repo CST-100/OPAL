@@ -1,0 +1,179 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
+<span class="breadcrumb-item">{{ risk.id }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px;">
+    <div class="panel-header">
+        RISK #{{ risk.id }}
+        {% set score = risk.probability * risk.impact %}
+        <span class="status status-{% if score <= 5 %}success{% elif score <= 12 %}warn{% else %}error{% endif %}" style="float: right;">
+            SCORE: {{ score }}
+        </span>
+    </div>
+    <div class="panel-body">
+        <h2 style="margin-bottom: var(--space-md);">{{ risk.title }}</h2>
+
+        <table class="data-table" style="margin-bottom: var(--space-md);">
+            <tr>
+                <th style="width: 120px;">STATUS</th>
+                <td>
+                    <select id="status-select" class="form-select" style="width: auto;" onchange="updateRisk('status', this.value)">
+                        {% for s in statuses %}
+                        {% set status_val = risk.status.value if risk.status.value is defined else risk.status %}
+                        <option value="{{ s }}" {% if status_val == s %}selected{% endif %}>{{ s | upper | replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>PROBABILITY</th>
+                <td>
+                    <select id="prob-select" class="form-select" style="width: auto;" onchange="updateRisk('probability', parseInt(this.value))">
+                        <option value="1" {% if risk.probability == 1 %}selected{% endif %}>1 - Rare</option>
+                        <option value="2" {% if risk.probability == 2 %}selected{% endif %}>2 - Unlikely</option>
+                        <option value="3" {% if risk.probability == 3 %}selected{% endif %}>3 - Possible</option>
+                        <option value="4" {% if risk.probability == 4 %}selected{% endif %}>4 - Likely</option>
+                        <option value="5" {% if risk.probability == 5 %}selected{% endif %}>5 - Almost Certain</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>IMPACT</th>
+                <td>
+                    <select id="impact-select" class="form-select" style="width: auto;" onchange="updateRisk('impact', parseInt(this.value))">
+                        <option value="1" {% if risk.impact == 1 %}selected{% endif %}>1 - Negligible</option>
+                        <option value="2" {% if risk.impact == 2 %}selected{% endif %}>2 - Minor</option>
+                        <option value="3" {% if risk.impact == 3 %}selected{% endif %}>3 - Moderate</option>
+                        <option value="4" {% if risk.impact == 4 %}selected{% endif %}>4 - Major</option>
+                        <option value="5" {% if risk.impact == 5 %}selected{% endif %}>5 - Severe</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>SCORE</th>
+                <td>
+                    <span id="score-value" style="font-weight: bold; font-size: 1.2rem;">
+                        {% set score = risk.probability * risk.impact %}
+                        {% if score <= 5 %}
+                        <span style="color: var(--success);">{{ score }} (LOW)</span>
+                        {% elif score <= 12 %}
+                        <span style="color: var(--warning);">{{ score }} (MEDIUM)</span>
+                        {% else %}
+                        <span style="color: var(--error);">{{ score }} (HIGH)</span>
+                        {% endif %}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <th>CREATED</th>
+                <td class="timestamp">{{ risk.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            <tr>
+                <th>UPDATED</th>
+                <td class="timestamp">{{ risk.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            {% if risk.linked_issue_id %}
+            <tr>
+                <th>LINKED ISSUE</th>
+                <td><a href="/issues/{{ risk.linked_issue_id }}">Issue #{{ risk.linked_issue_id }}</a></td>
+            </tr>
+            {% endif %}
+        </table>
+
+        {% if risk.description %}
+        <div class="form-label">DESCRIPTION</div>
+        <div style="padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color); margin-bottom: var(--space-md);">
+            {{ risk.description }}
+        </div>
+        {% endif %}
+
+        <div class="form-label">MITIGATION PLAN</div>
+        <div style="margin-bottom: var(--space-md);">
+            <textarea id="mitigation-text" class="form-textarea" rows="4"
+                      onblur="updateRisk('mitigation_plan', this.value)"
+                      placeholder="Describe mitigation strategy...">{{ risk.mitigation_plan or '' }}</textarea>
+        </div>
+
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="/risks" class="btn">BACK</a>
+            <button class="btn text-red" onclick="deleteRisk()">DELETE</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const riskId = {{ risk.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+function updateScoreDisplay() {
+    const prob = parseInt(document.getElementById('prob-select').value);
+    const impact = parseInt(document.getElementById('impact-select').value);
+    const score = prob * impact;
+    let severity = 'LOW';
+    let color = 'var(--success)';
+    if (score > 12) {
+        severity = 'HIGH';
+        color = 'var(--error)';
+    } else if (score > 5) {
+        severity = 'MEDIUM';
+        color = 'var(--warning)';
+    }
+    document.getElementById('score-value').innerHTML = `<span style="color: ${color}">${score} (${severity})</span>`;
+}
+
+async function updateRisk(field, value) {
+    try {
+        const data = {};
+        data[field] = value;
+
+        const response = await fetch(`/api/risks/${riskId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            alert(error.detail || 'Failed to update risk');
+            window.location.reload();
+        } else {
+            if (field === 'probability' || field === 'impact') {
+                updateScoreDisplay();
+            }
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+        window.location.reload();
+    }
+}
+
+async function deleteRisk() {
+    if (!confirm('Are you sure you want to delete this risk?')) return;
+
+    try {
+        const response = await fetch(`/api/risks/${riskId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.href = '/risks';
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to delete risk');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

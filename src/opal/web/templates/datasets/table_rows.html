@@ -1,0 +1,17 @@
+{% for dataset in datasets %}
+<tr onclick="window.location='/datasets/{{ dataset.id }}'" style="cursor: pointer;">
+    <td>{{ dataset.id }}</td>
+    <td>{{ dataset.name }}</td>
+    <td>
+        {% if dataset.procedure %}
+        <a href="/procedures/{{ dataset.procedure_id }}">{{ dataset.procedure.name }}</a>
+        {% else %}
+        <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="text-center">{{ dataset.data_points | length }}</td>
+    <td class="timestamp">{{ dataset.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-muted">No datasets found</td></tr>
+{% endfor %}

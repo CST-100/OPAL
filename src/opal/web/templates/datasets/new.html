@@ -1,0 +1,151 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/datasets">DATASETS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 700px;">
+    <div class="panel-header">NEW DATASET</div>
+    <div class="panel-body">
+        <form id="new-dataset-form" onsubmit="createDataset(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="procedure">LINKED PROCEDURE (optional)</label>
+                <select id="procedure" name="procedure_id" class="form-select">
+                    <option value="">No linked procedure...</option>
+                    {% for p in procedures %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">SCHEMA FIELDS</label>
+                <div id="schema-fields">
+                    <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                        <input type="text" class="form-input field-name" placeholder="Field name" style="flex: 2;">
+                        <select class="form-select field-type" style="flex: 1;">
+                            <option value="number">Number</option>
+                            <option value="text">Text</option>
+                            <option value="boolean">Boolean</option>
+                            <option value="date">Date</option>
+                        </select>
+                        <input type="text" class="form-input field-unit" placeholder="Unit (optional)" style="flex: 1;">
+                        <button type="button" class="btn" onclick="removeField(this)" style="padding: 0 var(--space-sm);">X</button>
+                    </div>
+                </div>
+                <button type="button" class="btn" onclick="addField()">+ ADD FIELD</button>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/datasets" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+function addField() {
+    const container = document.getElementById('schema-fields');
+    const fieldHtml = `
+        <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+            <input type="text" class="form-input field-name" placeholder="Field name" style="flex: 2;">
+            <select class="form-select field-type" style="flex: 1;">
+                <option value="number">Number</option>
+                <option value="text">Text</option>
+                <option value="boolean">Boolean</option>
+                <option value="date">Date</option>
+            </select>
+            <input type="text" class="form-input field-unit" placeholder="Unit (optional)" style="flex: 1;">
+            <button type="button" class="btn" onclick="removeField(this)" style="padding: 0 var(--space-sm);">X</button>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', fieldHtml);
+}
+
+function removeField(btn) {
+    btn.parentElement.remove();
+}
+
+function buildSchema() {
+    const fields = [];
+    document.querySelectorAll('.schema-field').forEach(row => {
+        const name = row.querySelector('.field-name').value.trim();
+        const type = row.querySelector('.field-type').value;
+        const unit = row.querySelector('.field-unit').value.trim();
+        if (name) {
+            const field = { name, type };
+            if (unit) field.unit = unit;
+            fields.push(field);
+        }
+    });
+    return { fields };
+}
+
+async function createDataset(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-dataset-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const schema = buildSchema();
+    if (schema.fields.length === 0) {
+        errorDiv.textContent = 'At least one field is required';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const data = {
+        name: form.name.value,
+        description: form.description.value || null,
+        schema: schema,
+        procedure_id: form.procedure_id.value ? parseInt(form.procedure_id.value) : null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/datasets', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const dataset = await response.json();
+            window.location.href = '/datasets/' + dataset.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create dataset';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

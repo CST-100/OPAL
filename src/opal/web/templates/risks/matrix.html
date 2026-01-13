@@ -1,0 +1,192 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
+<span class="breadcrumb-item">MATRIX</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>RISK MATRIX</span>
+        <a href="/risks" class="btn">LIST VIEW</a>
+    </div>
+    <div class="panel-body">
+        <div style="display: flex; gap: var(--space-lg);">
+            <!-- Matrix Grid -->
+            <div style="flex: 1;">
+                <div style="display: flex; align-items: center; margin-bottom: var(--space-md);">
+                    <div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); margin-right: var(--space-md); font-weight: bold;">
+                        PROBABILITY
+                    </div>
+                    <div>
+                        <table class="data-table" style="width: 400px;">
+                            <tr>
+                                <td style="width: 40px; text-align: right; border: none; font-size: 0.75rem;">5</td>
+                                {% for i in range(5) %}
+                                {% set score = 5 * (i + 1) %}
+                                <td class="matrix-cell matrix-{% if score <= 5 %}low{% elif score <= 12 %}med{% else %}high{% endif %}"
+                                    onclick="filterByCell(5, {{ i + 1 }})">
+                                    {{ matrix[4][i] if matrix[4][i] > 0 else '' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <td style="width: 40px; text-align: right; border: none; font-size: 0.75rem;">4</td>
+                                {% for i in range(5) %}
+                                {% set score = 4 * (i + 1) %}
+                                <td class="matrix-cell matrix-{% if score <= 5 %}low{% elif score <= 12 %}med{% else %}high{% endif %}"
+                                    onclick="filterByCell(4, {{ i + 1 }})">
+                                    {{ matrix[3][i] if matrix[3][i] > 0 else '' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <td style="width: 40px; text-align: right; border: none; font-size: 0.75rem;">3</td>
+                                {% for i in range(5) %}
+                                {% set score = 3 * (i + 1) %}
+                                <td class="matrix-cell matrix-{% if score <= 5 %}low{% elif score <= 12 %}med{% else %}high{% endif %}"
+                                    onclick="filterByCell(3, {{ i + 1 }})">
+                                    {{ matrix[2][i] if matrix[2][i] > 0 else '' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <td style="width: 40px; text-align: right; border: none; font-size: 0.75rem;">2</td>
+                                {% for i in range(5) %}
+                                {% set score = 2 * (i + 1) %}
+                                <td class="matrix-cell matrix-{% if score <= 5 %}low{% elif score <= 12 %}med{% else %}high{% endif %}"
+                                    onclick="filterByCell(2, {{ i + 1 }})">
+                                    {{ matrix[1][i] if matrix[1][i] > 0 else '' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <td style="width: 40px; text-align: right; border: none; font-size: 0.75rem;">1</td>
+                                {% for i in range(5) %}
+                                {% set score = 1 * (i + 1) %}
+                                <td class="matrix-cell matrix-{% if score <= 5 %}low{% elif score <= 12 %}med{% else %}high{% endif %}"
+                                    onclick="filterByCell(1, {{ i + 1 }})">
+                                    {{ matrix[0][i] if matrix[0][i] > 0 else '' }}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            <tr>
+                                <td style="border: none;"></td>
+                                <td style="border: none; text-align: center; font-size: 0.75rem;">1</td>
+                                <td style="border: none; text-align: center; font-size: 0.75rem;">2</td>
+                                <td style="border: none; text-align: center; font-size: 0.75rem;">3</td>
+                                <td style="border: none; text-align: center; font-size: 0.75rem;">4</td>
+                                <td style="border: none; text-align: center; font-size: 0.75rem;">5</td>
+                            </tr>
+                        </table>
+                        <div style="text-align: center; font-weight: bold; margin-top: var(--space-xs);">IMPACT</div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div style="display: flex; gap: var(--space-md); margin-top: var(--space-lg);">
+                    <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                        <div style="width: 20px; height: 20px; background: var(--success); border: 1px solid var(--border-color);"></div>
+                        <span>LOW (1-5)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                        <div style="width: 20px; height: 20px; background: var(--warning); border: 1px solid var(--border-color);"></div>
+                        <span>MEDIUM (6-12)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: var(--space-xs);">
+                        <div style="width: 20px; height: 20px; background: var(--error); border: 1px solid var(--border-color);"></div>
+                        <span>HIGH (13-25)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Panel -->
+            <div style="width: 250px;">
+                <div class="panel" style="margin: 0;">
+                    <div class="panel-header">SUMMARY</div>
+                    <div class="panel-body">
+                        <table class="data-table">
+                            <tr>
+                                <th>TOTAL ACTIVE</th>
+                                <td style="text-align: right;">{{ total_risks }}</td>
+                            </tr>
+                            <tr>
+                                <th>HIGH RISK</th>
+                                <td style="text-align: right; color: var(--error);">{{ high_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>MEDIUM RISK</th>
+                                <td style="text-align: right; color: var(--warning);">{{ medium_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>LOW RISK</th>
+                                <td style="text-align: right; color: var(--success);">{{ low_count }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="cell-risks" style="margin-top: var(--space-md); display: none;">
+                    <div class="panel" style="margin: 0;">
+                        <div class="panel-header">RISKS IN CELL</div>
+                        <div class="panel-body" id="cell-risks-list">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.matrix-cell {
+    width: 60px;
+    height: 60px;
+    text-align: center;
+    vertical-align: middle;
+    font-weight: bold;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.matrix-cell:hover {
+    opacity: 0.8;
+}
+.matrix-low {
+    background: var(--success);
+    color: var(--bg-primary);
+}
+.matrix-med {
+    background: var(--warning);
+    color: var(--bg-primary);
+}
+.matrix-high {
+    background: var(--error);
+    color: var(--bg-primary);
+}
+</style>
+
+<script>
+const risks = {{ risks_json | safe }};
+
+function filterByCell(prob, impact) {
+    const cellRisks = risks.filter(r => r.probability === prob && r.impact === impact);
+    const container = document.getElementById('cell-risks');
+    const list = document.getElementById('cell-risks-list');
+
+    if (cellRisks.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = cellRisks.map(r => `
+        <div style="padding: var(--space-xs); border-bottom: 1px solid var(--border-color);">
+            <a href="/risks/${r.id}">#${r.id} - ${r.title}</a>
+        </div>
+    `).join('');
+}
+</script>
+{% endblock %}

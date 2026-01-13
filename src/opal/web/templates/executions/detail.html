@@ -1,0 +1,975 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/executions">EXECUTIONS</a></span>
+<span class="breadcrumb-item">{{ instance.id }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            EXECUTION #{{ instance.id }}
+            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+            <span class="status status-{% if status_val == 'completed' %}ok{% elif status_val == 'aborted' %}error{% elif status_val == 'in_progress' %}info{% else %}warn{% endif %}" style="float: right;">
+                {{ status_val | upper | replace('_', ' ') }}
+            </span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 120px;">PROCEDURE</th>
+                    <td><a href="/procedures/{{ instance.procedure_id }}">{{ instance.procedure.name }}</a></td>
+                </tr>
+                <tr>
+                    <th>VERSION</th>
+                    <td class="mono">v{{ version.version_number }}</td>
+                </tr>
+                <tr>
+                    <th>WORK ORDER</th>
+                    <td class="mono">{{ instance.work_order_number or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>CREATED</th>
+                    <td class="timestamp">{{ instance.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+                <tr>
+                    <th>STARTED</th>
+                    <td class="timestamp">{% if instance.started_at %}{{ instance.started_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <th>COMPLETED</th>
+                    <td class="timestamp">{% if instance.completed_at %}{{ instance.completed_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}-{% endif %}</td>
+                </tr>
+            </table>
+            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+            {% if status_val == 'in_progress' %}
+            <div style="margin-top: var(--space-md);">
+                <button class="btn text-red" onclick="abortExecution()">ABORT EXECUTION</button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            COLLABORATION
+            <span id="connection-status" class="connection-status" style="float: right;">
+                <span class="connection-dot"></span>
+                <span id="connection-text">OFFLINE</span>
+            </span>
+        </div>
+        <div class="panel-body">
+            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+            {% if status_val in ['pending', 'in_progress'] %}
+            <div style="margin-bottom: var(--space-md);">
+                <button id="join-btn" class="btn btn-join" onclick="joinExecution()" style="display: none;">JOIN EXECUTION</button>
+                <button id="leave-btn" class="btn btn-leave" onclick="leaveExecution()" style="display: none;">LEAVE EXECUTION</button>
+            </div>
+            {% endif %}
+            <div class="participants-header">ACTIVE PARTICIPANTS</div>
+            <div id="participants-list" class="participants-list">
+                <span class="text-muted">Loading...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">PROGRESS</div>
+    <div class="panel-body">
+        {% set completed = steps | selectattr('status', 'in', ['completed', 'skipped']) | list | length %}
+        {% set total = steps | length %}
+        {% set ops_completed = ops | selectattr('step.status', 'in', ['completed', 'skipped']) | list | length %}
+        {% set ops_total = ops | length %}
+        <div style="font-size: 2rem; font-weight: bold; color: var(--accent-blue); margin-bottom: var(--space-md);">
+            {{ ops_completed }} / {{ ops_total }} OPS
+        </div>
+        <div style="font-size: 1rem; color: var(--text-muted); margin-bottom: var(--space-sm);">
+            {{ completed }} / {{ total }} total steps
+        </div>
+        <div style="background: var(--bg-tertiary); height: 20px; border: 1px solid var(--border-color);">
+            <div style="background: var(--accent-green); height: 100%; width: {{ (completed / total * 100) if total > 0 else 0 }}%;"></div>
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">OPERATIONS</div>
+    <div class="panel-body">
+        {% for op_data in ops %}
+        {% set op = op_data.step %}
+        <div class="op-block" id="op-{{ op.order }}" data-op-order="{{ op.order }}">
+            <div class="op-header">
+                <span class="op-number mono">OP {{ op.step_number }}</span>
+                <span class="op-title">{{ op.title }}</span>
+                <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+                <span class="status status-{% if op.status == 'completed' or op.status == 'signed_off' %}ok{% elif op.status == 'in_progress' %}info{% elif op.status == 'skipped' %}warn{% elif op.status == 'awaiting_signoff' %}signoff{% else %}draft{% endif %}">
+                    {{ op.status | upper | replace('_', ' ') }}
+                </span>
+                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+                {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
+                <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
+                {% endif %}
+            </div>
+            {% if op.instructions %}
+            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+            {% endif %}
+            {% if op_data.sub_steps %}
+            <!-- Sub-steps -->
+            <div class="op-steps">
+                {% for step in op_data.sub_steps %}
+                <div class="step-row" id="step-{{ step.order }}" data-step-order="{{ step.order }}">
+                    <div class="step-row-header">
+                        <span class="step-number mono">{{ step.step_number }}</span>
+                        <span class="step-title">{{ step.title }}</span>
+                        <span class="status status-{% if step.status == 'completed' %}ok{% elif step.status == 'in_progress' %}info{% elif step.status == 'skipped' %}warn{% else %}draft{% endif %}" style="margin-left: auto;">
+                            {{ step.status | upper | replace('_', ' ') }}
+                        </span>
+                    </div>
+                    {% if step.instructions %}
+                    <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
+                    {% endif %}
+                    <div class="step-actions">
+                        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+                        {% if status_val in ['pending', 'in_progress'] %}
+                            {% if step.status == 'pending' %}
+                            <button class="btn btn-sm btn-primary" onclick="startStep({{ step.order }})">START</button>
+                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
+                            {% elif step.status == 'in_progress' %}
+                            <button class="btn btn-sm btn-primary" onclick="completeStep({{ step.order }})">COMPLETE</button>
+                            <button class="btn btn-sm text-yellow" onclick="showNCModal({{ step.order }})">LOG NC</button>
+                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
+                            {% endif %}
+                        {% endif %}
+                        {% if step.execution and step.execution.started_at %}
+                        <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
+                            {{ step.execution.started_at.strftime('%H:%M:%S') }}
+                            {% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <!-- No sub-steps, op itself is executable -->
+            <div class="step-actions" style="padding: var(--space-sm) var(--space-md);">
+                {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+                {% if status_val in ['pending', 'in_progress'] %}
+                    {% if op.status == 'pending' %}
+                    <button class="btn btn-primary" onclick="startStep({{ op.order }})">START</button>
+                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                    {% elif op.status == 'in_progress' %}
+                    <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
+                    <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
+                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                    {% endif %}
+                {% endif %}
+                {% if op.execution and op.execution.started_at %}
+                <span class="text-muted mono" style="margin-left: auto;">
+                    Started: {{ op.execution.started_at.strftime('%H:%M:%S') }}
+                    {% if op.execution.completed_at %} | Completed: {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if contingency_ops %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">CONTINGENCY OPERATIONS</div>
+    <div class="panel-body">
+        {% for op_data in contingency_ops %}
+        {% set op = op_data.step %}
+        <div class="op-block op-contingency" id="op-{{ op.order }}" data-op-order="{{ op.order }}">
+            <div class="op-header">
+                <span class="op-number mono">OP {{ op.step_number }}</span>
+                <span class="status status-warn">CONTINGENCY</span>
+                <span class="op-title">{{ op.title }}</span>
+                <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+                <span class="status status-{% if op.status == 'completed' or op.status == 'signed_off' %}ok{% elif op.status == 'in_progress' %}info{% elif op.status == 'skipped' %}warn{% elif op.status == 'awaiting_signoff' %}signoff{% else %}draft{% endif %}">
+                    {{ op.status | upper | replace('_', ' ') }}
+                </span>
+                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+                {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
+                <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
+                {% endif %}
+            </div>
+            {% if op.instructions %}
+            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+            {% endif %}
+            {% if op_data.sub_steps %}
+            <div class="op-steps">
+                {% for step in op_data.sub_steps %}
+                <div class="step-row" id="step-{{ step.order }}" data-step-order="{{ step.order }}">
+                    <div class="step-row-header">
+                        <span class="step-number mono">{{ step.step_number }}</span>
+                        <span class="step-title">{{ step.title }}</span>
+                        <span class="status status-{% if step.status == 'completed' %}ok{% elif step.status == 'in_progress' %}info{% elif step.status == 'skipped' %}warn{% else %}draft{% endif %}" style="margin-left: auto;">
+                            {{ step.status | upper | replace('_', ' ') }}
+                        </span>
+                    </div>
+                    {% if step.instructions %}
+                    <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
+                    {% endif %}
+                    <div class="step-actions">
+                        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+                        {% if status_val in ['pending', 'in_progress'] %}
+                            {% if step.status == 'pending' %}
+                            <button class="btn btn-sm btn-primary" onclick="startStep({{ step.order }})">START</button>
+                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
+                            {% elif step.status == 'in_progress' %}
+                            <button class="btn btn-sm btn-primary" onclick="completeStep({{ step.order }})">COMPLETE</button>
+                            <button class="btn btn-sm text-yellow" onclick="showNCModal({{ step.order }})">LOG NC</button>
+                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
+                            {% endif %}
+                        {% endif %}
+                        {% if step.execution and step.execution.started_at %}
+                        <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
+                            {{ step.execution.started_at.strftime('%H:%M:%S') }}
+                            {% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="step-actions" style="padding: var(--space-sm) var(--space-md);">
+                {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+                {% if status_val in ['pending', 'in_progress'] %}
+                    {% if op.status == 'pending' %}
+                    <button class="btn btn-primary" onclick="startStep({{ op.order }})">START</button>
+                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                    {% elif op.status == 'in_progress' %}
+                    <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
+                    <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
+                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                    {% endif %}
+                {% endif %}
+                {% if op.execution and op.execution.started_at %}
+                <span class="text-muted mono" style="margin-left: auto;">
+                    Started: {{ op.execution.started_at.strftime('%H:%M:%S') }}
+                    {% if op.execution.completed_at %} | Completed: {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if kit_items %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        KIT / PARTS CONSUMPTION
+        {% if consumptions %}
+        <span class="status status-ok" style="float: right;">CONSUMED</span>
+        {% elif instance.status.value == 'completed' %}
+        <span class="status status-warn" style="float: right;">PENDING</span>
+        {% endif %}
+    </div>
+    <div class="panel-body">
+        {% if consumptions %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">QTY</th>
+                    <th style="width: 150px;">LOCATION</th>
+                    <th style="width: 100px;">LOT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in consumptions %}
+                <tr>
+                    <td><a href="/parts/{{ c.inventory_record.part_id }}">{{ c.inventory_record.part.name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ c.quantity }}</td>
+                    <td class="mono">{{ c.inventory_record.location }}</td>
+                    <td class="mono">{{ c.inventory_record.lot_number or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <table class="data-table" id="kit-table">
+            <thead>
+                <tr>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">REQUIRED</th>
+                    <th style="width: 100px; text-align: right;">AVAILABLE</th>
+                    <th style="width: 200px;">CONSUME FROM</th>
+                    <th style="width: 100px;">QTY</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kit in kit_items %}
+                <tr data-part-id="{{ kit.part_id }}" data-required="{{ kit.quantity_required }}">
+                    <td><a href="/parts/{{ kit.part_id }}">{{ kit.part.name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ kit.quantity_required }}</td>
+                    <td class="mono availability-cell" style="text-align: right;">-</td>
+                    <td>
+                        <select name="inv_{{ kit.part_id }}" class="form-select inv-select" data-part-id="{{ kit.part_id }}">
+                            <option value="">Loading...</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" name="qty_{{ kit.part_id }}" class="form-input qty-input"
+                               data-part-id="{{ kit.part_id }}" step="0.0001" min="0"
+                               value="{{ kit.quantity_required }}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+        {% if status_val == 'completed' %}
+        <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
+            <button class="btn btn-primary" onclick="consumeParts()">CONSUME PARTS</button>
+        </div>
+        <div id="consume-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        {% elif status_val in ['pending', 'in_progress'] %}
+        <p class="text-muted" style="margin-top: var(--space-md);">Parts can be consumed after the procedure is completed.</p>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if output_items %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        ASSEMBLY OUTPUT
+        {% if productions %}
+        <span class="status status-ok" style="float: right;">PRODUCED</span>
+        {% elif instance.status.value == 'completed' %}
+        <span class="status status-warn" style="float: right;">PENDING</span>
+        {% endif %}
+    </div>
+    <div class="panel-body">
+        {% if productions %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">QTY</th>
+                    <th style="width: 150px;">LOCATION</th>
+                    <th style="width: 100px;">LOT</th>
+                    <th style="width: 150px;">SERIAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in productions %}
+                <tr>
+                    <td><a href="/parts/{{ p.inventory_record.part_id }}">{{ p.inventory_record.part.name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ p.quantity }}</td>
+                    <td class="mono">{{ p.inventory_record.location }}</td>
+                    <td class="mono">{{ p.inventory_record.lot_number or '-' }}</td>
+                    <td class="mono">{{ p.serial_number or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <table class="data-table" id="output-table">
+            <thead>
+                <tr>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">EXPECTED</th>
+                    <th style="width: 100px;">QTY</th>
+                    <th style="width: 150px;">LOCATION *</th>
+                    <th style="width: 100px;">LOT</th>
+                    <th style="width: 150px;">SERIAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for out in output_items %}
+                <tr data-part-id="{{ out.part_id }}">
+                    <td><a href="/parts/{{ out.part_id }}">{{ out.part.name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ out.quantity_produced }}</td>
+                    <td>
+                        <input type="number" name="out_{{ out.part_id }}_qty" class="form-input"
+                               step="0.0001" min="0" value="{{ out.quantity_produced }}">
+                    </td>
+                    <td>
+                        <input type="text" name="out_{{ out.part_id }}_loc" class="form-input" placeholder="Location">
+                    </td>
+                    <td>
+                        <input type="text" name="out_{{ out.part_id }}_lot" class="form-input" placeholder="Lot #">
+                    </td>
+                    <td>
+                        <input type="text" name="out_{{ out.part_id }}_serial" class="form-input" placeholder="Serial #">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+        {% if status_val == 'completed' %}
+        <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
+            <button class="btn btn-primary" onclick="produceOutput()">RECORD OUTPUT</button>
+        </div>
+        <div id="produce-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        {% elif status_val in ['pending', 'in_progress'] %}
+        <p class="text-muted" style="margin-top: var(--space-md);">Output can be recorded after the procedure is completed.</p>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- NC Modal -->
+<div id="nc-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">LOG NON-CONFORMANCE</div>
+            <div class="panel-body">
+                <form id="nc-form" onsubmit="submitNC(event)">
+                    <input type="hidden" id="nc-step" name="step_number">
+                    <div class="form-group">
+                        <label class="form-label" for="nc-title">TITLE *</label>
+                        <input type="text" id="nc-title" name="title" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="nc-description">DESCRIPTION</label>
+                        <textarea id="nc-description" name="description" class="form-textarea" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="nc-priority">PRIORITY</label>
+                        <select id="nc-priority" name="priority" class="form-select">
+                            <option value="low">LOW</option>
+                            <option value="medium" selected>MEDIUM</option>
+                            <option value="high">HIGH</option>
+                            <option value="critical">CRITICAL</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideNCModal()">CANCEL</button>
+                        <button type="submit" class="btn btn-primary">LOG NC</button>
+                    </div>
+                </form>
+                <div id="nc-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Skip Modal -->
+<div id="skip-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">SKIP STEP</div>
+            <div class="panel-body">
+                <form id="skip-form" onsubmit="submitSkip(event)">
+                    <input type="hidden" id="skip-step" name="step_number">
+                    <p style="margin-bottom: var(--space-md);">
+                        Skip step: <strong id="skip-step-title"></strong>
+                    </p>
+                    <div class="form-group">
+                        <label class="form-label" for="skip-reason">REASON (optional)</label>
+                        <textarea id="skip-reason" name="reason" class="form-textarea" rows="2" placeholder="Why is this step being skipped?"></textarea>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        <button type="button" class="btn" onclick="hideSkipModal()">CANCEL</button>
+                        <button type="submit" class="btn text-yellow">SKIP STEP</button>
+                    </div>
+                </form>
+                <div id="skip-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const instanceId = {{ instance.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function startStep(stepNumber) {
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/start`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to start step');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function completeStep(stepNumber) {
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/complete`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({}),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to complete step');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function signoffStep(stepNumber) {
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/signoff`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to sign off step');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function abortExecution() {
+    if (!confirm('Are you sure you want to abort this execution?')) return;
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: 'aborted' }),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to abort execution');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+function showNCModal(stepNumber) {
+    document.getElementById('nc-step').value = stepNumber;
+    document.getElementById('nc-modal').style.display = 'block';
+}
+
+function hideNCModal() {
+    document.getElementById('nc-modal').style.display = 'none';
+    document.getElementById('nc-form').reset();
+}
+
+async function submitNC(event) {
+    event.preventDefault();
+    const form = document.getElementById('nc-form');
+    const errorDiv = document.getElementById('nc-error');
+    errorDiv.style.display = 'none';
+
+    const stepNumber = form.step_number.value;
+    const data = {
+        title: form.title.value,
+        description: form.description.value || null,
+        priority: form.priority.value,
+    };
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/nc`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            const issue = await response.json();
+            alert(`NC logged as Issue #${issue.id}`);
+            hideNCModal();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to log NC';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+function showSkipModal(stepNumber, stepTitle) {
+    document.getElementById('skip-step').value = stepNumber;
+    document.getElementById('skip-step-title').textContent = stepTitle;
+    document.getElementById('skip-modal').style.display = 'block';
+}
+
+function hideSkipModal() {
+    document.getElementById('skip-modal').style.display = 'none';
+    document.getElementById('skip-form').reset();
+}
+
+async function submitSkip(event) {
+    event.preventDefault();
+    const form = document.getElementById('skip-form');
+    const errorDiv = document.getElementById('skip-error');
+    errorDiv.style.display = 'none';
+
+    const stepNumber = form.step_number.value;
+    const data = {
+        reason: form.reason.value || null,
+    };
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/skip`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to skip step';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideNCModal();
+        hideSkipModal();
+    }
+});
+
+// Kit availability loading
+async function loadKitAvailability() {
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/kit-availability`, {
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            populateKitTable(data.items);
+        }
+    } catch (e) {
+        console.error('Failed to load kit availability:', e);
+    }
+}
+
+function populateKitTable(items) {
+    for (const item of items) {
+        const row = document.querySelector(`tr[data-part-id="${item.part_id}"]`);
+        if (!row) continue;
+
+        // Update availability cell
+        const availCell = row.querySelector('.availability-cell');
+        availCell.textContent = item.quantity_available.toFixed(4);
+        if (!item.is_available) {
+            availCell.classList.add('text-red');
+        }
+
+        // Populate location dropdown
+        const select = row.querySelector('.inv-select');
+        select.innerHTML = '<option value="">Select location...</option>';
+        for (const loc of item.available_locations) {
+            const opt = document.createElement('option');
+            opt.value = loc.inventory_record_id;
+            opt.textContent = `${loc.location} (${loc.quantity.toFixed(4)})${loc.lot_number ? ' - Lot: ' + loc.lot_number : ''}`;
+            opt.dataset.maxQty = loc.quantity;
+            select.appendChild(opt);
+        }
+
+        // Auto-select first location with enough quantity
+        const required = parseFloat(row.dataset.required);
+        for (const loc of item.available_locations) {
+            if (loc.quantity >= required) {
+                select.value = loc.inventory_record_id;
+                break;
+            }
+        }
+    }
+}
+
+async function consumeParts() {
+    const errorDiv = document.getElementById('consume-error');
+    errorDiv.style.display = 'none';
+
+    const items = [];
+    const rows = document.querySelectorAll('#kit-table tbody tr');
+
+    for (const row of rows) {
+        const partId = row.dataset.partId;
+        const select = row.querySelector('.inv-select');
+        const qtyInput = row.querySelector('.qty-input');
+
+        if (!select.value) {
+            errorDiv.textContent = 'Please select a location for all parts';
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        const qty = parseFloat(qtyInput.value);
+        if (qty <= 0) continue;
+
+        items.push({
+            inventory_record_id: parseInt(select.value),
+            quantity: qty,
+        });
+    }
+
+    if (items.length === 0) {
+        errorDiv.textContent = 'No parts to consume';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/consume`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ items: items }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to consume parts';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function produceOutput() {
+    const errorDiv = document.getElementById('produce-error');
+    errorDiv.style.display = 'none';
+
+    const items = [];
+    const rows = document.querySelectorAll('#output-table tbody tr');
+
+    for (const row of rows) {
+        const partId = row.dataset.partId;
+        const qtyInput = row.querySelector(`input[name="out_${partId}_qty"]`);
+        const locInput = row.querySelector(`input[name="out_${partId}_loc"]`);
+        const lotInput = row.querySelector(`input[name="out_${partId}_lot"]`);
+        const serialInput = row.querySelector(`input[name="out_${partId}_serial"]`);
+
+        const qty = parseFloat(qtyInput.value);
+        const loc = locInput.value.trim();
+
+        if (qty > 0) {
+            if (!loc) {
+                errorDiv.textContent = 'Please enter a location for all output items';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            items.push({
+                part_id: parseInt(partId),
+                quantity: qty,
+                location: loc,
+                lot_number: lotInput.value.trim() || null,
+                serial_number: serialInput.value.trim() || null,
+            });
+        }
+    }
+
+    if (items.length === 0) {
+        errorDiv.textContent = 'No output items to record';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/produce`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ items: items }),
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to record output';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Load kit availability on page load if kit section exists
+if (document.getElementById('kit-table')) {
+    loadKitAvailability();
+}
+
+// ============ Collaboration ============
+
+let collaboration = null;
+let isParticipant = false;
+
+function initCollaboration() {
+    collaboration = new ExecutionCollaboration(instanceId);
+
+    // Setup event listeners for connection status
+    window.opalEvents.on('connected', updateConnectionStatus);
+    window.opalEvents.on('disconnected', updateConnectionStatus);
+
+    // Load initial participants
+    loadParticipants();
+
+    // Update connection status
+    updateConnectionStatus();
+}
+
+function updateConnectionStatus() {
+    const statusEl = document.getElementById('connection-status');
+    const textEl = document.getElementById('connection-text');
+
+    if (window.opalEvents.isConnected) {
+        statusEl.classList.add('connected');
+        textEl.textContent = 'LIVE';
+    } else {
+        statusEl.classList.remove('connected');
+        textEl.textContent = 'OFFLINE';
+    }
+}
+
+async function loadParticipants() {
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/participants`, {
+            headers: getHeaders(),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            renderParticipants(data.participants);
+        }
+    } catch (e) {
+        console.error('Failed to load participants:', e);
+    }
+}
+
+function renderParticipants(participants) {
+    const container = document.getElementById('participants-list');
+    const currentUserId = parseInt(localStorage.getItem('opal_user_id'));
+
+    if (!participants || participants.length === 0) {
+        container.innerHTML = '<span class="text-muted">No active participants</span>';
+        updateJoinLeaveButtons(false);
+        return;
+    }
+
+    // Check if current user is a participant
+    isParticipant = participants.some(p => p.user_id === currentUserId);
+    updateJoinLeaveButtons(isParticipant);
+
+    container.innerHTML = participants.map(p => {
+        const isSelf = p.user_id === currentUserId;
+        return `
+            <div class="participant ${isSelf ? 'self' : ''}" data-user-id="${p.user_id}">
+                <span class="participant-avatar">${p.user_name.charAt(0).toUpperCase()}</span>
+                <span class="participant-name">${p.user_name}${isSelf ? ' (you)' : ''}</span>
+                ${p.last_step ? `<span class="participant-step">Step ${p.last_step}</span>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function updateJoinLeaveButtons(participating) {
+    const joinBtn = document.getElementById('join-btn');
+    const leaveBtn = document.getElementById('leave-btn');
+
+    if (joinBtn && leaveBtn) {
+        if (participating) {
+            joinBtn.style.display = 'none';
+            leaveBtn.style.display = 'inline-block';
+        } else {
+            joinBtn.style.display = 'inline-block';
+            leaveBtn.style.display = 'none';
+        }
+    }
+}
+
+async function joinExecution() {
+    if (!localStorage.getItem('opal_user_id')) {
+        alert('Please select a user first');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/join`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            renderParticipants(data.participants);
+            window.opalEvents.setActivity(`executing:${instanceId}`);
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to join execution');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function leaveExecution() {
+    try {
+        await fetch(`/api/procedure-instances/${instanceId}/leave`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+
+        window.opalEvents.setActivity(null);
+        loadParticipants();
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// Initialize collaboration on page load
+document.addEventListener('DOMContentLoaded', initCollaboration);
+
+// Auto-leave on page unload if participating
+window.addEventListener('beforeunload', function() {
+    if (isParticipant) {
+        // Use sendBeacon for reliable delivery on page unload
+        const userId = localStorage.getItem('opal_user_id');
+        if (userId) {
+            navigator.sendBeacon(
+                `/api/procedure-instances/${instanceId}/leave`,
+                new Blob([JSON.stringify({})], { type: 'application/json' })
+            );
+        }
+    }
+});
+</script>
+{% endblock %}

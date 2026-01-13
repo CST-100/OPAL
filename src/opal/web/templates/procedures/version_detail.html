@@ -1,0 +1,73 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
+<span class="breadcrumb-item"><a href="/procedures/{{ procedure.id }}">{{ procedure.name }}</a></span>
+<span class="breadcrumb-item">v{{ version.version_number }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        {{ version.content.procedure_name }} - VERSION {{ version.version_number }}
+        {% if procedure.current_version_id == version.id %}
+        <span class="status status-ok" style="float: right;">CURRENT</span>
+        {% else %}
+        <span class="status status-warn" style="float: right;">ARCHIVED</span>
+        {% endif %}
+    </div>
+    <div class="panel-body">
+        <table class="data-table" style="margin-bottom: var(--space-md);">
+            <tr>
+                <th style="width: 120px;">VERSION</th>
+                <td class="mono">v{{ version.version_number }}</td>
+            </tr>
+            <tr>
+                <th>PUBLISHED</th>
+                <td class="timestamp">{{ version.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            {% if version.content.procedure_description %}
+            <tr>
+                <th>DESCRIPTION</th>
+                <td>{{ version.content.procedure_description }}</td>
+            </tr>
+            {% endif %}
+        </table>
+
+        <div class="form-label" style="margin-bottom: var(--space-sm);">STEPS ({{ version.content.steps | length }})</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">#</th>
+                    <th>TITLE</th>
+                    <th>INSTRUCTIONS</th>
+                    <th style="width: 100px;">TYPE</th>
+                    <th style="width: 80px;">DURATION</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for step in version.content.steps %}
+                <tr>
+                    <td class="mono">{{ step.order }}</td>
+                    <td>{{ step.title }}</td>
+                    <td class="text-secondary">{{ step.instructions or '-' }}</td>
+                    <td>
+                        {% if step.is_contingency %}
+                        <span class="status status-warn">CONTINGENCY</span>
+                        {% else %}
+                        <span class="status status-info">NORMAL</span>
+                        {% endif %}
+                    </td>
+                    <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="margin-top: var(--space-lg);">
+            <a href="/procedures/{{ procedure.id }}" class="btn">BACK TO PROCEDURE</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

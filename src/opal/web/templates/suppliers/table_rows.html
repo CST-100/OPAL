@@ -1,0 +1,25 @@
+{% if suppliers %}
+{% for s in suppliers %}
+<tr>
+    <td class="id-cell"><a href="/suppliers/{{ s.id }}">{{ s.id }}</a></td>
+    <td class="mono">{{ s.code or '-' }}</td>
+    <td><a href="/suppliers/{{ s.id }}">{{ s.name }}</a></td>
+    <td class="mono">{{ s.email or '-' }}</td>
+    <td class="mono">{{ s.phone or '-' }}</td>
+    <td class="mono" style="text-align: right;">{{ s.purchase_count }}</td>
+    <td>
+        {% if s.is_active %}
+        <span class="status-badge status-active">ACTIVE</span>
+        {% else %}
+        <span class="status-badge status-inactive">INACTIVE</span>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="7" class="empty-state">
+        <p class="text-muted">No suppliers found</p>
+    </td>
+</tr>
+{% endif %}

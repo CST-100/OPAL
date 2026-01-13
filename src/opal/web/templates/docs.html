@@ -1,0 +1,262 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">DOCUMENTATION</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 1000px;">
+    <div class="panel-header">OPAL DOCUMENTATION - v{{ opal_version or '0.2.0' }}</div>
+    <div class="panel-body">
+        <div style="display: flex; gap: var(--space-xl);">
+            <!-- Table of Contents -->
+            <nav style="min-width: 200px; border-right: 1px solid var(--border-color); padding-right: var(--space-lg);">
+                <div class="form-label" style="margin-bottom: var(--space-sm);">CONTENTS</div>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li><a href="#overview" class="text-muted">Overview</a></li>
+                    <li><a href="#parts" class="text-muted">Parts & Inventory</a></li>
+                    <li><a href="#procedures" class="text-muted">Procedures</a></li>
+                    <li><a href="#issues" class="text-muted">Issues & Risks</a></li>
+                    <li><a href="#project" class="text-muted">Project Config</a></li>
+                    <li><a href="#mcp" class="text-muted">MCP / Claude Code</a></li>
+                    <li><a href="#roadmap" class="text-muted">Roadmap</a></li>
+                    <li><a href="#shortcuts" class="text-muted">Keyboard Shortcuts</a></li>
+                </ul>
+            </nav>
+
+            <!-- Content -->
+            <div style="flex: 1;">
+                <section id="overview" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">OVERVIEW</h2>
+                    <p><strong>OPAL (Operations, Procedures, Assets, Logistics)</strong> is an enterprise resource planning system optimized for small teams and hardware projects.</p>
+                    <p>Key design principles:</p>
+                    <ul>
+                        <li><strong>Local-first</strong> - Runs on a single machine, SQLite database</li>
+                        <li><strong>Full traceability</strong> - Every part movement is tracked</li>
+                        <li><strong>Procedure versioning</strong> - Immutable snapshots when published</li>
+                        <li><strong>Dense UI</strong> - Show all relevant data, no hiding information</li>
+                    </ul>
+                </section>
+
+                <section id="parts" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">PARTS & INVENTORY</h2>
+
+                    <h3>Parts</h3>
+                    <p>Parts are the core items in your inventory. Each part has:</p>
+                    <ul>
+                        <li><strong>ID</strong> - Unique, auto-incrementing, never reused</li>
+                        <li><strong>External PN</strong> - Manufacturer or supplier part number</li>
+                        <li><strong>Tier</strong> - Classification level (e.g., Flight, Ground, Loose)</li>
+                        <li><strong>Parent</strong> - Optional parent assembly for BOM structure</li>
+                        <li><strong>Category</strong> - Organizational grouping</li>
+                    </ul>
+
+                    <h3>Tiered Inventory</h3>
+                    <p>Parts are classified into tiers defined in your project config:</p>
+                    <ul>
+                        <li><strong>Tier 1 (Flight)</strong> - Flight-critical hardware requiring full traceability</li>
+                        <li><strong>Tier 2 (Ground)</strong> - Ground support equipment</li>
+                        <li><strong>Tier 3 (Loose)</strong> - Consumables and non-critical items</li>
+                    </ul>
+                    <p>Tier codes are embedded in part numbers (e.g., RV1-F-0001 for Flight tier).</p>
+
+                    <h3>OPAL Numbers</h3>
+                    <p>Each physical inventory item gets a unique OPAL number (OPAL-XXXXX) for full traceability. This tracks:</p>
+                    <ul>
+                        <li>Source (purchase order, production, manual entry)</li>
+                        <li>Location and movements</li>
+                        <li>Consumption in procedures</li>
+                        <li>Lot/batch information</li>
+                    </ul>
+
+                    <h3>Bill of Materials (BOM)</h3>
+                    <p>Parts can be organized into assemblies:</p>
+                    <ul>
+                        <li>Set a part's <strong>Parent</strong> to create hierarchy</li>
+                        <li>Use <strong>BOM Lines</strong> to define quantities of components in an assembly</li>
+                        <li>View the assembly tree from any part's detail page</li>
+                    </ul>
+                </section>
+
+                <section id="procedures" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">PROCEDURES</h2>
+
+                    <h3>Master Procedures</h3>
+                    <p>Procedures define step-by-step processes. Key concepts:</p>
+                    <ul>
+                        <li><strong>Draft/Active/Deprecated</strong> - Lifecycle states</li>
+                        <li><strong>Steps</strong> - Individual actions with instructions (supports Markdown)</li>
+                        <li><strong>Sub-steps</strong> - Nested steps for complex operations</li>
+                        <li><strong>Contingency steps</strong> - Only shown when a non-conformance occurs</li>
+                        <li><strong>Kitting</strong> - Required parts/quantities for the procedure</li>
+                    </ul>
+
+                    <h3>Versioning</h3>
+                    <p>When you <strong>Publish</strong> a procedure:</p>
+                    <ul>
+                        <li>Creates an immutable snapshot (version)</li>
+                        <li>Future edits don't affect published versions</li>
+                        <li>Executions always reference a specific version</li>
+                    </ul>
+
+                    <h3>Executions</h3>
+                    <p>An execution is a run-through of a published procedure:</p>
+                    <ul>
+                        <li>Tracks status of each step (pending, in progress, completed, skipped)</li>
+                        <li>Captures data defined in step schemas</li>
+                        <li>Records time spent on each step</li>
+                        <li>Logs non-conformances (auto-creates Issues)</li>
+                        <li>Consumes inventory items from kit</li>
+                    </ul>
+                </section>
+
+                <section id="issues" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">ISSUES & RISKS</h2>
+
+                    <h3>Issues</h3>
+                    <p>Track problems and tasks across your project:</p>
+                    <ul>
+                        <li><strong>Types</strong>: non_conformance, bug, task, improvement</li>
+                        <li><strong>Priority</strong>: low, medium, high, critical</li>
+                        <li><strong>Status</strong>: open, in_progress, resolved, closed</li>
+                        <li>Can link to parts, procedures, or executions</li>
+                        <li>Auto-created from non-conformances during execution</li>
+                    </ul>
+
+                    <h3>Risks</h3>
+                    <p>Proactive risk management with probability x impact scoring:</p>
+                    <ul>
+                        <li><strong>Probability</strong>: 1-5 scale</li>
+                        <li><strong>Impact</strong>: 1-5 scale</li>
+                        <li><strong>Severity</strong>: Calculated as P x I (low/medium/high)</li>
+                        <li>View risks on the 5x5 matrix at /risks/matrix</li>
+                    </ul>
+                </section>
+
+                <section id="project" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">PROJECT CONFIGURATION</h2>
+
+                    <p>Each project has an <code class="mono">opal.project.yaml</code> file defining:</p>
+                    <ul>
+                        <li><strong>Tiers</strong> - Inventory classification levels with codes</li>
+                        <li><strong>Part Numbering</strong> - Prefix, separator, format template</li>
+                        <li><strong>Requirements</strong> - Project-level requirements assignable to parts</li>
+                        <li><strong>Categories</strong> - Part category suggestions</li>
+                    </ul>
+
+                    <h3>Requirements</h3>
+                    <p>Define requirements in your project config, then:</p>
+                    <ul>
+                        <li>Assign requirements to parts</li>
+                        <li>Track status: open, verified, waived, not_applicable</li>
+                        <li>Record verification notes and timestamps</li>
+                    </ul>
+
+                    <h3>Running with a Project</h3>
+                    <pre class="mono" style="background: var(--bg-tertiary); padding: var(--space-sm); overflow-x: auto;">
+# From OPAL source directory:
+uv run opal serve --project /path/to/your/project
+
+# Initialize a new project's database:
+uv run opal init --project /path/to/your/project</pre>
+                </section>
+
+                <section id="mcp" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">MCP / CLAUDE CODE INTEGRATION</h2>
+
+                    <p>OPAL includes an MCP (Model Context Protocol) server for integration with Claude Code.</p>
+
+                    <h3>Setup</h3>
+                    <p>Add to your Claude Code config (<code class="mono">~/.claude.json</code>):</p>
+                    <pre class="mono" style="background: var(--bg-tertiary); padding: var(--space-sm); overflow-x: auto;">
+{
+  "mcpServers": {
+    "opal": {
+      "command": "uv",
+      "args": ["run", "opal", "mcp", "--project", "/path/to/project"],
+      "cwd": "/path/to/opal/source"
+    }
+  }
+}</pre>
+
+                    <h3>Available Tools</h3>
+                    <ul>
+                        <li><strong>get_project_info</strong> - Get project config, tiers, requirements</li>
+                        <li><strong>create_part</strong> - Create a new part</li>
+                        <li><strong>list_parts</strong> - Search and list parts</li>
+                        <li><strong>get_part</strong> - Get part details</li>
+                        <li><strong>preview_part_number</strong> - Preview part number format</li>
+                        <li><strong>list_requirements</strong> - List project requirements</li>
+                        <li><strong>assign_requirement</strong> - Assign requirement to part</li>
+                        <li><strong>verify_requirement</strong> - Mark requirement as verified</li>
+                        <li><strong>get_bom</strong> - Get bill of materials for assembly</li>
+                        <li><strong>add_component</strong> - Add component to assembly BOM</li>
+                    </ul>
+                </section>
+
+                <section id="roadmap" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">ROADMAP / TODO</h2>
+
+                    <h3>Implemented</h3>
+                    <ul>
+                        <li>Parts & inventory management</li>
+                        <li>Tiered inventory classification</li>
+                        <li>Purchase orders & receiving</li>
+                        <li>Procedure creation & versioning</li>
+                        <li>Procedure execution with data capture</li>
+                        <li>Issues & risks tracking</li>
+                        <li>Datasets & basic graphing</li>
+                        <li>Project configuration</li>
+                        <li>Bill of Materials (BOM)</li>
+                        <li>Requirements tracking</li>
+                        <li>MCP integration for Claude Code</li>
+                        <li>Audit logging</li>
+                    </ul>
+
+                    <h3>Planned / Not Yet Implemented</h3>
+                    <ul>
+                        <li>QR code / barcode scanning</li>
+                        <li>Label printing</li>
+                        <li>User authentication</li>
+                        <li>File attachments on steps</li>
+                        <li>CSV import/export</li>
+                        <li>Full-text search across all entities</li>
+                        <li>TUI (Terminal User Interface)</li>
+                        <li>Notifications/alerts</li>
+                        <li>Multi-project sync</li>
+                    </ul>
+                </section>
+
+                <section id="shortcuts" style="margin-bottom: var(--space-xl);">
+                    <h2 style="color: var(--accent-blue); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-xs);">KEYBOARD SHORTCUTS</h2>
+
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Shortcut</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td class="mono">Ctrl+K / Cmd+K</td><td>Open command palette</td></tr>
+                            <tr><td class="mono">Escape</td><td>Close modals/palettes</td></tr>
+                            <tr><td class="mono">Alt+H</td><td>Go to Home</td></tr>
+                            <tr><td class="mono">Alt+P</td><td>Go to Parts</td></tr>
+                            <tr><td class="mono">Alt+N</td><td>Go to Inventory</td></tr>
+                            <tr><td class="mono">Alt+R</td><td>Go to Procedures</td></tr>
+                            <tr><td class="mono">Alt+E</td><td>Go to Executions</td></tr>
+                            <tr><td class="mono">Alt+I</td><td>Go to Issues</td></tr>
+                            <tr><td class="mono">Alt+K</td><td>Go to Risks</td></tr>
+                            <tr><td class="mono">Alt+D</td><td>Go to Datasets</td></tr>
+                            <tr><td class="mono">Alt+U</td><td>Go to Purchases</td></tr>
+                            <tr><td class="mono">Alt+S</td><td>Go to Suppliers</td></tr>
+                            <tr><td class="mono">Alt+W</td><td>Go to Workcenters</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

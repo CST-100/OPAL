@@ -1,0 +1,118 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/issues">ISSUES</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 700px;">
+    <div class="panel-header">NEW ISSUE</div>
+    <div class="panel-body">
+        <form id="new-issue-form" onsubmit="createIssue(event)">
+            <div class="form-group">
+                <label class="form-label" for="title">TITLE *</label>
+                <input type="text" id="title" name="title" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="4"></textarea>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md);">
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label" for="issue-type">TYPE</label>
+                    <select id="issue-type" name="issue_type" class="form-select">
+                        {% for t in types %}
+                        <option value="{{ t }}" {% if t == 'task' %}selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label class="form-label" for="priority">PRIORITY</label>
+                    <select id="priority" name="priority" class="form-select">
+                        {% for p in priorities %}
+                        <option value="{{ p }}" {% if p == 'medium' %}selected{% endif %}>{{ p | upper }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">LINK TO (optional)</label>
+                <div style="display: flex; gap: var(--space-md);">
+                    <select id="part-id" name="part_id" class="form-select" style="flex: 1;">
+                        <option value="">No part...</option>
+                        {% for p in parts %}
+                        <option value="{{ p.id }}">{{ p.id }} - {{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <select id="procedure-id" name="procedure_id" class="form-select" style="flex: 1;">
+                        <option value="">No procedure...</option>
+                        {% for p in procedures %}
+                        <option value="{{ p.id }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                <a href="/issues" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE</button>
+            </div>
+        </form>
+
+        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+    </div>
+</div>
+
+<script>
+async function createIssue(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('new-issue-form');
+    const errorDiv = document.getElementById('form-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        title: form.title.value,
+        description: form.description.value || null,
+        issue_type: form.issue_type.value,
+        priority: form.priority.value,
+        part_id: form.part_id.value ? parseInt(form.part_id.value) : null,
+        procedure_id: form.procedure_id.value ? parseInt(form.procedure_id.value) : null,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    try {
+        const response = await fetch('/api/issues', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        if (response.ok) {
+            const issue = await response.json();
+            window.location.href = '/issues/' + issue.id;
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Failed to create issue';
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

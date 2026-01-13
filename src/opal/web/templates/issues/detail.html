@@ -1,0 +1,147 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/issues">ISSUES</a></span>
+<span class="breadcrumb-item">{{ issue.id }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px;">
+    <div class="panel-header">
+        ISSUE #{{ issue.id }}
+        {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+        <span class="status status-{% if type_val == 'non_conformance' %}error{% elif type_val == 'bug' %}warn{% elif type_val == 'improvement' %}info{% else %}draft{% endif %}" style="float: right;">
+            {{ type_val | upper | replace('_', ' ') }}
+        </span>
+    </div>
+    <div class="panel-body">
+        <h2 style="margin-bottom: var(--space-md);">{{ issue.title }}</h2>
+
+        <table class="data-table" style="margin-bottom: var(--space-md);">
+            <tr>
+                <th style="width: 120px;">STATUS</th>
+                <td>
+                    <select id="status-select" class="form-select" style="width: auto;" onchange="updateIssue('status', this.value)">
+                        {% for s in statuses %}
+                        {% set status_val = issue.status.value if issue.status.value is defined else issue.status %}
+                        <option value="{{ s }}" {% if status_val == s %}selected{% endif %}>{{ s | upper | replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>PRIORITY</th>
+                <td>
+                    <select id="priority-select" class="form-select" style="width: auto;" onchange="updateIssue('priority', this.value)">
+                        {% for p in priorities %}
+                        {% set priority_val = issue.priority.value if issue.priority.value is defined else issue.priority %}
+                        <option value="{{ p }}" {% if priority_val == p %}selected{% endif %}>{{ p | upper }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>TYPE</th>
+                <td>
+                    <select id="type-select" class="form-select" style="width: auto;" onchange="updateIssue('issue_type', this.value)">
+                        {% for t in types %}
+                        {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+                        <option value="{{ t }}" {% if type_val == t %}selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>CREATED</th>
+                <td class="timestamp">{{ issue.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            <tr>
+                <th>UPDATED</th>
+                <td class="timestamp">{{ issue.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+            </tr>
+            {% if issue.part_id %}
+            <tr>
+                <th>LINKED PART</th>
+                <td><a href="/parts/{{ issue.part_id }}">Part #{{ issue.part_id }}</a></td>
+            </tr>
+            {% endif %}
+            {% if issue.procedure_id %}
+            <tr>
+                <th>LINKED PROC</th>
+                <td><a href="/procedures/{{ issue.procedure_id }}">Procedure #{{ issue.procedure_id }}</a></td>
+            </tr>
+            {% endif %}
+            {% if issue.procedure_instance_id %}
+            <tr>
+                <th>LINKED EXEC</th>
+                <td><a href="/executions/{{ issue.procedure_instance_id }}">Execution #{{ issue.procedure_instance_id }}</a></td>
+            </tr>
+            {% endif %}
+        </table>
+
+        {% if issue.description %}
+        <div class="form-label">DESCRIPTION</div>
+        <div style="padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color); margin-bottom: var(--space-md);">
+            {{ issue.description }}
+        </div>
+        {% endif %}
+
+        <div style="display: flex; gap: var(--space-sm);">
+            <a href="/issues" class="btn">BACK</a>
+            <button class="btn text-red" onclick="deleteIssue()">DELETE</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const issueId = {{ issue.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function updateIssue(field, value) {
+    try {
+        const data = {};
+        data[field] = value;
+
+        const response = await fetch(`/api/issues/${issueId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            alert(error.detail || 'Failed to update issue');
+            window.location.reload();
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+        window.location.reload();
+    }
+}
+
+async function deleteIssue() {
+    if (!confirm('Are you sure you want to delete this issue?')) return;
+
+    try {
+        const response = await fetch(`/api/issues/${issueId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.href = '/issues';
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to delete issue');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

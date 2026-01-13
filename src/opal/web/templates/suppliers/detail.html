@@ -1,0 +1,137 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/suppliers">SUPPLIERS</a></span>
+<span class="breadcrumb-item">{{ supplier.name }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="panel">
+        <div class="panel-header">
+            SUPPLIER #{{ supplier.id }}
+            <a href="/suppliers/{{ supplier.id }}/edit" class="btn" style="float: right;">EDIT</a>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 150px;">ID</th>
+                    <td class="id-cell mono">{{ supplier.id }}</td>
+                </tr>
+                <tr>
+                    <th>CODE</th>
+                    <td class="mono">{{ supplier.code or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>NAME</th>
+                    <td>{{ supplier.name }}</td>
+                </tr>
+                <tr>
+                    <th>STATUS</th>
+                    <td>
+                        {% if supplier.is_active %}
+                        <span class="status-badge status-active">ACTIVE</span>
+                        {% else %}
+                        <span class="status-badge status-inactive">INACTIVE</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+
+            <div style="margin-top: var(--space-lg);">
+                <div class="form-label">CONTACT</div>
+                <table class="data-table">
+                    <tr>
+                        <th style="width: 150px;">EMAIL</th>
+                        <td>
+                            {% if supplier.email %}
+                            <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>PHONE</th>
+                        <td class="mono">{{ supplier.phone or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>WEBSITE</th>
+                        <td>
+                            {% if supplier.website %}
+                            <a href="{{ supplier.website }}" target="_blank">{{ supplier.website }}</a>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            {% if supplier.address %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">ADDRESS</div>
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); white-space: pre-wrap;">{{ supplier.address }}</div>
+            </div>
+            {% endif %}
+
+            {% if supplier.description %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">DESCRIPTION</div>
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.description }}</div>
+            </div>
+            {% endif %}
+
+            {% if supplier.notes %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">NOTES</div>
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.notes }}</div>
+            </div>
+            {% endif %}
+
+            <table class="data-table" style="margin-top: var(--space-lg);">
+                <tr>
+                    <th style="width: 150px;">CREATED</th>
+                    <td class="timestamp">{{ supplier.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+                <tr>
+                    <th>UPDATED</th>
+                    <td class="timestamp">{{ supplier.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            PURCHASE ORDERS
+            <a href="/purchases/new?supplier_id={{ supplier.id }}" class="btn btn-primary" style="float: right;">+ NEW PO</a>
+        </div>
+        <div class="panel-body">
+            {% if purchases %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>REF</th>
+                        <th>STATUS</th>
+                        <th>ORDERED</th>
+                        <th style="text-align: right;">LINES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for po in purchases %}
+                    <tr>
+                        <td class="mono"><a href="/purchases/{{ po.id }}">{{ po.reference or 'PO-' ~ po.id }}</a></td>
+                        <td><span class="status-badge status-{{ po.status | status_value }}">{{ po.status | status_value | upper }}</span></td>
+                        <td class="timestamp">{{ po.ordered_at.strftime('%Y-%m-%d') if po.ordered_at else '-' }}</td>
+                        <td class="mono" style="text-align: right;">{{ po.lines | length }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <p class="text-muted">No purchase orders for this supplier</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

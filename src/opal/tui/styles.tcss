@@ -1,0 +1,365 @@
+/* OPAL TUI Styles - US Graphics inspired */
+
+/* Global styles */
+Screen {
+    background: $surface;
+}
+
+/* Screen titles */
+.screen-title {
+    text-style: bold;
+    padding: 1 2;
+    background: $primary;
+    color: $text;
+    width: 100%;
+    text-align: center;
+}
+
+.section-title {
+    text-style: bold;
+    padding: 0 1;
+    margin-top: 1;
+    color: $primary;
+}
+
+/* Containers */
+.screen-container {
+    width: 100%;
+    height: 100%;
+}
+
+.dashboard-container {
+    width: 100%;
+    height: 100%;
+    padding: 1;
+}
+
+.main-content {
+    height: 1fr;
+    padding: 1;
+}
+
+.table-container {
+    width: 60%;
+    height: 100%;
+    border: solid $primary;
+    padding: 0;
+}
+
+.detail-panel {
+    width: 40%;
+    height: 100%;
+}
+
+#part-detail, #procedure-detail, #execution-detail, #issue-detail, #risk-detail {
+    width: 40%;
+    height: 100%;
+    border: solid $secondary;
+    padding: 1;
+}
+
+/* Stats cards */
+.stats-row {
+    height: auto;
+    padding: 1;
+}
+
+StatCard {
+    width: 1fr;
+    height: auto;
+    border: solid $primary;
+    padding: 1;
+    margin: 0 1;
+}
+
+.stat-title {
+    text-align: center;
+    color: $text-muted;
+}
+
+.stat-value {
+    text-align: center;
+    text-style: bold;
+    color: $text;
+}
+
+/* Quick actions */
+.quick-actions {
+    width: 50%;
+    padding: 1;
+    border: solid $secondary;
+}
+
+.action-hint {
+    padding: 0 1;
+    color: $text-muted;
+}
+
+.system-status {
+    width: 50%;
+    padding: 1;
+    border: solid $secondary;
+}
+
+.status-ok {
+    color: $success;
+}
+
+.status-error {
+    color: $error;
+}
+
+/* Search bar */
+.search-bar {
+    height: auto;
+    padding: 0 1;
+}
+
+#search-input {
+    width: 100%;
+    margin: 1 0;
+}
+
+/* Filter bar */
+.filter-bar {
+    height: auto;
+    padding: 0 1;
+}
+
+.filter-bar Button {
+    margin: 0 1;
+}
+
+.type-filter {
+    margin-top: 1;
+}
+
+/* Data tables */
+DataTable {
+    height: 100%;
+}
+
+DataTable > .datatable--header {
+    text-style: bold;
+    background: $primary-darken-2;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary;
+}
+
+/* Detail rows */
+.detail-row {
+    padding: 0 1;
+    margin: 0;
+}
+
+.detail-label {
+    padding: 1 1 0 1;
+    text-style: bold;
+    color: $text-muted;
+}
+
+.detail-text {
+    padding: 0 1;
+    color: $text;
+}
+
+.hint {
+    padding: 1;
+    color: $text-muted;
+    text-style: italic;
+}
+
+/* Status colors */
+.status-pending {
+    color: $warning;
+}
+
+.status-in_progress, .status-in-progress {
+    color: $primary;
+}
+
+.status-completed {
+    color: $success;
+}
+
+.status-aborted {
+    color: $error;
+}
+
+.status-open {
+    color: $warning;
+}
+
+.status-resolved {
+    color: $success;
+}
+
+.status-closed {
+    color: $text-muted;
+}
+
+/* Priority colors */
+.priority-low {
+    color: $success;
+}
+
+.priority-medium {
+    color: $warning;
+}
+
+.priority-high {
+    color: $error;
+}
+
+.priority-critical {
+    color: $error;
+    text-style: bold;
+}
+
+.priority {
+    color: $warning;
+    text-style: bold;
+}
+
+/* Type colors */
+.type-non_conformance {
+    color: $error;
+}
+
+.type-bug {
+    color: $warning;
+}
+
+.type-task {
+    color: $primary;
+}
+
+.type-improvement {
+    color: $success;
+}
+
+/* Published status */
+.published {
+    color: $success;
+}
+
+.draft {
+    color: $warning;
+}
+
+/* Steps */
+.step-item {
+    padding: 0 1;
+}
+
+.step-item.contingency {
+    color: $warning;
+}
+
+#steps-panel {
+    margin-top: 1;
+    height: auto;
+    max-height: 50%;
+    border: solid $secondary;
+}
+
+#steps-list {
+    height: auto;
+    max-height: 20;
+}
+
+/* Execution steps */
+#steps-execution {
+    height: 1fr;
+    max-height: 30;
+    border: solid $secondary;
+}
+
+.step-line {
+    padding: 0 1;
+}
+
+.step-line.pending {
+    color: $text-muted;
+}
+
+.step-line.in_progress {
+    color: $primary;
+    text-style: bold;
+}
+
+.step-line.completed {
+    color: $success;
+}
+
+.step-line.skipped {
+    color: $text-muted;
+    text-style: italic;
+}
+
+.step-controls {
+    height: auto;
+    padding: 1;
+}
+
+.step-controls Button {
+    margin: 0 1;
+}
+
+/* Risk levels */
+.risk-low {
+    color: $success;
+}
+
+.risk-medium {
+    color: $warning;
+}
+
+.risk-high {
+    color: $error;
+}
+
+.risk-critical {
+    color: $error;
+    text-style: bold;
+}
+
+/* Risk matrix */
+#risk-matrix {
+    margin-top: 1;
+    border: solid $secondary;
+    padding: 1;
+    height: auto;
+}
+
+.matrix-header, .matrix-footer {
+    color: $text-muted;
+    text-align: center;
+}
+
+.matrix-row {
+    text-align: center;
+}
+
+.matrix-legend {
+    margin-top: 1;
+    text-align: center;
+    color: $text-muted;
+}
+
+/* Dashboard content */
+.dashboard-content {
+    height: 1fr;
+    padding: 1;
+}
+
+#status-container {
+    padding: 1;
+}
+
+#activity-list {
+    height: auto;
+    max-height: 20;
+}

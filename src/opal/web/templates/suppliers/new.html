@@ -1,0 +1,150 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/suppliers">SUPPLIERS</a></span>
+<span class="breadcrumb-item">NEW</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px;">
+    <div class="panel-header">NEW SUPPLIER</div>
+    <div class="panel-body">
+        <form id="supplier-form" onsubmit="createSupplier(event)">
+            <div class="form-group">
+                <label class="form-label" for="name">NAME *</label>
+                <input type="text" id="name" name="name" class="form-input" required maxlength="255">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="code">CODE</label>
+                <input type="text" id="code" name="code" class="form-input mono" maxlength="50" placeholder="SUP001">
+                <small class="text-muted">Short unique code for quick reference</small>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="email">EMAIL</label>
+                    <input type="email" id="email" name="email" class="form-input" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="phone">PHONE</label>
+                    <input type="tel" id="phone" name="phone" class="form-input" maxlength="50">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="website">WEBSITE</label>
+                <input type="url" id="website" name="website" class="form-input" maxlength="255" placeholder="https://...">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="address">ADDRESS</label>
+                <textarea id="address" name="address" class="form-input" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-input" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="notes">NOTES</label>
+                <textarea id="notes" name="notes" class="form-input" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="is_active" name="is_active" checked>
+                    Active
+                </label>
+            </div>
+
+            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
+
+            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                <a href="/suppliers" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE SUPPLIER</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function createSupplier(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('supplier-form');
+    const errorDiv = document.getElementById('form-error');
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    errorDiv.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'CREATING...';
+
+    // Trim and convert empty strings to null
+    const trimOrNull = (val) => {
+        const trimmed = (val || '').trim();
+        return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const data = {
+        name: form.name.value.trim(),
+        code: trimOrNull(form.code.value),
+        email: trimOrNull(form.email.value),
+        phone: trimOrNull(form.phone.value),
+        website: trimOrNull(form.website.value),
+        address: trimOrNull(form.address.value),
+        description: trimOrNull(form.description.value),
+        notes: trimOrNull(form.notes.value),
+        is_active: form.is_active.checked,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+    };
+
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) {
+        headers['X-User-Id'] = userId;
+    }
+
+    console.log('Submitting supplier data:', JSON.stringify(data, null, 2));
+
+    try {
+        const response = await fetch('/api/suppliers', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(data),
+        });
+
+        console.log('Response status:', response.status);
+
+        if (response.ok) {
+            const result = await response.json();
+            window.location.href = '/suppliers/' + result.id;
+        } else {
+            let errorText = '';
+            try {
+                const error = await response.json();
+                console.log('Server error response:', JSON.stringify(error, null, 2));
+                errorText = formatApiError(error, 'Failed to create supplier');
+            } catch (parseErr) {
+                const text = await response.text();
+                console.log('Server error (non-JSON):', text);
+                errorText = `Server error (${response.status}): ${text.substring(0, 200)}`;
+            }
+            errorDiv.textContent = errorText;
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        console.error('Network/fetch error:', e);
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'CREATE SUPPLIER';
+    }
+}
+</script>
+{% endblock %}
