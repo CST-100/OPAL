@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script src="/static/js/htmx.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-brand">
+            <a href="/" class="brand-link">OPAL</a>
+            <span class="brand-version">v0.1.0</span>
+        </div>
+        <nav class="header-nav">
+            <a href="/parts" class="nav-link{% if request.url.path.startswith('/parts') %} active{% endif %}">PARTS</a>
+            <a href="/procedures" class="nav-link{% if request.url.path.startswith('/procedures') %} active{% endif %}">PROCEDURES</a>
+            <a href="/issues" class="nav-link{% if request.url.path.startswith('/issues') %} active{% endif %}">ISSUES</a>
+        </nav>
+        <div class="header-user">
+            <label for="user-select">USER:</label>
+            <select id="user-select" onchange="setUser(this.value)">
+                <option value="">Select user...</option>
+                {% for user in users %}
+                <option value="{{ user.id }}">{{ user.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </header>
+
+    <div class="breadcrumbs">
+        {% block breadcrumbs %}
+        <span class="breadcrumb-item">HOME</span>
+        {% endblock %}
+    </div>
+
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <span class="footer-status">STATUS: READY</span>
+        <span class="footer-time" id="current-time"></span>
+    </footer>
+
+    <script>
+        // User selection
+        function setUser(userId) {
+            if (userId) {
+                localStorage.setItem('opal_user_id', userId);
+            } else {
+                localStorage.removeItem('opal_user_id');
+            }
+        }
+
+        // Restore user selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const userId = localStorage.getItem('opal_user_id');
+            if (userId) {
+                document.getElementById('user-select').value = userId;
+            }
+        });
+
+        // Add user header to all HTMX requests
+        document.body.addEventListener('htmx:configRequest', function(event) {
+            const userId = localStorage.getItem('opal_user_id');
+            if (userId) {
+                event.detail.headers['X-User-Id'] = userId;
+            }
+        });
+
+        // Update time display
+        function updateTime() {
+            const now = new Date();
+            const iso = now.toISOString().replace('T', ' ').substring(0, 19);
+            document.getElementById('current-time').textContent = iso + 'Z';
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            // Alt+P -> Parts
+            if (event.altKey && event.key === 'p') {
+                window.location.href = '/parts';
+            }
+            // Alt+R -> Procedures
+            if (event.altKey && event.key === 'r') {
+                window.location.href = '/procedures';
+            }
+            // Alt+I -> Issues
+            if (event.altKey && event.key === 'i') {
+                window.location.href = '/issues';
+            }
+            // Alt+H -> Home
+            if (event.altKey && event.key === 'h') {
+                window.location.href = '/';
+            }
+        });
+    </script>
+</body>
+</html>

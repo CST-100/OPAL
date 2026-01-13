@@ -1,0 +1,169 @@
+"""OPAL CLI entry point."""
+
+import argparse
+import sys
+from pathlib import Path
+
+
+def cmd_serve(args: argparse.Namespace) -> None:
+    """Start the OPAL web server."""
+    import uvicorn
+
+    from opal.config import get_settings
+
+    settings = get_settings()
+    host = args.host or settings.host
+    port = args.port or settings.port
+
+    print(f"Starting OPAL server at http://{host}:{port}")
+
+    uvicorn.run(
+        "opal.api.app:app",
+        host=host,
+        port=port,
+        reload=settings.debug,
+    )
+
+
+def cmd_migrate(args: argparse.Namespace) -> None:
+    """Run database migrations."""
+    import subprocess
+
+    opal_dir = Path(__file__).parent.parent.parent.parent
+
+    if args.action == "upgrade":
+        revision = args.revision or "head"
+        subprocess.run(
+            ["alembic", "upgrade", revision],
+            cwd=opal_dir,
+            check=True,
+        )
+    elif args.action == "downgrade":
+        revision = args.revision or "-1"
+        subprocess.run(
+            ["alembic", "downgrade", revision],
+            cwd=opal_dir,
+            check=True,
+        )
+    elif args.action == "generate":
+        if not args.message:
+            print("Error: --message required for generate", file=sys.stderr)
+            sys.exit(1)
+        subprocess.run(
+            ["alembic", "revision", "--autogenerate", "-m", args.message],
+            cwd=opal_dir,
+            check=True,
+        )
+    elif args.action == "current":
+        subprocess.run(
+            ["alembic", "current"],
+            cwd=opal_dir,
+            check=True,
+        )
+    elif args.action == "history":
+        subprocess.run(
+            ["alembic", "history"],
+            cwd=opal_dir,
+            check=True,
+        )
+
+
+def cmd_seed(args: argparse.Namespace) -> None:
+    """Populate database with demo data."""
+    from opal.db.base import SessionLocal
+    from opal.db.models import User
+
+    db = SessionLocal()
+    try:
+        # Check if already seeded
+        if db.query(User).first():
+            print("Database already has data. Skipping seed.")
+            return
+
+        # Create demo users
+        users = [
+            User(name="Alice", email="alice@example.com"),
+            User(name="Bob", email="bob@example.com"),
+            User(name="Charlie", email="charlie@example.com"),
+        ]
+        db.add_all(users)
+        db.commit()
+
+        print(f"Created {len(users)} demo users")
+
+        # TODO: Add more seed data for parts, procedures, etc.
+
+    finally:
+        db.close()
+
+
+def cmd_init(args: argparse.Namespace) -> None:
+    """Initialize OPAL (create directories, run migrations)."""
+    from opal.config import get_settings
+
+    settings = get_settings()
+    settings.ensure_directories()
+
+    print("Created data directories")
+
+    # Run migrations
+    migrate_args = argparse.Namespace(action="upgrade", revision="head", message=None)
+    try:
+        cmd_migrate(migrate_args)
+        print("Database initialized")
+    except Exception as e:
+        print(f"Migration failed: {e}")
+        print("You may need to generate the initial migration first:")
+        print("  opal migrate generate --message 'Initial migration'")
+
+
+def main() -> None:
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(
+        prog="opal",
+        description="OPAL - Operations, Procedures, Assets, Logistics",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version="%(prog)s 0.1.0",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # serve command
+    serve_parser = subparsers.add_parser("serve", help="Start the web server")
+    serve_parser.add_argument("--host", type=str, help="Host to bind to")
+    serve_parser.add_argument("--port", type=int, help="Port to bind to")
+    serve_parser.set_defaults(func=cmd_serve)
+
+    # migrate command
+    migrate_parser = subparsers.add_parser("migrate", help="Database migrations")
+    migrate_parser.add_argument(
+        "action",
+        choices=["upgrade", "downgrade", "generate", "current", "history"],
+        help="Migration action",
+    )
+    migrate_parser.add_argument("--revision", type=str, help="Target revision")
+    migrate_parser.add_argument("--message", "-m", type=str, help="Migration message")
+    migrate_parser.set_defaults(func=cmd_migrate)
+
+    # seed command
+    seed_parser = subparsers.add_parser("seed", help="Seed demo data")
+    seed_parser.set_defaults(func=cmd_seed)
+
+    # init command
+    init_parser = subparsers.add_parser("init", help="Initialize OPAL")
+    init_parser.set_defaults(func=cmd_init)
+
+    args = parser.parse_args()
+
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
+
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

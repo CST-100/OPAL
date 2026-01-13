@@ -1,0 +1,37 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">ISSUES</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        ISSUES
+        <button class="btn btn-primary" style="float: right;">+ NEW ISSUE</button>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>TYPE</th>
+                    <th>TITLE</th>
+                    <th>STATUS</th>
+                    <th>PRIORITY</th>
+                    <th>LINKED TO</th>
+                    <th>CREATED</th>
+                </tr>
+            </thead>
+            <tbody id="issues-table-body">
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <p class="text-muted">No issues yet</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="grid grid-4">
+    <div class="stat">
+        <div class="stat-value" id="parts-count">--</div>
+        <div class="stat-label">PARTS</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value" id="procedures-count">--</div>
+        <div class="stat-label">PROCEDURES</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value" id="issues-count">--</div>
+        <div class="stat-label">OPEN ISSUES</div>
+    </div>
+    <div class="stat">
+        <div class="stat-value" id="executions-count">--</div>
+        <div class="stat-label">IN PROGRESS</div>
+    </div>
+</div>
+
+<div class="grid grid-2 mt-md">
+    <div class="panel">
+        <div class="panel-header">RECENT ACTIVITY</div>
+        <div class="panel-body">
+            <div class="empty-state">
+                <div class="empty-state-icon">[ ]</div>
+                <p>No recent activity</p>
+            </div>
+        </div>
+    </div>
+    <div class="panel">
+        <div class="panel-header">KEYBOARD SHORTCUTS</div>
+        <div class="panel-body">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>KEY</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="mono">Alt+H</td>
+                        <td>Go to Home</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">Alt+P</td>
+                        <td>Go to Parts</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">Alt+R</td>
+                        <td>Go to Procedures</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">Alt+I</td>
+                        <td>Go to Issues</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
