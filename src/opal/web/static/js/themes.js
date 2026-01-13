@@ -1,9 +1,28 @@
 /**
- * OPAL Theme System - Catppuccin Themes
- * https://github.com/catppuccin/catppuccin
+ * OPAL Theme System
+ * - Original: Classic OPAL dark theme
+ * - Catppuccin Mocha & Latte: https://github.com/catppuccin/catppuccin
  */
 
 const THEMES = {
+    original: {
+        name: 'ORIGINAL',
+        colors: {
+            '--bg-primary': '#0a0a0a',
+            '--bg-secondary': '#141414',
+            '--bg-tertiary': '#1e1e1e',
+            '--border-color': '#333',
+            '--border-light': '#444',
+            '--text-primary': '#e0e0e0',
+            '--text-secondary': '#888',
+            '--text-muted': '#666',
+            '--accent-blue': '#4a9eff',
+            '--accent-green': '#4ade80',
+            '--accent-yellow': '#fbbf24',
+            '--accent-red': '#f87171',
+            '--accent-orange': '#fb923c'
+        }
+    },
     mocha: {
         name: 'MOCHA',
         colors: {
@@ -88,11 +107,15 @@ function initTheme() {
 }
 
 /**
- * Toggle between available themes
+ * Toggle between available themes (cycles through original -> mocha -> latte)
  */
 function toggleTheme() {
     const currentTheme = getTheme();
-    const newTheme = currentTheme === 'mocha' ? 'latte' : 'mocha';
+    const themeOrder = ['original', 'mocha', 'latte'];
+    const currentIndex = themeOrder.indexOf(currentTheme);
+    const nextIndex = (currentIndex + 1) % themeOrder.length;
+    const newTheme = themeOrder[nextIndex];
+
     setTheme(newTheme);
 
     // Update select if it exists
