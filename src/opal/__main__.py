@@ -29,19 +29,23 @@ def cmd_migrate(args: argparse.Namespace) -> None:
     """Run database migrations."""
     import subprocess
 
-    opal_dir = Path(__file__).parent.parent.parent.parent
+    # Go up from __main__.py -> opal -> src -> project_root
+    opal_dir = Path(__file__).parent.parent.parent
+
+    # Use Python module invocation to ensure we use the correct environment
+    alembic_cmd = [sys.executable, "-m", "alembic"]
 
     if args.action == "upgrade":
         revision = args.revision or "head"
         subprocess.run(
-            ["alembic", "upgrade", revision],
+            alembic_cmd + ["upgrade", revision],
             cwd=opal_dir,
             check=True,
         )
     elif args.action == "downgrade":
         revision = args.revision or "-1"
         subprocess.run(
-            ["alembic", "downgrade", revision],
+            alembic_cmd + ["downgrade", revision],
             cwd=opal_dir,
             check=True,
         )
@@ -50,19 +54,19 @@ def cmd_migrate(args: argparse.Namespace) -> None:
             print("Error: --message required for generate", file=sys.stderr)
             sys.exit(1)
         subprocess.run(
-            ["alembic", "revision", "--autogenerate", "-m", args.message],
+            alembic_cmd + ["revision", "--autogenerate", "-m", args.message],
             cwd=opal_dir,
             check=True,
         )
     elif args.action == "current":
         subprocess.run(
-            ["alembic", "current"],
+            alembic_cmd + ["current"],
             cwd=opal_dir,
             check=True,
         )
     elif args.action == "history":
         subprocess.run(
-            ["alembic", "history"],
+            alembic_cmd + ["history"],
             cwd=opal_dir,
             check=True,
         )

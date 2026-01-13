@@ -6,12 +6,13 @@
     <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/css/main.css">
     <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/themes.js"></script>
 </head>
 <body>
     <header class="header">
         <div class="header-brand">
             <a href="/" class="brand-link">OPAL</a>
-            <span class="brand-version">v0.1.0</span>
+            <span class="brand-version">v0.4.0</span>
         </div>
         <nav class="header-nav">
             <a href="/parts" class="nav-link{% if request.url.path.startswith('/parts') %} active{% endif %}">PARTS</a>
@@ -19,6 +20,12 @@
             <a href="/issues" class="nav-link{% if request.url.path.startswith('/issues') %} active{% endif %}">ISSUES</a>
         </nav>
         <div class="header-user">
+            <label for="theme-select">THEME:</label>
+            <select id="theme-select" onchange="window.OPAL_THEMES.setTheme(this.value)">
+                <option value="mocha">MOCHA</option>
+                <option value="latte">LATTE</option>
+            </select>
+            <span style="color: var(--border-color); margin: 0 var(--space-sm);">|</span>
             <label for="user-select">USER:</label>
             <select id="user-select" onchange="setUser(this.value)">
                 <option value="">Select user...</option>
@@ -54,8 +61,12 @@
             }
         }
 
-        // Restore user selection
+        // Restore user selection and theme
         document.addEventListener('DOMContentLoaded', function() {
+            // Initialize theme system first
+            window.OPAL_THEMES.initTheme();
+
+            // Restore user selection
             const userId = localStorage.getItem('opal_user_id');
             if (userId) {
                 document.getElementById('user-select').value = userId;
@@ -96,6 +107,10 @@
             // Alt+H -> Home
             if (event.altKey && event.key === 'h') {
                 window.location.href = '/';
+            }
+            // Alt+T -> Toggle Theme
+            if (event.altKey && event.key === 't') {
+                window.OPAL_THEMES.toggleTheme();
             }
         });
     </script>
