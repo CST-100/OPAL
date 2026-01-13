@@ -1,6 +1,9 @@
 # Data directory (runtime)
 data/
 
+# local examples
+EXAMPLES/
+
 # Database files
 *.db
 *.db-journal
