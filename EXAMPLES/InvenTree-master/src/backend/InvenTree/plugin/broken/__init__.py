@@ -1,1 +1,0 @@
-# InvenTree plugin directory
