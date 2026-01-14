@@ -193,24 +193,6 @@ uv run alembic downgrade -1                          # Rollback one migration
 
 ## Important Context for AI Assistants
 
-### Task Completion Workflow
-
-After completing any task, follow this workflow:
-
-1. **Run tests** to ensure nothing is broken: `uv run pytest`
-2. **Increment version number** in both `pyproject.toml` and `src/opal/__init__.py`:
-   - **PATCH** (0.3.0 → 0.3.1): Bug fixes, minor tweaks, documentation
-   - **MINOR** (0.3.0 → 0.4.0): New features, new API endpoints, new UI pages
-   - **MAJOR** (0.3.0 → 1.0.0): Breaking changes, major rewrites, incompatible API changes
-3. **Commit changes** with a descriptive message:
-   ```bash
-   git add -A
-   git commit -m "v0.X.Y: Brief description of changes"
-   ```
-4. **Push to GitHub**:
-   ```bash
-   git push origin master
-   ```
 
 ### When Working on This Project
 
