@@ -44,6 +44,10 @@ class InventoryRecord(Base, IdMixin, TimestampMixin):
         String(20), nullable=True, unique=True, index=True,
         comment="Unique identifier like OPAL-00001"
     )
+    alias: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True,
+        comment="User-friendly alias for this inventory record"
+    )
 
     # Source tracking - where did this inventory come from?
     source_type: Mapped[SourceType | None] = mapped_column(
@@ -160,6 +164,10 @@ class InventoryProduction(Base, IdMixin, TimestampMixin):
     )
     serial_number: Mapped[str | None] = mapped_column(
         String(100), nullable=True, index=True, comment="Serial for trackable assemblies"
+    )
+    produced_opal_number: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True,
+        comment="OPAL number assigned to produced item"
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     produced_by_id: Mapped[int | None] = mapped_column(

@@ -49,6 +49,7 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
         "title": title,
         "project_name": project.name if project else None,
         "opal_version": __version__,
+        "app_version": f"v{__version__}",
     }
 
 
@@ -405,12 +406,15 @@ async def purchases_new(
         for p in parts
     ]
 
-    # Get suppliers for dropdown
+    # Get suppliers for dropdown - convert to dicts for JSON serialization
     suppliers = db.query(Supplier).filter(
         Supplier.deleted_at.is_(None),
         Supplier.is_active == True  # noqa: E712
     ).order_by(Supplier.name).all()
-    context["suppliers"] = suppliers
+    context["suppliers"] = [
+        {"id": s.id, "name": s.name, "code": s.code}
+        for s in suppliers
+    ]
     context["preselected_supplier_id"] = supplier_id
 
     return templates.TemplateResponse("purchases/new.html", context)
