@@ -6,18 +6,57 @@
     <title>{{ title }}</title>
     <link rel="stylesheet" href="/static/css/main.css">
     <script src="/static/js/htmx.min.js"></script>
-    <script src="/static/js/themes.js"></script>
+    <script src="/static/js/marked.min.js"></script>
+    <script src="/static/js/events.js"></script>
 </head>
 <body>
     <header class="header">
         <div class="header-brand">
             <a href="/" class="brand-link">OPAL</a>
-            <span class="brand-version">v0.4.0</span>
+            <span class="brand-version">v0.3.0</span>
         </div>
         <nav class="header-nav">
-            <a href="/parts" class="nav-link{% if request.url.path.startswith('/parts') %} active{% endif %}">PARTS</a>
-            <a href="/procedures" class="nav-link{% if request.url.path.startswith('/procedures') %} active{% endif %}">PROCEDURES</a>
-            <a href="/issues" class="nav-link{% if request.url.path.startswith('/issues') %} active{% endif %}">ISSUES</a>
+            <!-- Inventory dropdown -->
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn{% if request.url.path.startswith('/parts') or request.url.path.startswith('/inventory') or request.url.path.startswith('/purchases') or request.url.path.startswith('/suppliers') %} active{% endif %}">
+                    INVENTORY
+                </button>
+                <div class="nav-dropdown-content">
+                    <a href="/parts" class="{% if request.url.path.startswith('/parts') %}active{% endif %}">Parts</a>
+                    <a href="/inventory" class="{% if request.url.path.startswith('/inventory') %}active{% endif %}">Stock Levels</a>
+                    <a href="/purchases" class="{% if request.url.path.startswith('/purchases') %}active{% endif %}">Purchases</a>
+                    <a href="/suppliers" class="{% if request.url.path.startswith('/suppliers') %}active{% endif %}">Suppliers</a>
+                </div>
+            </div>
+
+            <!-- Manufacturing dropdown -->
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn{% if request.url.path.startswith('/procedures') or request.url.path.startswith('/executions') or request.url.path.startswith('/workcenters') %} active{% endif %}">
+                    MANUFACTURING
+                </button>
+                <div class="nav-dropdown-content">
+                    <a href="/procedures" class="{% if request.url.path.startswith('/procedures') %}active{% endif %}">Procedures</a>
+                    <a href="/executions" class="{% if request.url.path.startswith('/executions') %}active{% endif %}">Executions</a>
+                    <a href="/workcenters" class="{% if request.url.path.startswith('/workcenters') %}active{% endif %}">Workcenters</a>
+                </div>
+            </div>
+
+            <!-- Quality dropdown -->
+            <div class="nav-dropdown">
+                <button class="nav-dropdown-btn{% if request.url.path.startswith('/issues') or request.url.path.startswith('/risks') or request.url.path.startswith('/datasets') %} active{% endif %}">
+                    QUALITY
+                </button>
+                <div class="nav-dropdown-content">
+                    <a href="/issues" class="{% if request.url.path.startswith('/issues') %}active{% endif %}">Issues</a>
+                    <a href="/risks" class="{% if request.url.path.startswith('/risks') %}active{% endif %}">Risks</a>
+                    <a href="/datasets" class="{% if request.url.path.startswith('/datasets') %}active{% endif %}">Datasets</a>
+                </div>
+            </div>
+
+            <!-- Command palette trigger -->
+            <button class="nav-cmd-btn" onclick="openCommandPalette()" title="Command Palette (Ctrl+K)">
+                <span class="cmd-icon">&#8984;</span>K
+            </button>
         </nav>
         <div class="header-user">
             <label for="theme-select">THEME:</label>
@@ -52,7 +91,125 @@
         <span class="footer-time" id="current-time"></span>
     </footer>
 
+    <!-- Command Palette Modal -->
+    <div id="command-palette" class="cmd-palette" style="display: none;">
+        <div class="cmd-palette-backdrop" onclick="closeCommandPalette()"></div>
+        <div class="cmd-palette-dialog">
+            <input type="text"
+                   id="cmd-input"
+                   class="cmd-input"
+                   placeholder="Type a command or search..."
+                   autocomplete="off"
+                   oninput="filterCommands(this.value)">
+            <div id="cmd-results" class="cmd-results"></div>
+            <div class="cmd-footer">
+                <span><kbd>↑↓</kbd> navigate</span>
+                <span><kbd>Enter</kbd> select</span>
+                <span><kbd>Esc</kbd> close</span>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Command palette data
+        const commands = [
+            // Navigation
+            { type: 'nav', label: 'Go to Parts', action: '/parts', keywords: 'parts inventory components' },
+            { type: 'nav', label: 'Go to Stock Levels', action: '/inventory', keywords: 'inventory stock quantities' },
+            { type: 'nav', label: 'Go to Purchases', action: '/purchases', keywords: 'purchases orders po' },
+            { type: 'nav', label: 'Go to Suppliers', action: '/suppliers', keywords: 'suppliers vendors' },
+            { type: 'nav', label: 'Go to Procedures', action: '/procedures', keywords: 'procedures ops manufacturing' },
+            { type: 'nav', label: 'Go to Executions', action: '/executions', keywords: 'executions runs instances' },
+            { type: 'nav', label: 'Go to Workcenters', action: '/workcenters', keywords: 'workcenters stations' },
+            { type: 'nav', label: 'Go to Issues', action: '/issues', keywords: 'issues bugs problems nc' },
+            { type: 'nav', label: 'Go to Risks', action: '/risks', keywords: 'risks hazards mitigation' },
+            { type: 'nav', label: 'Go to Datasets', action: '/datasets', keywords: 'datasets charts graphs data' },
+            { type: 'nav', label: 'Go to Home', action: '/', keywords: 'home dashboard' },
+            // Actions
+            { type: 'action', label: 'New Part', action: '/parts/new', keywords: 'create add part' },
+            { type: 'action', label: 'New Purchase Order', action: '/purchases/new', keywords: 'create add purchase po' },
+            { type: 'action', label: 'New Supplier', action: '/suppliers/new', keywords: 'create add supplier vendor' },
+            { type: 'action', label: 'New Procedure', action: '/procedures/new', keywords: 'create add procedure op' },
+            { type: 'action', label: 'New Execution', action: '/executions/new', keywords: 'start run execute procedure' },
+            { type: 'action', label: 'New Workcenter', action: '/workcenters/new', keywords: 'create add workcenter station' },
+            { type: 'action', label: 'New Issue', action: '/issues/new', keywords: 'create add issue bug nc' },
+            { type: 'action', label: 'New Risk', action: '/risks/new', keywords: 'create add risk hazard' },
+            { type: 'action', label: 'New Dataset', action: '/datasets/new', keywords: 'create add dataset chart' },
+        ];
+
+        let selectedIndex = 0;
+        let filteredCommands = [...commands];
+
+        function openCommandPalette() {
+            document.getElementById('command-palette').style.display = 'flex';
+            const input = document.getElementById('cmd-input');
+            input.value = '';
+            input.focus();
+            filteredCommands = [...commands];
+            selectedIndex = 0;
+            renderCommands();
+        }
+
+        function closeCommandPalette() {
+            document.getElementById('command-palette').style.display = 'none';
+        }
+
+        function filterCommands(query) {
+            query = query.toLowerCase().trim();
+            if (!query) {
+                filteredCommands = [...commands];
+            } else {
+                filteredCommands = commands.filter(cmd => {
+                    const searchText = (cmd.label + ' ' + cmd.keywords).toLowerCase();
+                    return query.split(' ').every(term => searchText.includes(term));
+                });
+            }
+            selectedIndex = 0;
+            renderCommands();
+        }
+
+        function renderCommands() {
+            const container = document.getElementById('cmd-results');
+            if (filteredCommands.length === 0) {
+                container.innerHTML = '<div class="cmd-empty">No matches found</div>';
+                return;
+            }
+
+            container.innerHTML = filteredCommands.map((cmd, i) => `
+                <div class="cmd-item ${i === selectedIndex ? 'selected' : ''}"
+                     onclick="executeCommand(${i})"
+                     onmouseenter="selectedIndex = ${i}; renderCommands();">
+                    <span class="cmd-type cmd-type-${cmd.type}">${cmd.type === 'nav' ? 'GO' : 'NEW'}</span>
+                    <span class="cmd-label">${cmd.label}</span>
+                </div>
+            `).join('');
+        }
+
+        function executeCommand(index) {
+            const cmd = filteredCommands[index];
+            if (cmd) {
+                window.location.href = cmd.action;
+            }
+        }
+
+        // Keyboard navigation for command palette
+        document.getElementById('cmd-input').addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, filteredCommands.length - 1);
+                renderCommands();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                renderCommands();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                executeCommand(selectedIndex);
+            } else if (e.key === 'Escape') {
+                closeCommandPalette();
+            }
+        });
+
         // User selection
         function setUser(userId) {
             if (userId) {
@@ -91,29 +248,61 @@
         updateTime();
         setInterval(updateTime, 1000);
 
-        // Keyboard shortcuts
+        // Global keyboard shortcuts
         document.addEventListener('keydown', function(event) {
-            // Alt+P -> Parts
-            if (event.altKey && event.key === 'p') {
-                window.location.href = '/parts';
+            // Command palette: Ctrl+K or Cmd+K
+            if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+                event.preventDefault();
+                openCommandPalette();
+                return;
             }
-            // Alt+R -> Procedures
-            if (event.altKey && event.key === 'r') {
-                window.location.href = '/procedures';
+
+            // Escape closes command palette
+            if (event.key === 'Escape') {
+                closeCommandPalette();
+                return;
             }
-            // Alt+I -> Issues
-            if (event.altKey && event.key === 'i') {
-                window.location.href = '/issues';
-            }
-            // Alt+H -> Home
-            if (event.altKey && event.key === 'h') {
-                window.location.href = '/';
+
+            // Alt+key shortcuts still work
+            if (!event.altKey) return;
+            const shortcuts = {
+                'h': '/',
+                'p': '/parts',
+                'r': '/procedures',
+                'e': '/executions',
+                'i': '/issues',
+                'k': '/risks',
+                'd': '/datasets',
+                'n': '/inventory',
+                'u': '/purchases',
+                's': '/suppliers',
+                'w': '/workcenters',
+            };
+            if (shortcuts[event.key]) {
+                event.preventDefault();
+                window.location.href = shortcuts[event.key];
             }
             // Alt+T -> Toggle Theme
             if (event.altKey && event.key === 't') {
                 window.OPAL_THEMES.toggleTheme();
             }
         });
+
+        // Markdown rendering helper
+        function renderMarkdown() {
+            document.querySelectorAll('[data-markdown]').forEach(el => {
+                const raw = el.textContent;
+                el.innerHTML = marked.parse(raw);
+                el.classList.add('markdown-content');
+                el.removeAttribute('data-markdown');
+            });
+        }
+
+        // Render markdown on page load
+        document.addEventListener('DOMContentLoaded', renderMarkdown);
+
+        // Re-render after HTMX swaps
+        document.body.addEventListener('htmx:afterSwap', renderMarkdown);
     </script>
 </body>
 </html>

@@ -1,6 +1,9 @@
 # Data directory (runtime)
 data/
 
+# local examples
+EXAMPLES/
+
 # Database files
 *.db
 *.db-journal
@@ -62,3 +65,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Examples/scratch
+examples/

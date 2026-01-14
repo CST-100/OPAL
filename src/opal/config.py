@@ -2,9 +2,13 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+if TYPE_CHECKING:
+    from opal.project import ProjectConfig
 
 
 class Settings(BaseSettings):
@@ -76,3 +80,66 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+# Runtime settings that can be modified by project config
+_runtime_settings: Settings | None = None
+_active_project: "ProjectConfig | None" = None
+
+
+def configure_for_project(
+    project: "ProjectConfig | None" = None,
+    database_path: Path | str | None = None,
+) -> Settings:
+    """Configure settings for a specific project.
+
+    Args:
+        project: Project configuration to use.
+        database_path: Explicit database path (overrides project).
+
+    Returns:
+        Configured Settings instance.
+    """
+    global _runtime_settings, _active_project
+
+    base = get_settings()
+
+    # Determine database URL
+    if database_path:
+        db_path = Path(database_path).resolve()
+        database_url = f"sqlite:///{db_path}"
+        upload_dir = db_path.parent / "attachments"
+    elif project:
+        database_url = project.database_url
+        upload_dir = project.attachments_dir
+    else:
+        database_url = base.database_url
+        upload_dir = base.upload_dir
+
+    # Create new settings with overrides
+    _runtime_settings = Settings(
+        host=base.host,
+        port=base.port,
+        debug=base.debug,
+        database_url=database_url,
+        allowed_origins=base.allowed_origins,
+        rate_limit_enabled=base.rate_limit_enabled,
+        rate_limit_requests=base.rate_limit_requests,
+        rate_limit_window=base.rate_limit_window,
+        upload_dir=upload_dir,
+        max_upload_size=base.max_upload_size,
+        allowed_mime_types=base.allowed_mime_types,
+    )
+    _active_project = project
+
+    return _runtime_settings
+
+
+def get_active_settings() -> Settings:
+    """Get the currently active settings (runtime or default)."""
+    return _runtime_settings or get_settings()
+
+
+def get_active_project() -> "ProjectConfig | None":
+    """Get the currently active project configuration."""
+    return _active_project

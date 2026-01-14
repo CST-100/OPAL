@@ -42,6 +42,9 @@ class Risk(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
 
     # Relationships
     linked_issue: Mapped["Issue | None"] = relationship("Issue", back_populates="risk")
+    references: Mapped[list["RiskReference"]] = relationship(
+        "RiskReference", back_populates="risk", cascade="all, delete-orphan"
+    )
 
     @property
     def score(self) -> int:
