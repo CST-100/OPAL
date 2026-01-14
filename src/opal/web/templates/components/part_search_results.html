@@ -1,0 +1,15 @@
+{% if parts %}
+{% for part in parts %}
+<div class="part-search-result"
+     data-part-id="{{ part.id }}"
+     data-part-name="{{ part.name }}"
+     data-part-pn="{{ part.internal_pn or part.external_pn or '' }}"
+     onclick="selectPart(this)">
+    <span class="part-search-id">{{ part.id }}</span>
+    <span class="part-search-pn mono">{{ part.internal_pn or part.external_pn or '-' }}</span>
+    <span class="part-search-name">{{ part.name }}</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="part-search-empty">No parts found for "{{ query }}"</div>
+{% endif %}

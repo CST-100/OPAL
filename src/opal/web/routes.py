@@ -135,7 +135,7 @@ async def parts_table(
 
     parts = query.order_by(Part.id.desc()).limit(100).all()
 
-    # Calculate total quantities
+    # Calculate total quantities and attach to part-like objects
     parts_with_qty = []
     for part in parts:
         total_qty = (
@@ -143,11 +143,55 @@ async def parts_table(
             .filter(InventoryRecord.part_id == part.id)
             .scalar()
         )
-        parts_with_qty.append({"part": part, "total_qty": total_qty or 0})
+        # Create a dict with all part attributes plus total_quantity
+        part_data = {
+            "id": part.id,
+            "internal_pn": part.internal_pn,
+            "external_pn": part.external_pn,
+            "name": part.name,
+            "category": part.category,
+            "tier": part.tier,
+            "unit_of_measure": part.unit_of_measure,
+            "total_quantity": total_qty or 0,
+        }
+        parts_with_qty.append(type("PartWithQty", (), part_data)())
 
     return templates.TemplateResponse(
         "parts/table_rows.html",
         {"request": request, "parts": parts_with_qty},
+    )
+
+
+@router.get("/parts/search", response_class=HTMLResponse)
+async def parts_search_dropdown(
+    request: Request,
+    db: DbSession,
+    q: str = Query("", min_length=0),
+    limit: int = Query(5, ge=1, le=10),
+) -> HTMLResponse:
+    """Search parts and return dropdown results (HTMX partial)."""
+    if not q or len(q) < 1:
+        return HTMLResponse("")
+
+    search_term = f"%{q}%"
+    parts = (
+        db.query(Part)
+        .filter(
+            Part.deleted_at.is_(None),
+            or_(
+                Part.name.ilike(search_term),
+                Part.internal_pn.ilike(search_term),
+                Part.external_pn.ilike(search_term),
+            ),
+        )
+        .order_by(Part.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "components/part_search_results.html",
+        {"request": request, "parts": parts, "query": q},
     )
 
 

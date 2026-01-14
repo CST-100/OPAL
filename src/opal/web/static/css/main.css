@@ -962,3 +962,104 @@ select option {
     background: var(--bg-tertiary);
     color: var(--accent-red);
 }
+
+/* Part Search Component */
+.part-search-container {
+    position: relative;
+    width: 100%;
+}
+
+.part-search-input {
+    width: 100%;
+}
+
+.part-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.part-search-dropdown.active {
+    display: block;
+}
+
+.part-search-result {
+    display: grid;
+    grid-template-columns: 50px 100px 1fr;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.part-search-result:last-child {
+    border-bottom: none;
+}
+
+.part-search-result:hover {
+    background: var(--bg-tertiary);
+}
+
+.part-search-result.selected {
+    background: var(--accent-orange);
+    color: var(--bg-primary);
+}
+
+.part-search-id {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+}
+
+.part-search-pn {
+    font-family: var(--font-mono);
+    color: var(--accent-orange);
+}
+
+.part-search-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.part-search-empty {
+    padding: var(--space-md);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.part-search-selected {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    margin-top: var(--space-xs);
+}
+
+.part-search-selected .part-id {
+    font-family: var(--font-mono);
+    color: var(--accent-orange);
+}
+
+.part-search-selected .part-name {
+    flex: 1;
+}
+
+.part-search-clear {
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: var(--space-xs);
+}
+
+.part-search-clear:hover {
+    color: var(--accent-red);
+}

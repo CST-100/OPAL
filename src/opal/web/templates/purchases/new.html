@@ -89,7 +89,6 @@
 </div>
 
 <script>
-const parts = {{ parts | tojson | safe }};
 const suppliers = {{ suppliers | tojson | safe }};
 let lineCount = 0;
 
@@ -106,23 +105,95 @@ function updateSupplierText() {
     }
 }
 
+// Part search component functions
+function selectPart(el) {
+    const partId = el.dataset.partId;
+    const partName = el.dataset.partName;
+    const partPn = el.dataset.partPn;
+
+    const container = el.closest('.part-search-dropdown').parentElement;
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const dropdown = container.querySelector('.part-search-dropdown');
+    const selected = container.querySelector('.part-search-selected');
+
+    hiddenInput.value = partId;
+    selected.querySelector('.part-id').textContent = partId;
+    selected.querySelector('.part-name').textContent = partPn ? `${partPn} - ${partName}` : partName;
+    selected.style.display = 'flex';
+    searchInput.style.display = 'none';
+    dropdown.classList.remove('active');
+    dropdown.innerHTML = '';
+}
+
+function clearRowPartSelection(lineId) {
+    const row = document.getElementById('line-' + lineId);
+    if (!row) return;
+
+    const container = row.querySelector('.part-search-container');
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const selected = container.querySelector('.part-search-selected');
+
+    hiddenInput.value = '';
+    searchInput.value = '';
+    searchInput.style.display = 'block';
+    selected.style.display = 'none';
+    searchInput.focus();
+}
+
+// Show dropdown when results load
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.classList.contains('part-search-dropdown')) {
+        const dropdown = evt.detail.target;
+        if (dropdown.innerHTML.trim()) {
+            dropdown.classList.add('active');
+        } else {
+            dropdown.classList.remove('active');
+        }
+    }
+});
+
+// Hide dropdown when clicking outside
+document.addEventListener('click', function(evt) {
+    if (!evt.target.closest('.part-search-container')) {
+        document.querySelectorAll('.part-search-dropdown').forEach(d => d.classList.remove('active'));
+    }
+});
+
 function addLine() {
     const tbody = document.getElementById('lines-body');
     const row = document.createElement('tr');
     row.id = 'line-' + lineCount;
+    const currentLine = lineCount;
     row.innerHTML = `
         <td>
-            <select name="lines[${lineCount}][part_id]" class="form-select" required>
-                <option value="">Select part...</option>
-                ${parts.map(p => `<option value="${p.id}">${p.id} - ${p.name}${p.external_pn ? ' (' + p.external_pn + ')' : ''}</option>`).join('')}
-            </select>
+            <div class="part-search-container">
+                <input type="text"
+                       class="form-input part-search-input"
+                       placeholder="Search parts..."
+                       autocomplete="off"
+                       hx-get="/parts/search"
+                       hx-trigger="keyup changed delay:200ms"
+                       hx-target="#line-${currentLine}-results"
+                       hx-vals='{"limit": 5}'
+                       name="q">
+                <input type="hidden" name="lines[${currentLine}][part_id]" required>
+                <div id="line-${currentLine}-results" class="part-search-dropdown"></div>
+                <div class="part-search-selected" style="display: none;">
+                    <span class="part-id"></span>
+                    <span class="part-name"></span>
+                    <span class="part-search-clear" onclick="clearRowPartSelection(${currentLine})">&times;</span>
+                </div>
+            </div>
         </td>
-        <td><input type="number" name="lines[${lineCount}][qty_ordered]" class="form-input" step="0.0001" min="0.0001" required></td>
-        <td><input type="number" name="lines[${lineCount}][unit_cost]" class="form-input" step="0.01" min="0"></td>
-        <td><input type="text" name="lines[${lineCount}][destination]" class="form-input" placeholder="Location"></td>
-        <td><button type="button" class="btn text-red" onclick="removeLine(${lineCount})">X</button></td>
+        <td><input type="number" name="lines[${currentLine}][qty_ordered]" class="form-input" step="0.0001" min="0.0001" required></td>
+        <td><input type="number" name="lines[${currentLine}][unit_cost]" class="form-input" step="0.01" min="0"></td>
+        <td><input type="text" name="lines[${currentLine}][destination]" class="form-input" placeholder="Location"></td>
+        <td><button type="button" class="btn text-red" onclick="removeLine(${currentLine})">X</button></td>
     `;
     tbody.appendChild(row);
+    htmx.process(row);  // Process HTMX attributes on new elements
     lineCount++;
 }
 
@@ -142,19 +213,25 @@ async function createPO(event) {
     const lines = [];
     const rows = document.querySelectorAll('#lines-body tr');
     for (const row of rows) {
-        const partSelect = row.querySelector('select');
+        const partInput = row.querySelector('input[type="hidden"][name*="part_id"]');
         const qtyInput = row.querySelector('input[name*="qty_ordered"]');
         const costInput = row.querySelector('input[name*="unit_cost"]');
         const destInput = row.querySelector('input[name*="destination"]');
 
-        if (partSelect.value && qtyInput.value) {
+        if (partInput.value && qtyInput.value) {
             lines.push({
-                part_id: parseInt(partSelect.value),
+                part_id: parseInt(partInput.value),
                 qty_ordered: parseFloat(qtyInput.value),
                 unit_cost: costInput.value ? parseFloat(costInput.value) : null,
                 destination: destInput.value || null,
             });
         }
+    }
+
+    if (lines.length === 0) {
+        errorDiv.textContent = 'Please add at least one line item with a part selected';
+        errorDiv.style.display = 'block';
+        return;
     }
 
     const data = {

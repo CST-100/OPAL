@@ -193,13 +193,26 @@
             <div class="panel-body">
                 <form id="add-line-form" onsubmit="addLine(event)">
                     <div class="form-group">
-                        <label class="form-label" for="line-part">PART *</label>
-                        <select id="line-part" name="part_id" class="form-select" required>
-                            <option value="">Select part...</option>
-                            {% for p in parts %}
-                            <option value="{{ p.id }}">{{ p.id }} - {{ p.name }}{% if p.external_pn %} ({{ p.external_pn }}){% endif %}</option>
-                            {% endfor %}
-                        </select>
+                        <label class="form-label" for="line-part-search">PART *</label>
+                        <div class="part-search-container">
+                            <input type="text"
+                                   id="line-part-search"
+                                   class="form-input part-search-input"
+                                   placeholder="Search parts..."
+                                   autocomplete="off"
+                                   hx-get="/parts/search"
+                                   hx-trigger="keyup changed delay:200ms"
+                                   hx-target="#line-part-results"
+                                   hx-vals='{"limit": 5}'
+                                   name="q">
+                            <input type="hidden" id="line-part" name="part_id" required>
+                            <div id="line-part-results" class="part-search-dropdown"></div>
+                            <div id="line-part-selected" class="part-search-selected" style="display: none;">
+                                <span class="part-id"></span>
+                                <span class="part-name"></span>
+                                <span class="part-search-clear" onclick="clearPartSelection('line')">&times;</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="line-qty">QUANTITY *</label>
@@ -228,12 +241,77 @@ function getHeaders() {
     return headers;
 }
 
+// Part search component functions
+function selectPart(el) {
+    const partId = el.dataset.partId;
+    const partName = el.dataset.partName;
+    const partPn = el.dataset.partPn;
+
+    // Find the parent container
+    const container = el.closest('.part-search-dropdown').parentElement;
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const dropdown = container.querySelector('.part-search-dropdown');
+    const selected = container.querySelector('.part-search-selected');
+
+    // Set the hidden value
+    hiddenInput.value = partId;
+
+    // Update selected display
+    selected.querySelector('.part-id').textContent = partId;
+    selected.querySelector('.part-name').textContent = partPn ? `${partPn} - ${partName}` : partName;
+    selected.style.display = 'flex';
+
+    // Hide search input and dropdown
+    searchInput.style.display = 'none';
+    dropdown.classList.remove('active');
+    dropdown.innerHTML = '';
+}
+
+function clearPartSelection(prefix) {
+    const container = document.getElementById(prefix + '-part-search').closest('.part-search-container');
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const selected = container.querySelector('.part-search-selected');
+
+    hiddenInput.value = '';
+    searchInput.value = '';
+    searchInput.style.display = 'block';
+    selected.style.display = 'none';
+    searchInput.focus();
+}
+
+// Show dropdown when results load
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.classList.contains('part-search-dropdown')) {
+        const dropdown = evt.detail.target;
+        if (dropdown.innerHTML.trim()) {
+            dropdown.classList.add('active');
+        } else {
+            dropdown.classList.remove('active');
+        }
+    }
+});
+
+// Hide dropdown when clicking outside
+document.addEventListener('click', function(evt) {
+    if (!evt.target.closest('.part-search-container')) {
+        document.querySelectorAll('.part-search-dropdown').forEach(d => d.classList.remove('active'));
+    }
+});
+
 function showAddLine() {
     document.getElementById('add-line-modal').style.display = 'block';
 }
 
 function hideAddLine() {
     document.getElementById('add-line-modal').style.display = 'none';
+    // Reset the part search
+    document.getElementById('line-part').value = '';
+    document.getElementById('line-part-search').value = '';
+    document.getElementById('line-part-search').style.display = 'block';
+    document.getElementById('line-part-selected').style.display = 'none';
+    document.getElementById('line-part-results').innerHTML = '';
 }
 
 async function placeOrder() {
