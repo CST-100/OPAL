@@ -1,6 +1,5 @@
 """Database module."""
 
-from opal.db.base import Base, engine, get_db
-from opal.db.session import SessionLocal
+from opal.db.base import Base, get_db, get_engine, SessionLocal, reinitialize_engine
 
-__all__ = ["Base", "engine", "get_db", "SessionLocal"]
+__all__ = ["Base", "get_engine", "get_db", "SessionLocal", "reinitialize_engine"]
