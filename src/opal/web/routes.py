@@ -365,15 +365,21 @@ async def inventory_opal_detail(
     # Build history timeline
     history = []
 
-    # Creation event
+    # Track source PO for display
+    source_po = None
     source_info = {}
     if record.source_purchase_line_id:
         po_line = db.query(PurchaseLine).filter(PurchaseLine.id == record.source_purchase_line_id).first()
-        if po_line:
+        if po_line and po_line.purchase:
+            source_po = {
+                "id": po_line.purchase_id,
+                "number": po_line.purchase.po_number,
+            }
             source_info = {
                 "po_id": po_line.purchase_id,
-                "po_number": po_line.purchase.po_number if po_line.purchase else None,
+                "po_number": po_line.purchase.po_number,
             }
+    context["source_po"] = source_po
 
     history.append({
         "event": "created",
@@ -550,6 +556,11 @@ async def procedures_table(
 async def procedures_new(request: Request, db: DbSession) -> HTMLResponse:
     """New procedure form page."""
     context = get_base_context(request, db, "New Procedure - OPAL")
+
+    # Get workcenters for the form
+    workcenters = db.query(Workcenter).filter(Workcenter.is_active == True).order_by(Workcenter.name).all()  # noqa: E712
+    context["workcenters"] = workcenters
+
     return templates.TemplateResponse("procedures/new.html", context)
 
 

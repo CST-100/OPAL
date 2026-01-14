@@ -11,6 +11,7 @@ from opal.core.audit import log_create, log_update, get_model_dict
 from opal.core.inventory import generate_opal_number
 from opal.db.models import InventoryRecord, Part, Purchase, PurchaseLine, Supplier
 from opal.db.models.inventory import SourceType
+from opal.db.models.part import TrackingType
 from opal.db.models.purchase import PurchaseStatus
 
 router = APIRouter()
@@ -514,20 +515,40 @@ async def receive_purchase(
         # Update line received quantity
         line.qty_received += recv.qty_received
 
-        # Always create a new inventory record with OPAL number for traceability
-        # Each receipt is a distinct traceable unit
-        opal_number = generate_opal_number(db)
-        inv_record = InventoryRecord(
-            part_id=line.part_id,
-            quantity=recv.qty_received,
-            location=recv.location,
-            lot_number=recv.lot_number,
-            opal_number=opal_number,
-            source_type=SourceType.PURCHASE,
-            source_purchase_line_id=line.id,
-        )
-        db.add(inv_record)
-        db.flush()  # Ensure OPAL number is committed before generating next one
+        # Get the part to check tracking type
+        part = db.query(Part).filter(Part.id == line.part_id).first()
+
+        if part and part.tracking_type == TrackingType.SERIALIZED:
+            # Serialized parts: create individual inventory records with unique OPAL numbers
+            # Each physical unit gets its own OPAL for full traceability
+            qty_to_create = int(recv.qty_received)
+            for _ in range(qty_to_create):
+                opal_number = generate_opal_number(db)
+                inv_record = InventoryRecord(
+                    part_id=line.part_id,
+                    quantity=1,  # Individual unit
+                    location=recv.location,
+                    lot_number=recv.lot_number,
+                    opal_number=opal_number,
+                    source_type=SourceType.PURCHASE,
+                    source_purchase_line_id=line.id,
+                )
+                db.add(inv_record)
+                db.flush()  # Ensure OPAL is committed before generating next
+        else:
+            # Bulk parts: one OPAL number for the entire received quantity
+            opal_number = generate_opal_number(db)
+            inv_record = InventoryRecord(
+                part_id=line.part_id,
+                quantity=recv.qty_received,
+                location=recv.location,
+                lot_number=recv.lot_number,
+                opal_number=opal_number,
+                source_type=SourceType.PURCHASE,
+                source_purchase_line_id=line.id,
+            )
+            db.add(inv_record)
+            db.flush()
 
     # Update purchase status
     all_complete = all(line.is_complete for line in purchase.lines)

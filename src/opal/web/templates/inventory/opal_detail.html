@@ -41,8 +41,12 @@
                 <div class="detail-value">
                     {% if record.source_type %}
                         {% set source = record.source_type.value if record.source_type.value is defined else record.source_type %}
-                        {% if source == 'purchase' %}
-                        <span class="status-badge status-in_progress">From Purchase Order</span>
+                        {% if source == 'purchase' and source_po %}
+                        <a href="/purchases/{{ source_po.id }}" class="status-badge status-in_progress" style="text-decoration: none;">
+                            PO-{{ source_po.number }}
+                        </a>
+                        {% elif source == 'purchase' %}
+                        <span class="status-badge status-in_progress">From PO</span>
                         {% elif source == 'production' %}
                         <span class="status-badge status-completed">Produced</span>
                         {% elif source == 'manual' %}
@@ -62,12 +66,11 @@
         </div>
 
         <!-- Source Link -->
-        {% if record.source_purchase_line_id %}
+        {% if source_po %}
         <div style="background: var(--color-bg-secondary); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-xl);">
-            <strong>Source PO:</strong>
-            <a href="/purchases/{{ history[0].details.po_id if history and history[0].details.po_id else '' }}">
-                {{ history[0].details.po_number if history and history[0].details.po_number else 'View PO' }}
-            </a>
+            <strong>Source:</strong>
+            <a href="/purchases/{{ source_po.id }}" class="mono">PO-{{ source_po.number }}</a>
+            <span class="text-muted">Line #{{ record.source_purchase_line_id }}</span>
         </div>
         {% endif %}
 

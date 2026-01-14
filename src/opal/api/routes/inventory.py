@@ -12,6 +12,7 @@ from opal.core.audit import log_create, log_update, get_model_dict
 from opal.core.inventory import generate_opal_number
 from opal.db.models import InventoryRecord, Part, StockTestResult, StockTransfer, TestTemplate
 from opal.db.models.inventory import SourceType, TestResult, TransferStatus
+from opal.db.models.part import TrackingType
 
 router = APIRouter()
 
@@ -302,13 +303,26 @@ async def get_opal_history(
     )
 
 
-@router.post("", response_model=InventoryResponse, status_code=status.HTTP_201_CREATED)
+class InventoryCreateResponse(BaseModel):
+    """Schema for inventory creation response (may create multiple records)."""
+
+    items: list[InventoryResponse]
+    total_created: int
+
+
+@router.post("", response_model=InventoryCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_inventory(
     db: DbSession,
     inv_in: InventoryCreate,
     user_id: CurrentUserId,
-) -> InventoryResponse:
-    """Create a new inventory record with OPAL number for traceability."""
+) -> InventoryCreateResponse:
+    """Create inventory record(s) with OPAL number(s) for traceability.
+
+    For SERIALIZED parts (default): Creates individual records, one per unit,
+    each with its own OPAL number. Quantity determines how many records to create.
+
+    For BULK parts: Creates a single record with the full quantity and one OPAL number.
+    """
     # Verify part exists
     part = db.query(Part).filter(Part.id == inv_in.part_id, Part.deleted_at.is_(None)).first()
     if not part:
@@ -317,25 +331,57 @@ async def create_inventory(
             detail=f"Part {inv_in.part_id} not found",
         )
 
-    # Each inventory record gets a unique OPAL number for traceability
-    opal_number = generate_opal_number(db)
+    created_records: list[InventoryRecord] = []
 
-    record = InventoryRecord(
-        part_id=inv_in.part_id,
-        quantity=inv_in.quantity,
-        location=inv_in.location,
-        lot_number=inv_in.lot_number,
-        opal_number=opal_number,
-        source_type=SourceType.MANUAL,
+    if part.tracking_type == TrackingType.SERIALIZED:
+        # Create individual records with unique OPAL numbers for each unit
+        qty_to_create = int(inv_in.quantity)
+        if qty_to_create < 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Quantity must be at least 1 for serialized parts",
+            )
+
+        for _ in range(qty_to_create):
+            opal_number = generate_opal_number(db)
+            record = InventoryRecord(
+                part_id=inv_in.part_id,
+                quantity=1,  # Each serialized item has quantity 1
+                location=inv_in.location,
+                lot_number=inv_in.lot_number,
+                opal_number=opal_number,
+                source_type=SourceType.MANUAL,
+            )
+            db.add(record)
+            db.flush()  # Get the ID
+            created_records.append(record)
+    else:
+        # BULK parts: single record with full quantity
+        opal_number = generate_opal_number(db)
+        record = InventoryRecord(
+            part_id=inv_in.part_id,
+            quantity=inv_in.quantity,
+            location=inv_in.location,
+            lot_number=inv_in.lot_number,
+            opal_number=opal_number,
+            source_type=SourceType.MANUAL,
+        )
+        db.add(record)
+        db.flush()
+        created_records.append(record)
+
+    db.commit()
+
+    # Log all created records
+    for record in created_records:
+        db.refresh(record)
+        log_create(db, record, user_id)
+    db.commit()
+
+    return InventoryCreateResponse(
+        items=[inventory_to_response(r) for r in created_records],
+        total_created=len(created_records),
     )
-    db.add(record)
-    db.commit()
-    db.refresh(record)
-
-    log_create(db, record, user_id)
-    db.commit()
-
-    return inventory_to_response(record)
 
 
 @router.get("/{inventory_id}", response_model=InventoryResponse)

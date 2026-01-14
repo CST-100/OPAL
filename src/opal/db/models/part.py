@@ -43,8 +43,8 @@ class Part(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         "metadata", JSON, nullable=True, comment="Flexible additional fields"
     )
     tracking_type: Mapped[TrackingType] = mapped_column(
-        String(20), nullable=False, default=TrackingType.BULK,
-        comment="bulk = one OPAL per batch, serialized = one OPAL per unit"
+        String(20), nullable=False, default=TrackingType.SERIALIZED,
+        comment="bulk = one OPAL per batch, serialized = one OPAL per unit (default)"
     )
 
     # Tiered inventory classification (1=Flight, 2=Ground, 3=Loose by default)
