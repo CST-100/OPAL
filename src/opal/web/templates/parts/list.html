@@ -1,0 +1,86 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item">PARTS</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        PARTS
+        <a href="/parts/new" class="btn btn-primary" style="float: right;">+ NEW PART</a>
+    </div>
+    <div class="panel-body">
+        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <input type="text"
+                   id="search-input"
+                   class="form-input"
+                   placeholder="Search parts by name, PN, description..."
+                   style="max-width: 350px;"
+                   hx-get="/parts/table"
+                   hx-trigger="keyup changed delay:300ms, search"
+                   hx-target="#parts-table-body"
+                   hx-include="#category-filter, #tier-filter, #top-level-filter"
+                   name="search">
+            <select id="category-filter"
+                    name="category"
+                    class="form-select"
+                    style="max-width: 180px;"
+                    hx-get="/parts/table"
+                    hx-trigger="change"
+                    hx-target="#parts-table-body"
+                    hx-include="#search-input, #tier-filter, #top-level-filter">
+                <option value="">All categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select id="tier-filter"
+                    name="tier"
+                    class="form-select"
+                    style="max-width: 150px;"
+                    hx-get="/parts/table"
+                    hx-trigger="change"
+                    hx-target="#parts-table-body"
+                    hx-include="#search-input, #category-filter, #top-level-filter">
+                <option value="">All tiers</option>
+                {% for tier in tiers %}
+                <option value="{{ tier.number }}">Tier {{ tier.number }} - {{ tier.name }}</option>
+                {% endfor %}
+            </select>
+            <select id="top-level-filter"
+                    name="top_level"
+                    class="form-select"
+                    style="max-width: 180px;"
+                    hx-get="/parts/table"
+                    hx-trigger="change"
+                    hx-target="#parts-table-body"
+                    hx-include="#search-input, #category-filter, #tier-filter">
+                <option value="">All parts</option>
+                <option value="true">Top-level only</option>
+                <option value="false">Sub-components only</option>
+            </select>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th style="width: 120px;">INTERNAL PN</th>
+                    <th style="width: 120px;">EXTERNAL PN</th>
+                    <th>NAME</th>
+                    <th style="width: 150px;">CATEGORY</th>
+                    <th style="width: 60px;">TIER</th>
+                    <th style="width: 100px; text-align: right;">STOCK QTY</th>
+                    <th style="width: 80px;">UNIT</th>
+                </tr>
+            </thead>
+            <tbody id="parts-table-body" hx-get="/parts/table" hx-trigger="load">
+                <tr>
+                    <td colspan="8" class="text-muted">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

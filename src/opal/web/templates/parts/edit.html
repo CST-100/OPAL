@@ -1,0 +1,152 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
+<span class="breadcrumb-item"><a href="/parts/{{ part.id }}">{{ part.internal_pn }}</a></span>
+<span class="breadcrumb-item">EDIT</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px; margin: 0 auto;">
+    <div class="panel-header">
+        EDIT PART #{{ part.id }}
+    </div>
+    <div class="panel-body">
+        <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
+            <div class="form-group">
+                <label class="form-label">INTERNAL PN (READ-ONLY)</label>
+                <input type="text" class="form-input" value="{{ part.internal_pn }}" disabled style="background: var(--bg-tertiary); color: var(--text-muted);">
+                <small class="form-help">Internal part numbers cannot be changed</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="external_pn">EXTERNAL PART NUMBER</label>
+                <input type="text" id="external_pn" name="external_pn" class="form-input" value="{{ part.external_pn or '' }}" placeholder="Manufacturer or supplier PN">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="name">NAME <span class="text-red">*</span></label>
+                <input type="text" id="name" name="name" class="form-input" value="{{ part.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-input" rows="4" style="resize: none; overflow: hidden;" oninput="autoResize(this)">{{ part.description or '' }}</textarea>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="category">CATEGORY</label>
+                    <input type="text" id="category" name="category" class="form-input" value="{{ part.category or '' }}" list="category-list">
+                    <datalist id="category-list">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">TIER (READ-ONLY)</label>
+                    <input type="text" class="form-input" value="Tier {{ part.tier }}" disabled style="background: var(--bg-tertiary); color: var(--text-muted);">
+                    <small class="form-help">Tier cannot be changed after creation</small>
+                </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="unit_of_measure">UNIT OF MEASURE</label>
+                    <input type="text" id="unit_of_measure" name="unit_of_measure" class="form-input" value="{{ part.unit_of_measure or 'EA' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="tracking_type">TRACKING TYPE</label>
+                    <select id="tracking_type" name="tracking_type" class="form-select">
+                        <option value="BULK" {% if not part.tracking_type or part.tracking_type.value == 'BULK' %}selected{% endif %}>BULK - Track by quantity</option>
+                        <option value="SERIALIZED" {% if part.tracking_type and part.tracking_type.value == 'SERIALIZED' %}selected{% endif %}>SERIALIZED - Track individual units</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="parent_id">PARENT ASSEMBLY</label>
+                <select id="parent_id" name="parent_id" class="form-select">
+                    <option value="">None (top-level part)</option>
+                    {% for asm in assemblies %}
+                    <option value="{{ asm.id }}" {% if part.parent_id == asm.id %}selected{% endif %}>{{ asm.internal_pn }} - {{ asm.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">METADATA (JSON)</label>
+                <textarea id="metadata" name="metadata" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.875rem; resize: none; overflow: hidden;" oninput="autoResize(this)">{{ part.metadata | tojson if part.metadata else '' }}</textarea>
+            </div>
+
+            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                <a href="/parts/{{ part.id }}" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+// Auto-resize textareas on page load if they have content
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('textarea[oninput*="autoResize"]').forEach(autoResize);
+});
+
+async function submitPartForm() {
+    const form = document.getElementById('part-form');
+    const formData = new FormData(form);
+
+    // Build request body
+    const body = {
+        name: formData.get('name'),
+        external_pn: formData.get('external_pn') || null,
+        description: formData.get('description') || null,
+        category: formData.get('category') || null,
+        unit_of_measure: formData.get('unit_of_measure') || 'EA',
+        tracking_type: formData.get('tracking_type') || 'BULK',
+        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null
+    };
+
+    // Parse metadata if provided
+    const metadataText = formData.get('metadata');
+    if (metadataText && metadataText.trim()) {
+        try {
+            body.metadata = JSON.parse(metadataText);
+        } catch (e) {
+            alert('Invalid JSON in metadata field');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch('/api/parts/{{ part.id }}', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            window.location.href = '/parts/{{ part.id }}';
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to update part'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

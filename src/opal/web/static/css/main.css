@@ -257,6 +257,8 @@ body {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
 }
 
 .btn:hover {
@@ -271,6 +273,16 @@ body {
 
 .btn-primary:hover {
     background: var(--accent-blue);
+    color: var(--bg-primary);
+}
+
+.btn-danger {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.btn-danger:hover {
+    background: var(--accent-red);
     color: var(--bg-primary);
 }
 

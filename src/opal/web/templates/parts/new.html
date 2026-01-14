@@ -1,0 +1,152 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
+<span class="breadcrumb-item">NEW PART</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px; margin: 0 auto;">
+    <div class="panel-header">
+        NEW PART
+    </div>
+    <div class="panel-body">
+        <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
+            <div class="form-group">
+                <label class="form-label" for="external_pn">EXTERNAL PART NUMBER</label>
+                <input type="text" id="external_pn" name="external_pn" class="form-input" placeholder="Manufacturer or supplier PN">
+                <small class="form-help">Optional: Part number from manufacturer or supplier</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="name">NAME <span class="text-red">*</span></label>
+                <input type="text" id="name" name="name" class="form-input" required placeholder="Descriptive part name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-input" rows="4" placeholder="Detailed part description (supports markdown)" style="resize: none; overflow: hidden;" oninput="autoResize(this)"></textarea>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="category">CATEGORY</label>
+                    <input type="text" id="category" name="category" class="form-input" list="category-list" placeholder="e.g., Electronics, Mechanical">
+                    <datalist id="category-list">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">
+                        {% endfor %}
+                    </datalist>
+                    <small class="form-help">Existing categories: {{ categories | join(', ') if categories else 'None' }}</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="tier">TIER <span class="text-red">*</span></label>
+                    <select id="tier" name="tier" class="form-select" required>
+                        <option value="">Select tier...</option>
+                        {% for tier in tiers %}
+                        <option value="{{ tier.number }}">Tier {{ tier.number }} - {{ tier.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-help">Internal PN will be auto-generated based on tier</small>
+                </div>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" for="unit_of_measure">UNIT OF MEASURE</label>
+                    <input type="text" id="unit_of_measure" name="unit_of_measure" class="form-input" placeholder="EA" value="EA">
+                    <small class="form-help">e.g., EA (each), M (meter), KG, L</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="tracking_type">TRACKING TYPE</label>
+                    <select id="tracking_type" name="tracking_type" class="form-select">
+                        <option value="BULK" selected>BULK - Track by quantity</option>
+                        <option value="SERIALIZED">SERIALIZED - Track individual units</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="parent_id">PARENT ASSEMBLY</label>
+                <select id="parent_id" name="parent_id" class="form-select">
+                    <option value="">None (top-level part)</option>
+                    {% for asm in assemblies %}
+                    <option value="{{ asm.id }}">{{ asm.internal_pn }} - {{ asm.name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="form-help">Optional: Select if this part is a sub-component of another assembly</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">METADATA (JSON)</label>
+                <textarea id="metadata" name="metadata" class="form-input" rows="4" placeholder='{"key": "value"}' style="font-family: var(--font-mono); font-size: 0.875rem; resize: none; overflow: hidden;" oninput="autoResize(this)"></textarea>
+                <small class="form-help">Optional: Additional structured data as JSON</small>
+            </div>
+
+            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                <a href="/parts" class="btn">CANCEL</a>
+                <button type="submit" class="btn btn-primary">CREATE PART</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function autoResize(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+async function submitPartForm() {
+    const form = document.getElementById('part-form');
+    const formData = new FormData(form);
+
+    // Build request body
+    const body = {
+        name: formData.get('name'),
+        tier: parseInt(formData.get('tier')),
+        external_pn: formData.get('external_pn') || null,
+        description: formData.get('description') || null,
+        category: formData.get('category') || null,
+        unit_of_measure: formData.get('unit_of_measure') || 'EA',
+        tracking_type: formData.get('tracking_type') || 'BULK',
+        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null
+    };
+
+    // Parse metadata if provided
+    const metadataText = formData.get('metadata');
+    if (metadataText && metadataText.trim()) {
+        try {
+            body.metadata = JSON.parse(metadataText);
+        } catch (e) {
+            alert('Invalid JSON in metadata field');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch('/api/parts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = '/parts/' + data.id;
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to create part'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

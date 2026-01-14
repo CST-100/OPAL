@@ -1,0 +1,190 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
+<span class="breadcrumb-item">{{ part.internal_pn }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <!-- Left Column: Part Details -->
+    <div class="panel">
+        <div class="panel-header">
+            PART #{{ part.id }}
+            <div style="float: right; display: flex; gap: var(--space-sm);">
+                <a href="/parts/{{ part.id }}/edit" class="btn">EDIT</a>
+                <button class="btn btn-danger" onclick="if(confirm('Delete this part?')) { htmx.ajax('DELETE', '/api/parts/{{ part.id }}', {target: 'body', swap: 'none'}).then(() => window.location.href='/parts') }">DELETE</button>
+            </div>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 180px;">ID</th>
+                    <td class="id-cell mono">{{ part.id }}</td>
+                </tr>
+                <tr>
+                    <th>INTERNAL PN</th>
+                    <td class="mono"><strong>{{ part.internal_pn }}</strong></td>
+                </tr>
+                <tr>
+                    <th>EXTERNAL PN</th>
+                    <td class="mono">{{ part.external_pn or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>NAME</th>
+                    <td>{{ part.name }}</td>
+                </tr>
+                <tr>
+                    <th>CATEGORY</th>
+                    <td>{{ part.category or '-' }}</td>
+                </tr>
+                <tr>
+                    <th>TIER</th>
+                    <td class="mono">{{ 'Tier ' ~ part.tier if part.tier is not none else '-' }}</td>
+                </tr>
+                <tr>
+                    <th>UNIT OF MEASURE</th>
+                    <td class="mono">{{ part.unit_of_measure or 'EA' }}</td>
+                </tr>
+                <tr>
+                    <th>TRACKING TYPE</th>
+                    <td><span class="status-badge">{{ part.tracking_type.value if part.tracking_type else 'BULK' }}</span></td>
+                </tr>
+                {% if part.parent_id %}
+                <tr>
+                    <th>PARENT ASSEMBLY</th>
+                    <td><a href="/parts/{{ part.parent_id }}" class="mono">{{ part.parent.internal_pn }}</a> - {{ part.parent.name }}</td>
+                </tr>
+                {% endif %}
+            </table>
+
+            {% if part.description %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">DESCRIPTION</div>
+                <div class="markdown-content" style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ part.description }}</div>
+            </div>
+            {% endif %}
+
+            {% if part.metadata %}
+            <div style="margin-top: var(--space-md);">
+                <div class="form-label">METADATA</div>
+                <pre style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.875rem; overflow-x: auto;">{{ part.metadata | tojson(indent=2) }}</pre>
+            </div>
+            {% endif %}
+
+            <table class="data-table" style="margin-top: var(--space-lg);">
+                <tr>
+                    <th style="width: 180px;">CREATED</th>
+                    <td class="timestamp">{{ part.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+                <tr>
+                    <th>UPDATED</th>
+                    <td class="timestamp">{{ part.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Right Column: Inventory & Related Data -->
+    <div>
+        <!-- Stock Summary Panel -->
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                STOCK SUMMARY
+                <a href="/inventory/new?part_id={{ part.id }}" class="btn btn-primary" style="float: right;">+ ADD INVENTORY</a>
+            </div>
+            <div class="panel-body">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <div class="form-label">TOTAL QUANTITY</div>
+                    <div style="font-family: var(--font-mono); font-size: 2rem; font-weight: 600;">
+                        {{ '%g' % part.total_quantity if part.total_quantity else '0' }}
+                    </div>
+                </div>
+                <div class="text-muted" style="text-align: right; font-family: var(--font-mono);">{{ part.unit_of_measure or 'EA' }}</div>
+            </div>
+        </div>
+
+        <!-- Inventory Records Panel -->
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                INVENTORY RECORDS ({{ inventory_records | length }})
+            </div>
+            <div class="panel-body">
+                {% if inventory_records %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>OPAL #</th>
+                            <th>LOCATION</th>
+                            <th style="text-align: right;">QTY</th>
+                            <th>LOT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in inventory_records %}
+                        <tr>
+                            <td class="mono"><a href="/inventory/opal/{{ inv.opal_number }}">{{ inv.opal_number }}</a></td>
+                            <td>{{ inv.location or '-' }}</td>
+                            <td class="mono" style="text-align: right;">{{ '%g' % inv.quantity }}</td>
+                            <td class="mono">{{ inv.lot_number or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state">
+                    <p class="text-muted">No inventory records</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sub-components (if assembly) -->
+        {% if part.components %}
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                SUB-COMPONENTS ({{ part.components | length }})
+            </div>
+            <div class="panel-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>INTERNAL PN</th>
+                            <th>NAME</th>
+                            <th style="text-align: right;">QTY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comp in part.components %}
+                        <tr>
+                            <td class="mono"><a href="/parts/{{ comp.id }}">{{ comp.internal_pn }}</a></td>
+                            <td><a href="/parts/{{ comp.id }}">{{ comp.name }}</a></td>
+                            <td class="mono" style="text-align: right;">{{ '%g' % comp.total_quantity if comp.total_quantity else '0' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Where Used (if sub-component) -->
+        {% if part.parent_id %}
+        <div class="panel">
+            <div class="panel-header">
+                WHERE USED
+            </div>
+            <div class="panel-body">
+                <table class="data-table">
+                    <tr>
+                        <th style="width: 150px;">PARENT ASSEMBLY</th>
+                        <td><a href="/parts/{{ part.parent.id }}" class="mono">{{ part.parent.internal_pn }}</a> - {{ part.parent.name }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

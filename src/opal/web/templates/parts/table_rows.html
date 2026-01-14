@@ -1,0 +1,20 @@
+{% if parts %}
+{% for part in parts %}
+<tr>
+    <td class="id-cell"><a href="/parts/{{ part.id }}">{{ part.id }}</a></td>
+    <td class="mono"><a href="/parts/{{ part.id }}">{{ part.internal_pn }}</a></td>
+    <td class="mono">{{ part.external_pn or '-' }}</td>
+    <td><a href="/parts/{{ part.id }}">{{ part.name }}</a></td>
+    <td>{{ part.category or '-' }}</td>
+    <td class="mono" style="text-align: center;">{{ part.tier if part.tier is not none else '-' }}</td>
+    <td class="mono" style="text-align: right;">{{ '%g' % part.total_quantity if part.total_quantity else '0' }}</td>
+    <td class="mono">{{ part.unit_of_measure or '-' }}</td>
+</tr>
+{% endfor %}
+{% else %}
+<tr>
+    <td colspan="8" class="empty-state">
+        <p class="text-muted">No parts found</p>
+    </td>
+</tr>
+{% endif %}
