@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, MetaData
 from sqlalchemy.orm import Session
 
 from opal.db.models.audit import AuditAction, AuditLog
@@ -13,16 +13,26 @@ def get_model_dict(instance: Any) -> dict[str, Any]:
     """Convert SQLAlchemy model instance to dictionary.
 
     Excludes relationship attributes and includes only column values.
+    Handles edge cases like column names conflicting with SQLAlchemy internals.
     """
     mapper = inspect(instance.__class__)
     result = {}
 
     for column in mapper.columns:
-        value = getattr(instance, column.key)
+        # Use the column key (Python attribute name) to get the value
+        attr_name = column.key
+        value = getattr(instance, attr_name, None)
+
+        # Skip SQLAlchemy internal objects that aren't actual data
+        if isinstance(value, MetaData):
+            continue
+
         # Convert datetime to ISO format for JSON serialization
         if isinstance(value, datetime):
             value = value.isoformat()
-        result[column.key] = value
+
+        # Use column name (DB column) for consistency in audit logs
+        result[column.name] = value
 
     return result
 

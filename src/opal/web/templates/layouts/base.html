@@ -13,7 +13,7 @@
     <header class="header">
         <div class="header-brand">
             <a href="/" class="brand-link">OPAL</a>
-            <span class="brand-version">v0.3.0</span>
+            <span class="brand-version">{{ app_version }}</span>
         </div>
         <nav class="header-nav">
             <!-- Inventory dropdown -->
@@ -52,13 +52,18 @@
                     <a href="/datasets" class="{% if request.url.path.startswith('/datasets') %}active{% endif %}">Datasets</a>
                 </div>
             </div>
+        </nav>
 
+        <div class="header-right">
             <!-- Command palette trigger -->
             <button class="nav-cmd-btn" onclick="openCommandPalette()" title="Command Palette (Ctrl+K)">
                 <span class="cmd-icon">&#8984;</span>K
             </button>
-        </nav>
-        <div class="user-dropdown">
+
+            <!-- Project link -->
+            <a href="/project/edit" class="header-link{% if request.url.path.startswith('/project') %} active{% endif %}" title="Project Settings">PROJECT</a>
+
+            <div class="user-dropdown">
             <button class="user-dropdown-btn" id="user-btn" onclick="toggleUserDropdown()">
                 <span id="user-display">Lavie Ohana</span>
                 <span>▼</span>
@@ -244,10 +249,10 @@
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(event) {
-            const dropdown = document.querySelector('.user-dropdown');
-            const dropdownContent = document.getElementById('user-dropdown-content');
-            if (dropdown && !dropdown.contains(event.target)) {
-                dropdownContent.style.display = 'none';
+            const userDropdown = document.querySelector('.user-dropdown');
+            const userDropdownContent = document.getElementById('user-dropdown-content');
+            if (userDropdown && !userDropdown.contains(event.target)) {
+                userDropdownContent.style.display = 'none';
             }
         });
 

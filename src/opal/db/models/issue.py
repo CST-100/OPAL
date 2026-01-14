@@ -42,6 +42,10 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
     or created manually for bugs, tasks, and improvements.
     """
 
+    issue_number: Mapped[str] = mapped_column(
+        String(20), nullable=False, unique=True, index=True,
+        comment="Human-readable issue ID (e.g., IT-001)"
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     issue_type: Mapped[IssueType] = mapped_column(

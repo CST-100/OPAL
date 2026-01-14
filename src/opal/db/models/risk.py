@@ -21,6 +21,10 @@ class RiskStatus(str, Enum):
 class Risk(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
     """Risk ticket with probability x impact scoring."""
 
+    risk_number: Mapped[str] = mapped_column(
+        String(20), nullable=False, unique=True, index=True,
+        comment="Human-readable risk ID (e.g., RISK-001)"
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[RiskStatus] = mapped_column(
