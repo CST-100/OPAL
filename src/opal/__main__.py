@@ -76,7 +76,7 @@ def cmd_migrate(args: argparse.Namespace) -> None:
     if args.action == "upgrade":
         revision = args.revision or "head"
         subprocess.run(
-            ["alembic", "upgrade", revision],
+            alembic_cmd + ["upgrade", revision],
             cwd=opal_dir,
             env=env,
             check=True,
@@ -84,7 +84,7 @@ def cmd_migrate(args: argparse.Namespace) -> None:
     elif args.action == "downgrade":
         revision = args.revision or "-1"
         subprocess.run(
-            ["alembic", "downgrade", revision],
+            alembic_cmd + ["downgrade", revision],
             cwd=opal_dir,
             env=env,
             check=True,
@@ -94,21 +94,21 @@ def cmd_migrate(args: argparse.Namespace) -> None:
             print("Error: --message required for generate", file=sys.stderr)
             sys.exit(1)
         subprocess.run(
-            ["alembic", "revision", "--autogenerate", "-m", args.message],
+            alembic_cmd + ["revision", "--autogenerate", "-m", args.message],
             cwd=opal_dir,
             env=env,
             check=True,
         )
     elif args.action == "current":
         subprocess.run(
-            ["alembic", "current"],
+            alembic_cmd + ["current"],
             cwd=opal_dir,
             env=env,
             check=True,
         )
     elif args.action == "history":
         subprocess.run(
-            ["alembic", "history"],
+            alembic_cmd + ["history"],
             cwd=opal_dir,
             env=env,
             check=True,
