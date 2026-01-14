@@ -61,3 +61,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Examples/scratch
+examples/

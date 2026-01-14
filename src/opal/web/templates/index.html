@@ -2,32 +2,77 @@
 
 {% block content %}
 <div class="grid grid-4">
-    <div class="stat">
-        <div class="stat-value" id="parts-count">--</div>
+    <a href="/parts" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value">{{ parts_count }}</div>
         <div class="stat-label">PARTS</div>
-    </div>
-    <div class="stat">
-        <div class="stat-value" id="procedures-count">--</div>
+    </a>
+    <a href="/procedures" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value">{{ procedures_count }}</div>
         <div class="stat-label">PROCEDURES</div>
-    </div>
-    <div class="stat">
-        <div class="stat-value" id="issues-count">--</div>
+    </a>
+    <a href="/issues?status=open" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value{% if open_issues_count > 0 %} text-warn{% endif %}">{{ open_issues_count }}</div>
         <div class="stat-label">OPEN ISSUES</div>
-    </div>
-    <div class="stat">
-        <div class="stat-value" id="executions-count">--</div>
+    </a>
+    <a href="/executions?status=in_progress" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value{% if in_progress_count > 0 %} text-info{% endif %}">{{ in_progress_count }}</div>
         <div class="stat-label">IN PROGRESS</div>
-    </div>
+    </a>
+</div>
+
+<div class="grid grid-4 mt-sm">
+    <a href="/risks" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value">{{ risks_count }}</div>
+        <div class="stat-label">ACTIVE RISKS</div>
+    </a>
+    <a href="/risks?severity=high" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value{% if high_risks_count > 0 %} text-red{% endif %}">{{ high_risks_count }}</div>
+        <div class="stat-label">HIGH RISKS</div>
+    </a>
+    <a href="/datasets" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value">--</div>
+        <div class="stat-label">DATASETS</div>
+    </a>
+    <a href="/inventory" class="stat" style="text-decoration: none; color: inherit;">
+        <div class="stat-value">--</div>
+        <div class="stat-label">LOCATIONS</div>
+    </a>
 </div>
 
 <div class="grid grid-2 mt-md">
     <div class="panel">
         <div class="panel-header">RECENT ACTIVITY</div>
-        <div class="panel-body">
+        <div class="panel-body" style="max-height: 300px; overflow-y: auto;">
+            {% if recent_activity %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">ACTION</th>
+                        <th>ENTITY</th>
+                        <th style="width: 160px;">TIME</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in recent_activity %}
+                    {% set action_val = log.action.value if log.action.value is defined else log.action %}
+                    <tr>
+                        <td>
+                            <span class="status status-{% if action_val == 'create' %}success{% elif action_val == 'update' %}info{% elif action_val == 'delete' %}error{% else %}draft{% endif %}">
+                                {{ action_val | upper }}
+                            </span>
+                        </td>
+                        <td>{{ log.table_name }} #{{ log.record_id }}</td>
+                        <td class="timestamp">{{ log.timestamp.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
             <div class="empty-state">
                 <div class="empty-state-icon">[ ]</div>
                 <p>No recent activity</p>
             </div>
+            {% endif %}
         </div>
     </div>
     <div class="panel">
@@ -36,7 +81,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>KEY</th>
+                        <th style="width: 80px;">KEY</th>
                         <th>ACTION</th>
                     </tr>
                 </thead>
@@ -54,11 +99,37 @@
                         <td>Go to Procedures</td>
                     </tr>
                     <tr>
+                        <td class="mono">Alt+E</td>
+                        <td>Go to Executions</td>
+                    </tr>
+                    <tr>
                         <td class="mono">Alt+I</td>
                         <td>Go to Issues</td>
                     </tr>
+                    <tr>
+                        <td class="mono">Alt+K</td>
+                        <td>Go to Risks</td>
+                    </tr>
+                    <tr>
+                        <td class="mono">Alt+D</td>
+                        <td>Go to Datasets</td>
+                    </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<div class="panel mt-md">
+    <div class="panel-header">QUICK ACTIONS</div>
+    <div class="panel-body">
+        <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
+            <a href="/parts/new" class="btn btn-primary">+ NEW PART</a>
+            <a href="/procedures/new" class="btn btn-primary">+ NEW PROCEDURE</a>
+            <a href="/issues/new" class="btn btn-primary">+ NEW ISSUE</a>
+            <a href="/risks/new" class="btn btn-primary">+ NEW RISK</a>
+            <a href="/datasets/new" class="btn btn-primary">+ NEW DATASET</a>
+            <a href="/executions/new" class="btn">START EXECUTION</a>
         </div>
     </div>
 </div>
