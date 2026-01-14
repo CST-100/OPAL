@@ -308,7 +308,7 @@ async def create_purchase(
         db.add(line)
 
     db.flush()
-    log_create(db, "Purchase", purchase.id, get_model_dict(purchase), user_id)
+    log_create(db, purchase, user_id)
     db.commit()
 
     return purchase_to_response(purchase)

@@ -10,12 +10,13 @@
     </td>
     <td class="mono">{% if p.current_version_id %}v{{ p.version_number }}{% else %}-{% endif %}</td>
     <td class="mono" style="text-align: center;">{{ p.step_count }}</td>
+    <td class="timestamp">{{ p.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
     <td class="timestamp">{{ p.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="6" class="empty-state">
+    <td colspan="7" class="empty-state">
         <p class="text-muted">No procedures found</p>
     </td>
 </tr>

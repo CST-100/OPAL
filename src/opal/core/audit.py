@@ -1,6 +1,8 @@
 """Audit logging utilities."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 from sqlalchemy import inspect, MetaData
@@ -14,6 +16,7 @@ def get_model_dict(instance: Any) -> dict[str, Any]:
 
     Excludes relationship attributes and includes only column values.
     Handles edge cases like column names conflicting with SQLAlchemy internals.
+    Converts non-JSON-serializable types (Decimal, Enum, datetime) to serializable forms.
     """
     mapper = inspect(instance.__class__)
     result = {}
@@ -27,9 +30,17 @@ def get_model_dict(instance: Any) -> dict[str, Any]:
         if isinstance(value, MetaData):
             continue
 
-        # Convert datetime to ISO format for JSON serialization
+        # Convert datetime/date to ISO format for JSON serialization
         if isinstance(value, datetime):
             value = value.isoformat()
+        elif isinstance(value, date):
+            value = value.isoformat()
+        # Convert Decimal to float for JSON serialization
+        elif isinstance(value, Decimal):
+            value = float(value)
+        # Convert Enum to its value for JSON serialization
+        elif isinstance(value, Enum):
+            value = value.value
 
         # Use column name (DB column) for consistency in audit logs
         result[column.name] = value

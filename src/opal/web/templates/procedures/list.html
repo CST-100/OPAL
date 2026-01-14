@@ -9,26 +9,49 @@
 <div class="panel">
     <div class="panel-header">
         PROCEDURES
-        <button class="btn btn-primary" style="float: right;">+ NEW PROCEDURE</button>
+        <a href="/procedures/new" class="btn btn-primary" style="float: right;">+ NEW PROCEDURE</a>
     </div>
     <div class="panel-body">
+        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
+            <input type="text"
+                   id="search-input"
+                   class="form-input"
+                   placeholder="Search procedures..."
+                   style="max-width: 300px;"
+                   hx-get="/procedures/table"
+                   hx-trigger="keyup changed delay:300ms, search"
+                   hx-target="#procedures-table-body"
+                   hx-include="#status-filter"
+                   name="search">
+            <select id="status-filter"
+                    name="status"
+                    class="form-select"
+                    style="max-width: 200px;"
+                    hx-get="/procedures/table"
+                    hx-trigger="change"
+                    hx-target="#procedures-table-body"
+                    hx-include="#search-input">
+                <option value="">All statuses</option>
+                {% for status in statuses %}
+                <option value="{{ status }}">{{ status | upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 60px;">ID</th>
                     <th>NAME</th>
-                    <th>STATUS</th>
-                    <th>VERSION</th>
-                    <th>STEPS</th>
-                    <th>CREATED</th>
-                    <th>UPDATED</th>
+                    <th style="width: 100px;">STATUS</th>
+                    <th style="width: 80px;">VERSION</th>
+                    <th style="width: 60px;">STEPS</th>
+                    <th style="width: 180px;">CREATED</th>
+                    <th style="width: 180px;">UPDATED</th>
                 </tr>
             </thead>
-            <tbody id="procedures-table-body">
+            <tbody id="procedures-table-body" hx-get="/procedures/table" hx-trigger="load">
                 <tr>
-                    <td colspan="7" class="empty-state">
-                        <p class="text-muted">No procedures yet</p>
-                    </td>
+                    <td colspan="7" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
         </table>

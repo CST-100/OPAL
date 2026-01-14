@@ -492,6 +492,7 @@ async def procedures_table(
             "current_version_id": p.current_version_id,
             "version_number": version_number,
             "step_count": len(p.steps),
+            "created_at": p.created_at,
             "updated_at": p.updated_at,
         })
 
