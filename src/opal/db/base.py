@@ -14,8 +14,6 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-from opal.config import get_settings
-
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
@@ -84,26 +82,48 @@ class IdMixin:
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
 
-# Create engine from settings
-settings = get_settings()
-engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
-    echo=settings.debug,
-)
-
-# Enable SQLite foreign key support
-if "sqlite" in settings.database_url:
-
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+# Lazy engine initialization - allows project config to be set before engine creation
+_engine = None
+_session_local = None
 
 
-# Session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def _setup_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+    """Enable SQLite foreign key support."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+def get_engine():
+    """Get or create the database engine (lazy initialization)."""
+    global _engine
+    if _engine is None:
+        from opal.config import get_active_settings
+        settings = get_active_settings()
+        _engine = create_engine(
+            settings.database_url,
+            connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
+            echo=settings.debug,
+        )
+        # Enable SQLite foreign key support
+        if "sqlite" in settings.database_url:
+            event.listen(_engine, "connect", _setup_sqlite_pragma)
+    return _engine
+
+
+def reinitialize_engine():
+    """Reinitialize the engine (call after configure_for_project)."""
+    global _engine, _session_local
+    _engine = None
+    _session_local = None
+
+
+def SessionLocal():
+    """Get a database session (lazy initialization)."""
+    global _session_local
+    if _session_local is None:
+        _session_local = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return _session_local()
 
 
 def get_db() -> Generator[Session, None, None]:

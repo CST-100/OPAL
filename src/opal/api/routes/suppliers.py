@@ -1,11 +1,12 @@
 """Supplier API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
 
-from opal.api.deps import get_db, CurrentUserId
+from opal.api.deps import CurrentUserId, DbSession
 from opal.core.audit import log_create, log_update, get_model_dict
 from opal.db.models import Supplier
 
@@ -74,8 +75,8 @@ class SupplierListResponse(BaseModel):
 
 
 @router.get("", response_model=SupplierListResponse)
-def list_suppliers(
-    db: Session = Depends(get_db),
+async def list_suppliers(
+    db: DbSession,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
     search: str | None = None,
@@ -132,10 +133,10 @@ def list_suppliers(
 
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
-def create_supplier(
+async def create_supplier(
+    db: DbSession,
     data: SupplierCreate,
-    db: Session = Depends(get_db),
-    user_id: CurrentUserId = None,
+    user_id: CurrentUserId,
 ):
     """Create a new supplier."""
     # Check for duplicate code
@@ -175,7 +176,10 @@ def create_supplier(
 
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
-def get_supplier(supplier_id: int, db: Session = Depends(get_db)):
+async def get_supplier(
+    db: DbSession,
+    supplier_id: int,
+):
     """Get a supplier by ID."""
     supplier = db.execute(
         select(Supplier).where(
@@ -205,11 +209,11 @@ def get_supplier(supplier_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{supplier_id}", response_model=SupplierResponse)
-def update_supplier(
+async def update_supplier(
+    db: DbSession,
     supplier_id: int,
     data: SupplierUpdate,
-    db: Session = Depends(get_db),
-    user_id: CurrentUserId = None,
+    user_id: CurrentUserId,
 ):
     """Update a supplier."""
     supplier = db.execute(
@@ -246,7 +250,6 @@ def update_supplier(
         setattr(supplier, key, value)
 
     db.flush()
-    new_data = get_model_dict(supplier)
     log_update(db, supplier, old_data, user_id)
     db.commit()
     db.refresh(supplier)
@@ -267,10 +270,10 @@ def update_supplier(
 
 
 @router.delete("/{supplier_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_supplier(
+async def delete_supplier(
+    db: DbSession,
     supplier_id: int,
-    db: Session = Depends(get_db),
-    user_id: CurrentUserId = None,
+    user_id: CurrentUserId,
 ):
     """Soft-delete a supplier."""
     supplier = db.execute(
@@ -292,11 +295,8 @@ def delete_supplier(
             detail="Cannot delete supplier with existing purchase orders. Deactivate instead.",
         )
 
-    from datetime import datetime, timezone
-
     old_data = get_model_dict(supplier)
     supplier.deleted_at = datetime.now(timezone.utc)
     db.flush()
-    new_data = get_model_dict(supplier)
     log_update(db, supplier, old_data, user_id)
     db.commit()

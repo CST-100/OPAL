@@ -80,6 +80,9 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         "ProcedureInstance", back_populates="issues"
     )
     risk: Mapped["Risk | None"] = relationship("Risk", back_populates="linked_issue")
+    references: Mapped[list["IssueReference"]] = relationship(
+        "IssueReference", back_populates="issue", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Issue(id={self.id}, type={self.issue_type}, title='{self.title}', status={self.status})>"
