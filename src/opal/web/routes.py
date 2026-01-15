@@ -257,9 +257,12 @@ async def parts_detail(request: Request, db: DbSession, part_id: int) -> HTMLRes
     context["tier_name"] = tier_name
 
     # Get inventory records
-    inventory = db.query(InventoryRecord).filter(InventoryRecord.part_id == part_id).all()
-    context["inventory"] = inventory
-    context["total_qty"] = sum(r.quantity for r in inventory)
+    inventory_records = db.query(InventoryRecord).filter(InventoryRecord.part_id == part_id).all()
+    context["inventory_records"] = inventory_records
+
+    # Calculate total quantity for display
+    total_quantity = sum(r.quantity for r in inventory_records)
+    part.total_quantity = total_quantity  # Attach to part for template access
 
     return templates.TemplateResponse("parts/detail.html", context)
 
@@ -302,6 +305,28 @@ async def inventory_list(request: Request, db: DbSession) -> HTMLResponse:
     context["locations"] = sorted([l[0] for l in locations])
 
     return templates.TemplateResponse("inventory/list.html", context)
+
+
+@router.get("/inventory/new", response_class=HTMLResponse)
+async def inventory_new(
+    request: Request,
+    db: DbSession,
+    part_id: int | None = Query(None),
+) -> HTMLResponse:
+    """New inventory record form page."""
+    context = get_base_context(request, db, "Add Inventory - OPAL")
+
+    # Get locations for autocomplete
+    locations = db.query(InventoryRecord.location).distinct().all()
+    context["locations"] = sorted([l[0] for l in locations if l[0]])
+
+    # If part_id provided, load the part
+    selected_part = None
+    if part_id:
+        selected_part = db.query(Part).filter(Part.id == part_id, Part.deleted_at.is_(None)).first()
+    context["selected_part"] = selected_part
+
+    return templates.TemplateResponse("inventory/new.html", context)
 
 
 @router.get("/inventory/table", response_class=HTMLResponse)
@@ -373,11 +398,11 @@ async def inventory_opal_detail(
         if po_line and po_line.purchase:
             source_po = {
                 "id": po_line.purchase_id,
-                "number": po_line.purchase.po_number,
+                "number": po_line.purchase.reference,
             }
             source_info = {
                 "po_id": po_line.purchase_id,
-                "po_number": po_line.purchase.po_number,
+                "po_number": po_line.purchase.reference,
             }
     context["source_po"] = source_po
 

@@ -4,6 +4,7 @@
      data-part-id="{{ part.id }}"
      data-part-name="{{ part.name }}"
      data-part-pn="{{ part.internal_pn or part.external_pn or '' }}"
+     data-tracking-type="{{ part.tracking_type.value if part.tracking_type else 'BULK' }}"
      onclick="selectPart(this)">
     <span class="part-search-id">{{ part.id }}</span>
     <span class="part-search-pn mono">{{ part.internal_pn or part.external_pn or '-' }}</span>

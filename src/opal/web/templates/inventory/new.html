@@ -1,0 +1,188 @@
+{% extends "layouts/base.html" %}
+
+{% block breadcrumbs %}
+<span class="breadcrumb-item">HOME</span>
+<span class="breadcrumb-item"><a href="/inventory">INVENTORY</a></span>
+<span class="breadcrumb-item">ADD INVENTORY</span>
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px; margin: 0 auto;">
+    <div class="panel-header">
+        ADD INVENTORY
+    </div>
+    <div class="panel-body">
+        <form id="inventory-form" onsubmit="event.preventDefault(); submitInventoryForm();">
+            <!-- Part Selection -->
+            <div class="form-group">
+                <label class="form-label" for="part_id">PART <span class="text-red">*</span></label>
+                {% if selected_part %}
+                <input type="hidden" id="part_id" name="part_id" value="{{ selected_part.id }}">
+                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                    <span class="mono"><strong>{{ selected_part.internal_pn }}</strong></span> - {{ selected_part.name }}
+                    <br>
+                    <small class="text-muted">
+                        Tracking: {{ selected_part.tracking_type.value if selected_part.tracking_type else 'BULK' }}
+                        {% if selected_part.tracking_type and selected_part.tracking_type.value == 'SERIALIZED' %}
+                        (individual OPAL # per unit)
+                        {% else %}
+                        (one OPAL # for entire quantity)
+                        {% endif %}
+                    </small>
+                </div>
+                {% else %}
+                <div class="part-search-container" style="position: relative;">
+                    <input type="hidden" id="part_id" name="part_id" required>
+                    <input type="text"
+                           id="part_search"
+                           class="form-input"
+                           placeholder="Search by name or part number..."
+                           autocomplete="off"
+                           hx-get="/parts/search"
+                           hx-trigger="keyup changed delay:200ms"
+                           hx-target="#part-search-results"
+                           hx-vals='{"limit": "5"}'
+                           name="q">
+                    <div id="part-search-results" class="part-search-dropdown"></div>
+                    <div id="selected-part-display" style="display: none; margin-top: var(--space-xs); padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);"></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quantity -->
+            <div class="form-group">
+                <label class="form-label" for="quantity">QUANTITY <span class="text-red">*</span></label>
+                <input type="number" id="quantity" name="quantity" class="form-input" required min="1" step="1" value="1">
+                <small class="form-help" id="quantity-help">
+                    {% if selected_part and selected_part.tracking_type and selected_part.tracking_type.value == 'SERIALIZED' %}
+                    For serialized parts, this creates separate inventory records (e.g., qty 5 = 5 individual OPALs)
+                    {% else %}
+                    Number of units to add
+                    {% endif %}
+                </small>
+            </div>
+
+            <!-- Location -->
+            <div class="form-group">
+                <label class="form-label" for="location">LOCATION <span class="text-red">*</span></label>
+                <input type="text" id="location" name="location" class="form-input" required
+                       list="location-list" placeholder="e.g., SHELF-A1, BIN-001">
+                <datalist id="location-list">
+                    {% for loc in locations %}
+                    <option value="{{ loc }}">
+                    {% endfor %}
+                </datalist>
+                <small class="form-help">Where this inventory will be stored</small>
+            </div>
+
+            <!-- Lot Number (optional) -->
+            <div class="form-group">
+                <label class="form-label" for="lot_number">LOT NUMBER</label>
+                <input type="text" id="lot_number" name="lot_number" class="form-input" placeholder="Optional: Supplier lot or batch number">
+            </div>
+
+            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                {% if selected_part %}
+                <a href="/parts/{{ selected_part.id }}" class="btn">CANCEL</a>
+                {% else %}
+                <a href="/inventory" class="btn">CANCEL</a>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">ADD INVENTORY</button>
+            </div>
+        </form>
+
+        <div id="result-message" style="display: none; margin-top: var(--space-md); padding: var(--space-md); border: 1px solid var(--border-color);"></div>
+    </div>
+</div>
+
+<script>
+function selectPart(element) {
+    const partId = element.dataset.partId;
+    const partName = element.dataset.partName;
+    const partPn = element.dataset.partPn;
+    const trackingType = element.dataset.trackingType || 'BULK';
+
+    document.getElementById('part_id').value = partId;
+    document.getElementById('part_search').style.display = 'none';
+    document.getElementById('part-search-results').innerHTML = '';
+
+    const display = document.getElementById('selected-part-display');
+    display.style.display = 'block';
+    display.innerHTML = `<span class="mono"><strong>${partPn}</strong></span> - ${partName} <a href="#" onclick="clearPartSelection(); return false;" style="margin-left: var(--space-sm);">[change]</a>
+        <br><small class="text-muted">Tracking: ${trackingType}</small>`;
+
+    // Update quantity help text based on tracking type
+    const qtyHelp = document.getElementById('quantity-help');
+    if (trackingType === 'SERIALIZED') {
+        qtyHelp.textContent = 'For serialized parts, this creates separate inventory records (e.g., qty 5 = 5 individual OPALs)';
+    } else {
+        qtyHelp.textContent = 'Number of units to add';
+    }
+}
+
+function clearPartSelection() {
+    document.getElementById('part_id').value = '';
+    document.getElementById('part_search').style.display = 'block';
+    document.getElementById('part_search').value = '';
+    document.getElementById('selected-part-display').style.display = 'none';
+}
+
+async function submitInventoryForm() {
+    const form = document.getElementById('inventory-form');
+    const formData = new FormData(form);
+
+    const partId = formData.get('part_id');
+    if (!partId) {
+        alert('Please select a part');
+        return;
+    }
+
+    const body = {
+        part_id: parseInt(partId),
+        quantity: parseFloat(formData.get('quantity')),
+        location: formData.get('location'),
+        lot_number: formData.get('lot_number') || null
+    };
+
+    try {
+        const response = await fetch('/api/inventory', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const resultDiv = document.getElementById('result-message');
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'var(--color-success-bg)';
+            resultDiv.style.borderColor = 'var(--color-success)';
+
+            if (data.total_created === 1) {
+                // Single item - redirect to OPAL detail
+                resultDiv.innerHTML = `<strong>Success!</strong> Created 1 inventory record. Redirecting...`;
+                setTimeout(() => {
+                    window.location.href = '/inventory/opal/' + data.items[0].opal_number;
+                }, 1000);
+            } else {
+                // Multiple items - show summary and link back to part
+                resultDiv.innerHTML = `<strong>Success!</strong> Created ${data.total_created} inventory records with OPAL numbers:<br>
+                    <span class="mono">${data.items.map(i => i.opal_number).join(', ')}</span>`;
+
+                // Add navigation button
+                const partId = formData.get('part_id');
+                resultDiv.innerHTML += `<br><br><a href="/parts/${partId}" class="btn btn-primary">View Part Inventory</a>`;
+            }
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to add inventory'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

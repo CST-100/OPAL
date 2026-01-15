@@ -80,7 +80,7 @@
 
             <div class="form-group">
                 <label class="form-label">METADATA (JSON)</label>
-                <textarea id="metadata" name="metadata" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.875rem; resize: none; overflow: hidden;" oninput="autoResize(this)">{{ part.metadata | tojson if part.metadata else '' }}</textarea>
+                <textarea id="metadata" name="metadata" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.875rem; resize: none; overflow: hidden;" oninput="autoResize(this)">{{ part.metadata_ | tojson if part.metadata_ else '' }}</textarea>
             </div>
 
             <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">

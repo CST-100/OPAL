@@ -66,10 +66,10 @@
             </div>
             {% endif %}
 
-            {% if part.metadata %}
+            {% if part.metadata_ %}
             <div style="margin-top: var(--space-md);">
                 <div class="form-label">METADATA</div>
-                <pre style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.875rem; overflow-x: auto;">{{ part.metadata | tojson(indent=2) }}</pre>
+                <pre style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.875rem; overflow-x: auto;">{{ part.metadata_ | tojson(indent=2) }}</pre>
             </div>
             {% endif %}
 
