@@ -88,15 +88,15 @@
                 <!-- Legend -->
                 <div style="display: flex; gap: var(--space-md); margin-top: var(--space-lg);">
                     <div style="display: flex; align-items: center; gap: var(--space-xs);">
-                        <div style="width: 20px; height: 20px; background: var(--success); border: 1px solid var(--border-color);"></div>
+                        <div style="width: 20px; height: 20px; background: var(--status-ok); border: 1px solid var(--border-color);"></div>
                         <span>LOW (1-5)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: var(--space-xs);">
-                        <div style="width: 20px; height: 20px; background: var(--warning); border: 1px solid var(--border-color);"></div>
+                        <div style="width: 20px; height: 20px; background: var(--status-warn); border: 1px solid var(--border-color);"></div>
                         <span>MEDIUM (6-12)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: var(--space-xs);">
-                        <div style="width: 20px; height: 20px; background: var(--error); border: 1px solid var(--border-color);"></div>
+                        <div style="width: 20px; height: 20px; background: var(--status-error); border: 1px solid var(--border-color);"></div>
                         <span>HIGH (13-25)</span>
                     </div>
                 </div>
@@ -114,15 +114,15 @@
                             </tr>
                             <tr>
                                 <th>HIGH RISK</th>
-                                <td style="text-align: right; color: var(--error);">{{ high_count }}</td>
+                                <td style="text-align: right; color: var(--status-error);">{{ high_count }}</td>
                             </tr>
                             <tr>
                                 <th>MEDIUM RISK</th>
-                                <td style="text-align: right; color: var(--warning);">{{ medium_count }}</td>
+                                <td style="text-align: right; color: var(--status-warn);">{{ medium_count }}</td>
                             </tr>
                             <tr>
                                 <th>LOW RISK</th>
-                                <td style="text-align: right; color: var(--success);">{{ low_count }}</td>
+                                <td style="text-align: right; color: var(--status-ok);">{{ low_count }}</td>
                             </tr>
                         </table>
                     </div>
@@ -155,15 +155,15 @@
     opacity: 0.8;
 }
 .matrix-low {
-    background: var(--success);
+    background: var(--status-ok);
     color: var(--bg-primary);
 }
 .matrix-med {
-    background: var(--warning);
+    background: var(--status-warn);
     color: var(--bg-primary);
 }
 .matrix-high {
-    background: var(--error);
+    background: var(--status-error);
     color: var(--bg-primary);
 }
 </style>

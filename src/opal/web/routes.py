@@ -96,6 +96,8 @@ async def index(request: Request, db: DbSession) -> HTMLResponse:
 @router.get("/parts", response_class=HTMLResponse)
 async def parts_list(request: Request, db: DbSession) -> HTMLResponse:
     """Parts list page."""
+    from opal.config import get_active_project
+
     context = get_base_context(request, db, "Parts - OPAL")
 
     # Get categories for filter dropdown
@@ -107,6 +109,13 @@ async def parts_list(request: Request, db: DbSession) -> HTMLResponse:
     )
     context["categories"] = sorted([c[0] for c in categories if c[0]])
 
+    # Get tiers from project config or use defaults
+    project = get_active_project()
+    if project:
+        context["tiers"] = project.tiers
+    else:
+        context["tiers"] = DEFAULT_TIERS
+
     return templates.TemplateResponse("parts/list.html", context)
 
 
@@ -116,6 +125,10 @@ async def parts_table(
     db: DbSession,
     search: str | None = Query(None),
     category: str | None = Query(None),
+    tier: int | None = Query(None),
+    top_level: str | None = Query(None),
+    sort_by: str | None = Query("id"),
+    sort_order: str | None = Query("desc"),
 ) -> HTMLResponse:
     """Parts table rows (HTMX partial)."""
     query = db.query(Part).filter(Part.deleted_at.is_(None))
@@ -133,7 +146,31 @@ async def parts_table(
     if category:
         query = query.filter(Part.category == category)
 
-    parts = query.order_by(Part.id.desc()).limit(100).all()
+    if tier is not None:
+        query = query.filter(Part.tier == tier)
+
+    if top_level:
+        if top_level == "true":
+            query = query.filter(Part.parent_id.is_(None))
+        elif top_level == "false":
+            query = query.filter(Part.parent_id.isnot(None))
+
+    # Apply sorting
+    sort_columns = {
+        "id": Part.id,
+        "internal_pn": Part.internal_pn,
+        "external_pn": Part.external_pn,
+        "name": Part.name,
+        "category": Part.category,
+        "tier": Part.tier,
+        "unit_of_measure": Part.unit_of_measure,
+    }
+
+    sort_col = sort_columns.get(sort_by, Part.id)
+    if sort_order == "asc":
+        parts = query.order_by(sort_col.asc()).limit(100).all()
+    else:
+        parts = query.order_by(sort_col.desc()).limit(100).all()
 
     # Calculate total quantities and attach to part-like objects
     parts_with_qty = []
@@ -158,7 +195,12 @@ async def parts_table(
 
     return templates.TemplateResponse(
         "parts/table_rows.html",
-        {"request": request, "parts": parts_with_qty},
+        {
+            "request": request,
+            "parts": parts_with_qty,
+            "sort_by": sort_by,
+            "sort_order": sort_order,
+        },
     )
 
 
