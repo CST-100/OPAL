@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from opal.api.routes import (
+    attachments,
     bom,
     datasets,
     events,
@@ -17,7 +18,9 @@ from opal.api.routes import (
     reports,
     requirements,
     risks,
+    search,
     suppliers,
+    undo,
     users,
     workcenters,
 )
@@ -42,3 +45,6 @@ router.include_router(reports.router)  # Has its own /reports prefix
 router.include_router(requirements.router, prefix="/requirements", tags=["requirements"])
 router.include_router(bom.router, prefix="/bom", tags=["bom"])
 router.include_router(project.router)  # Has its own /project prefix
+router.include_router(search.router)  # Has its own /search prefix
+router.include_router(attachments.router)  # Has its own /attachments prefix
+router.include_router(undo.router)  # Has its own /undo prefix

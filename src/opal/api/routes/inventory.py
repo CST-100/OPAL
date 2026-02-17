@@ -1,9 +1,11 @@
 """Inventory management endpoints."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from enum import Enum
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func
 
@@ -11,7 +13,7 @@ from opal.api.deps import CurrentUserId, DbSession, PaginationParams
 from opal.core.audit import log_create, log_update, get_model_dict
 from opal.core.inventory import generate_opal_number
 from opal.db.models import InventoryRecord, Part, StockTestResult, StockTransfer, TestTemplate
-from opal.db.models.inventory import SourceType, TestResult, TransferStatus
+from opal.db.models.inventory import ConsumptionType, InventoryConsumption, InventoryProduction, SourceType, TestResult, TransferStatus, UsageType
 from opal.db.models.part import TrackingType
 
 router = APIRouter()
@@ -24,6 +26,7 @@ class InventoryCreate(BaseModel):
     quantity: Decimal
     location: str
     lot_number: str | None = None
+    expiration_date: date | None = None
 
 
 class InventoryUpdate(BaseModel):
@@ -32,13 +35,25 @@ class InventoryUpdate(BaseModel):
     quantity: Decimal | None = None
     location: str | None = None
     lot_number: str | None = None
+    expiration_date: date | None = None
+
+
+class AdjustmentReason(str, Enum):
+    """Reason for an inventory adjustment."""
+
+    CYCLE_COUNT = "cycle_count"
+    DAMAGE = "damage"
+    SCRAP = "scrap"
+    FOUND = "found"
+    CORRECTION = "correction"
 
 
 class InventoryAdjust(BaseModel):
     """Schema for adjusting inventory quantity."""
 
     adjustment: Decimal  # Positive to add, negative to subtract
-    reason: str | None = None
+    reason: AdjustmentReason
+    notes: str | None = None
 
 
 class InventoryCount(BaseModel):
@@ -62,6 +77,12 @@ class InventoryResponse(BaseModel):
     source_type: str | None
     source_purchase_line_id: int | None
     source_production_id: int | None
+    expiration_date: str | None
+    is_expired: bool = False
+    days_until_expiration: int | None = None
+    last_calibrated_at: str | None = None
+    calibration_due_at: str | None = None
+    calibration_status: str | None = None  # "ok", "due_soon", "overdue"
     created_at: str
     updated_at: str
 
@@ -89,6 +110,26 @@ def inventory_to_response(record: InventoryRecord) -> InventoryResponse:
     if record.source_type:
         source_type = record.source_type.value if hasattr(record.source_type, 'value') else record.source_type
 
+    # Compute expiration fields
+    is_expired = False
+    days_until = None
+    if record.expiration_date:
+        today = date.today()
+        delta = (record.expiration_date - today).days
+        days_until = delta
+        is_expired = delta < 0
+
+    # Compute calibration status
+    calibration_status = None
+    if record.part.is_tooling and record.calibration_due_at:
+        now = datetime.now(timezone.utc)
+        if record.calibration_due_at <= now:
+            calibration_status = "overdue"
+        elif (record.calibration_due_at - now).days <= 30:
+            calibration_status = "due_soon"
+        else:
+            calibration_status = "ok"
+
     return InventoryResponse(
         id=record.id,
         part_id=record.part_id,
@@ -102,6 +143,12 @@ def inventory_to_response(record: InventoryRecord) -> InventoryResponse:
         source_type=source_type,
         source_purchase_line_id=record.source_purchase_line_id,
         source_production_id=record.source_production_id,
+        expiration_date=record.expiration_date.isoformat() if record.expiration_date else None,
+        is_expired=is_expired,
+        days_until_expiration=days_until,
+        last_calibrated_at=record.last_calibrated_at.isoformat() if record.last_calibrated_at else None,
+        calibration_due_at=record.calibration_due_at.isoformat() if record.calibration_due_at else None,
+        calibration_status=calibration_status,
         created_at=record.created_at.isoformat(),
         updated_at=record.updated_at.isoformat(),
     )
@@ -114,6 +161,9 @@ async def list_inventory(
     part_id: int | None = Query(None, description="Filter by part ID"),
     location: str | None = Query(None, description="Filter by location"),
     lot_number: str | None = Query(None, description="Filter by lot number"),
+    expired: bool = Query(False, description="Filter to only expired items"),
+    expiring_soon: bool = Query(False, description="Filter to items expiring within 30 days"),
+    calibration_overdue: bool = Query(False, description="Filter to tooling items with overdue calibration"),
 ) -> InventoryListResponse:
     """List inventory records with optional filtering."""
     query = db.query(InventoryRecord).join(Part).filter(Part.deleted_at.is_(None))
@@ -124,6 +174,25 @@ async def list_inventory(
         query = query.filter(InventoryRecord.location == location)
     if lot_number:
         query = query.filter(InventoryRecord.lot_number == lot_number)
+    if expired:
+        query = query.filter(
+            InventoryRecord.expiration_date.isnot(None),
+            InventoryRecord.expiration_date < date.today(),
+        )
+    elif expiring_soon:
+        today = date.today()
+        threshold = today + timedelta(days=30)
+        query = query.filter(
+            InventoryRecord.expiration_date.isnot(None),
+            InventoryRecord.expiration_date <= threshold,
+        )
+    if calibration_overdue:
+        now = datetime.now(timezone.utc)
+        query = query.filter(
+            Part.is_tooling == True,  # noqa: E712
+            InventoryRecord.calibration_due_at.isnot(None),
+            InventoryRecord.calibration_due_at <= now,
+        )
 
     total = query.count()
     records = (
@@ -137,6 +206,33 @@ async def list_inventory(
         items=[inventory_to_response(r) for r in records],
         total=total,
     )
+
+
+@router.get("/{inventory_id}/qrcode")
+async def get_inventory_qrcode(
+    db: DbSession,
+    inventory_id: int,
+    request: Request,
+) -> Response:
+    """Generate a QR code SVG for an inventory record."""
+    import io
+
+    import segno
+
+    record = (
+        db.query(InventoryRecord)
+        .join(Part)
+        .filter(InventoryRecord.id == inventory_id, Part.deleted_at.is_(None))
+        .first()
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Inventory record {inventory_id} not found")
+
+    url = f"{request.base_url}inventory/opal/{record.opal_number}"
+    qr = segno.make(url)
+    buf = io.BytesIO()
+    qr.save(buf, kind="svg", scale=4, border=1)
+    return Response(content=buf.getvalue(), media_type="image/svg+xml")
 
 
 @router.get("/locations")
@@ -351,6 +447,7 @@ async def create_inventory(
                 lot_number=inv_in.lot_number,
                 opal_number=opal_number,
                 source_type=SourceType.MANUAL,
+                expiration_date=inv_in.expiration_date,
             )
             db.add(record)
             db.flush()  # Get the ID
@@ -365,6 +462,7 @@ async def create_inventory(
             lot_number=inv_in.lot_number,
             opal_number=opal_number,
             source_type=SourceType.MANUAL,
+            expiration_date=inv_in.expiration_date,
         )
         db.add(record)
         db.flush()
@@ -447,7 +545,14 @@ async def adjust_inventory(
     adjust_in: InventoryAdjust,
     user_id: CurrentUserId,
 ) -> InventoryResponse:
-    """Adjust inventory quantity (add or subtract)."""
+    """Adjust inventory quantity (add or subtract).
+
+    Creates consumption or production records for traceability.
+    Reason-based validation:
+    - found: adjustment must be positive
+    - damage/scrap: adjustment must be negative
+    - cycle_count: also sets last_counted_at timestamp
+    """
     record = (
         db.query(InventoryRecord)
         .join(Part)
@@ -460,16 +565,70 @@ async def adjust_inventory(
             detail=f"Inventory record {inventory_id} not found",
         )
 
+    reason = adjust_in.reason
+    adjustment = adjust_in.adjustment
+
+    # Validate reason/adjustment sign
+    if reason == AdjustmentReason.FOUND and adjustment <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'found' adjustments must be positive",
+        )
+    if reason in (AdjustmentReason.DAMAGE, AdjustmentReason.SCRAP) and adjustment >= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"'{reason.value}' adjustments must be negative",
+        )
+
     old_values = get_model_dict(record)
 
-    new_quantity = record.quantity + adjust_in.adjustment
+    new_quantity = record.quantity + adjustment
     if new_quantity < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Adjustment would result in negative quantity ({new_quantity})",
         )
 
+    # For serialized parts, reject adjustments that would make quantity > 1
+    if record.part.tracking_type == TrackingType.SERIALIZED and new_quantity > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Serialized parts cannot have quantity greater than 1",
+        )
+
     record.quantity = new_quantity
+
+    # Set last_counted_at for cycle counts
+    if reason == AdjustmentReason.CYCLE_COUNT:
+        record.last_counted_at = datetime.now(timezone.utc)
+
+    db.flush()
+
+    # Create consumption or production record for traceability
+    if adjustment < 0:
+        consumption_type = ConsumptionType.SCRAP if reason in (AdjustmentReason.DAMAGE, AdjustmentReason.SCRAP) else ConsumptionType.ADJUSTMENT
+        consumption = InventoryConsumption(
+            inventory_record_id=record.id,
+            quantity=abs(adjustment),
+            consumption_type=consumption_type,
+            usage_type=UsageType.CONSUME,
+            notes=f"[{reason.value}] {adjust_in.notes}" if adjust_in.notes else f"[{reason.value}]",
+            consumed_by_id=user_id,
+        )
+        db.add(consumption)
+        db.flush()
+        log_create(db, consumption, user_id)
+    elif adjustment > 0:
+        production = InventoryProduction(
+            inventory_record_id=record.id,
+            quantity=adjustment,
+            notes=f"[{reason.value}] {adjust_in.notes}" if adjust_in.notes else f"[{reason.value}]",
+            produced_by_id=user_id,
+        )
+        db.add(production)
+        db.flush()
+        log_create(db, production, user_id)
+
     db.commit()
     db.refresh(record)
 
@@ -503,6 +662,54 @@ async def record_count(
 
     record.quantity = count_in.counted_quantity
     record.last_counted_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(record)
+
+    log_update(db, record, old_values, user_id)
+    db.commit()
+
+    return inventory_to_response(record)
+
+
+@router.post("/{inventory_id}/calibrate", response_model=InventoryResponse)
+async def record_calibration(
+    db: DbSession,
+    inventory_id: int,
+    user_id: CurrentUserId,
+) -> InventoryResponse:
+    """Record a calibration event for a tooling item.
+
+    Sets last_calibrated_at to now and computes calibration_due_at
+    from the part's calibration_interval_days.
+    """
+    record = (
+        db.query(InventoryRecord)
+        .join(Part)
+        .filter(InventoryRecord.id == inventory_id, Part.deleted_at.is_(None))
+        .first()
+    )
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Inventory record {inventory_id} not found",
+        )
+
+    if not record.part.is_tooling:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This part is not marked as tooling",
+        )
+
+    old_values = get_model_dict(record)
+
+    now = datetime.now(timezone.utc)
+    record.last_calibrated_at = now
+
+    if record.part.calibration_interval_days:
+        record.calibration_due_at = now + timedelta(days=record.part.calibration_interval_days)
+    else:
+        record.calibration_due_at = None
+
     db.commit()
     db.refresh(record)
 

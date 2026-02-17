@@ -1193,8 +1193,7 @@ async def remove_step_kit_item(
 class CloneProcedureRequest(BaseModel):
     """Request to clone a procedure."""
 
-    new_name: str
-    new_code: str | None = None
+    new_name: str | None = None
     copy_kit: bool = True
     copy_outputs: bool = True
 
@@ -1225,24 +1224,13 @@ async def clone_procedure(
     if not source:
         raise HTTPException(status_code=404, detail="Procedure not found")
 
-    # Check if name or code already exists
-    if data.new_code:
-        existing = (
-            db.query(MasterProcedure)
-            .filter(MasterProcedure.code == data.new_code, MasterProcedure.deleted_at.is_(None))
-            .first()
-        )
-        if existing:
-            raise HTTPException(status_code=409, detail=f"Code '{data.new_code}' already exists")
-
     # Create new procedure
+    clone_name = data.new_name or f"Copy of {source.name}"
     new_procedure = MasterProcedure(
-        name=data.new_name,
-        code=data.new_code or f"{source.code}-COPY" if source.code else None,
+        name=clone_name,
         description=source.description,
         status=ProcedureStatus.DRAFT,
-        procedure_type=source.procedure_type,
-        current_version=0,
+        current_version_id=None,
     )
     db.add(new_procedure)
     db.flush()
@@ -1337,30 +1325,4 @@ async def clone_procedure(
         .all()
     )
 
-    return ProcedureResponse(
-        id=new_procedure.id,
-        name=new_procedure.name,
-        code=new_procedure.code,
-        description=new_procedure.description,
-        status=new_procedure.status.value if hasattr(new_procedure.status, 'value') else new_procedure.status,
-        procedure_type=new_procedure.procedure_type,
-        current_version=new_procedure.current_version,
-        created_at=new_procedure.created_at.isoformat(),
-        updated_at=new_procedure.updated_at.isoformat(),
-        steps=[
-            StepSchema(
-                id=s.id,
-                order=s.order,
-                step_number=s.step_number,
-                level=s.level,
-                parent_step_id=s.parent_step_id,
-                title=s.title,
-                instructions=s.instructions,
-                required_data_schema=s.required_data_schema,
-                is_contingency=s.is_contingency,
-                estimated_duration_minutes=s.estimated_duration_minutes,
-                workcenter_id=s.workcenter_id,
-            )
-            for s in steps
-        ],
-    )
+    return ProcedureResponse.model_validate(new_procedure)

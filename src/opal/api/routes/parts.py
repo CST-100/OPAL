@@ -1,10 +1,13 @@
 """Parts management endpoints."""
 
+import csv
+import io
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 
@@ -27,6 +30,9 @@ class PartCreate(BaseModel):
     tracking_type: str = "bulk"  # "bulk" = one OPAL per batch, "serialized" = one OPAL per unit
     tier: int = 1  # 1=Flight, 2=Ground, 3=Loose by default
     parent_id: int | None = None  # Parent assembly if this is a child part
+    reorder_point: Decimal | None = None
+    is_tooling: bool = False
+    calibration_interval_days: int | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -42,6 +48,9 @@ class PartUpdate(BaseModel):
     tracking_type: str | None = None  # "bulk" or "serialized"
     tier: int | None = None
     parent_id: int | None = None
+    reorder_point: Decimal | None = None
+    is_tooling: bool | None = None
+    calibration_interval_days: int | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -59,6 +68,10 @@ class PartResponse(BaseModel):
     tier: int
     tier_name: str | None = None  # Populated from project config if available
     parent_id: int | None
+    reorder_point: Decimal | None = None
+    is_low_stock: bool = False
+    is_tooling: bool = False
+    calibration_interval_days: int | None = None
     metadata: dict[str, Any] | None
     total_quantity: Decimal
     created_at: str
@@ -92,6 +105,9 @@ def get_part_with_quantity(db: DbSession, part: Part) -> PartResponse:
         if tier:
             tier_name = tier.name
 
+    total = total_qty or Decimal(0)
+    is_low = bool(part.reorder_point is not None and total < part.reorder_point)
+
     return PartResponse(
         id=part.id,
         internal_pn=part.internal_pn,
@@ -104,8 +120,12 @@ def get_part_with_quantity(db: DbSession, part: Part) -> PartResponse:
         tier=part.tier,
         tier_name=tier_name,
         parent_id=part.parent_id,
+        reorder_point=part.reorder_point,
+        is_low_stock=is_low,
+        is_tooling=part.is_tooling,
+        calibration_interval_days=part.calibration_interval_days,
         metadata=part.metadata_,
-        total_quantity=total_qty or Decimal(0),
+        total_quantity=total,
         created_at=part.created_at.isoformat(),
         updated_at=part.updated_at.isoformat(),
     )
@@ -120,6 +140,7 @@ async def list_parts(
     tier: int | None = Query(None, description="Filter by tier level (1=Flight, 2=Ground, 3=Loose)"),
     parent_id: int | None = Query(None, description="Filter by parent assembly ID"),
     top_level: bool = Query(False, description="Only show parts with no parent (top-level assemblies)"),
+    low_stock: bool = Query(False, description="Only show parts below reorder point"),
 ) -> PartListResponse:
     """List all parts with optional filtering."""
     query = db.query(Part).filter(Part.deleted_at.is_(None))
@@ -149,6 +170,23 @@ async def list_parts(
         query = query.filter(Part.parent_id == parent_id)
     elif top_level:
         query = query.filter(Part.parent_id.is_(None))
+
+    if low_stock:
+        # Filter to parts with reorder_point set, where stock < reorder_point
+        query = query.filter(Part.reorder_point.isnot(None))
+        # We need to compute stock in a subquery
+        stock_subq = (
+            db.query(
+                InventoryRecord.part_id,
+                func.coalesce(func.sum(InventoryRecord.quantity), 0).label("total_qty"),
+            )
+            .group_by(InventoryRecord.part_id)
+            .subquery()
+        )
+        query = (
+            query.outerjoin(stock_subq, Part.id == stock_subq.c.part_id)
+            .filter(func.coalesce(stock_subq.c.total_qty, 0) < Part.reorder_point)
+        )
 
     total = query.count()
     parts = query.order_by(Part.id.desc()).offset(pagination.skip).limit(pagination.limit).all()
@@ -205,6 +243,9 @@ async def create_part(
         tracking_type=part_in.tracking_type,
         tier=part_in.tier,
         parent_id=part_in.parent_id,
+        reorder_point=part_in.reorder_point,
+        is_tooling=part_in.is_tooling,
+        calibration_interval_days=part_in.calibration_interval_days,
         metadata_=part_in.metadata,
     )
     db.add(part)
@@ -227,6 +268,28 @@ async def list_categories(db: DbSession) -> list[str]:
         .all()
     )
     return sorted([c[0] for c in categories if c[0]])
+
+
+@router.get("/{part_id}/qrcode")
+async def get_part_qrcode(
+    db: DbSession,
+    part_id: int,
+    request: Request,
+) -> Response:
+    """Generate a QR code SVG for a part."""
+    import io as _io
+
+    import segno
+
+    part = db.query(Part).filter(Part.id == part_id, Part.deleted_at.is_(None)).first()
+    if not part:
+        raise HTTPException(status_code=404, detail=f"Part {part_id} not found")
+
+    url = f"{request.base_url}parts/{part.id}"
+    qr = segno.make(url)
+    buf = _io.BytesIO()
+    qr.save(buf, kind="svg", scale=4, border=1)
+    return Response(content=buf.getvalue(), media_type="image/svg+xml")
 
 
 @router.get("/{part_id}", response_model=PartResponse)
@@ -311,3 +374,232 @@ async def delete_part(
     log_delete(db, part, user_id)
     part.soft_delete()
     db.commit()
+
+
+# ============ CSV Import ============
+
+# Column header normalization mapping
+_HEADER_ALIASES: dict[str, str] = {
+    "name": "name",
+    "part_name": "name",
+    "external_pn": "external_pn",
+    "external pn": "external_pn",
+    "external_part_number": "external_pn",
+    "external part number": "external_pn",
+    "part_number": "external_pn",
+    "part number": "external_pn",
+    "manufacturer_pn": "external_pn",
+    "description": "description",
+    "category": "category",
+    "tier": "tier",
+    "unit_of_measure": "unit_of_measure",
+    "unit of measure": "unit_of_measure",
+    "unit": "unit_of_measure",
+    "uom": "unit_of_measure",
+    "tracking_type": "tracking_type",
+    "tracking type": "tracking_type",
+    "tracking": "tracking_type",
+    "reorder_point": "reorder_point",
+    "reorder point": "reorder_point",
+}
+
+# Columns to silently ignore (from CSV export format)
+_IGNORE_COLUMNS = {"id", "internal_pn", "internal pn", "internal_part_number",
+                    "total_quantity", "total quantity", "locations", "stock_qty",
+                    "stock qty", "created_at", "updated_at"}
+
+
+class ImportRowPreview(BaseModel):
+    """Preview of a single CSV row."""
+
+    row_number: int
+    name: str | None = None
+    external_pn: str | None = None
+    tier: int | None = None
+    category: str | None = None
+    unit_of_measure: str | None = None
+    tracking_type: str | None = None
+    description: str | None = None
+    reorder_point: float | None = None
+    errors: list[str] = []
+    warnings: list[str] = []
+    valid: bool = True
+
+
+class ImportPreviewResponse(BaseModel):
+    """Response from import preview."""
+
+    total_rows: int
+    valid_rows: int
+    error_rows: int
+    warning_rows: int
+    rows: list[ImportRowPreview]
+    headers_found: list[str]
+
+
+class ImportResult(BaseModel):
+    """Response from actual import."""
+
+    created: int
+    skipped: int
+    errors: list[str]
+
+
+def _normalize_header(header: str) -> str | None:
+    """Normalize a CSV column header to a known field name."""
+    h = header.strip().lower().replace(" ", "_")
+    if h in _IGNORE_COLUMNS or header.strip().lower() in _IGNORE_COLUMNS:
+        return None
+    return _HEADER_ALIASES.get(h) or _HEADER_ALIASES.get(header.strip().lower())
+
+
+@router.post("/import/preview", response_model=ImportPreviewResponse)
+async def import_preview(
+    db: DbSession,
+    file: UploadFile,
+) -> ImportPreviewResponse:
+    """Parse and validate a CSV file for parts import without creating anything."""
+    # Read CSV with BOM handling
+    content = await file.read()
+    text_stream = io.StringIO(content.decode("utf-8-sig"))
+    reader = csv.DictReader(text_stream)
+
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file has no headers")
+
+    # Normalize headers
+    header_map: dict[str, str | None] = {}
+    for h in reader.fieldnames:
+        header_map[h] = _normalize_header(h)
+
+    headers_found = [v for v in header_map.values() if v]
+
+    if "name" not in headers_found:
+        raise HTTPException(status_code=400, detail="CSV must have a 'Name' column")
+
+    # Collect existing parts for duplicate detection
+    existing_names = {p.name.lower() for p in db.query(Part.name).filter(Part.deleted_at.is_(None)).all()}
+    existing_external_pns = set()
+    for row in db.query(Part.external_pn).filter(Part.deleted_at.is_(None), Part.external_pn.isnot(None)).all():
+        existing_external_pns.add(row[0].lower())
+
+    valid_tiers = {1, 2, 3, 4, 5}  # Reasonable tier range
+    valid_tracking = {"bulk", "serialized"}
+
+    rows: list[ImportRowPreview] = []
+    for i, raw_row in enumerate(reader):
+        if i >= 5000:
+            break
+
+        row_data: dict[str, str] = {}
+        for csv_key, normalized_key in header_map.items():
+            if normalized_key and csv_key in raw_row:
+                row_data[normalized_key] = raw_row[csv_key].strip() if raw_row[csv_key] else ""
+
+        preview = ImportRowPreview(row_number=i + 1)
+        preview.name = row_data.get("name") or None
+        preview.external_pn = row_data.get("external_pn") or None
+        preview.category = row_data.get("category") or None
+        preview.unit_of_measure = row_data.get("unit_of_measure") or None
+        preview.tracking_type = row_data.get("tracking_type") or None
+        preview.description = row_data.get("description") or None
+
+        # Parse tier
+        tier_str = row_data.get("tier", "").strip()
+        if tier_str:
+            try:
+                preview.tier = int(tier_str)
+            except ValueError:
+                preview.errors.append(f"Invalid tier: '{tier_str}'")
+
+        # Parse reorder_point
+        rp_str = row_data.get("reorder_point", "").strip()
+        if rp_str:
+            try:
+                preview.reorder_point = float(rp_str)
+            except ValueError:
+                preview.errors.append(f"Invalid reorder_point: '{rp_str}'")
+
+        # Validate required fields
+        if not preview.name:
+            preview.errors.append("Name is required")
+
+        if preview.tier is not None and preview.tier not in valid_tiers:
+            preview.errors.append(f"Tier must be 1-5, got {preview.tier}")
+
+        if preview.tracking_type and preview.tracking_type.lower() not in valid_tracking:
+            preview.errors.append(f"Tracking type must be 'bulk' or 'serialized', got '{preview.tracking_type}'")
+
+        # Check duplicates
+        if preview.name and preview.name.lower() in existing_names:
+            preview.warnings.append(f"Part with name '{preview.name}' already exists")
+        if preview.external_pn and preview.external_pn.lower() in existing_external_pns:
+            preview.warnings.append(f"Part with external PN '{preview.external_pn}' already exists")
+
+        preview.valid = len(preview.errors) == 0
+        rows.append(preview)
+
+    return ImportPreviewResponse(
+        total_rows=len(rows),
+        valid_rows=sum(1 for r in rows if r.valid),
+        error_rows=sum(1 for r in rows if not r.valid),
+        warning_rows=sum(1 for r in rows if r.warnings),
+        rows=rows,
+        headers_found=headers_found,
+    )
+
+
+class ImportRequest(BaseModel):
+    """Request to perform the actual import."""
+
+    rows: list[PartCreate]
+    skip_duplicates: bool = True
+
+
+@router.post("/import", response_model=ImportResult)
+async def import_parts(
+    db: DbSession,
+    import_in: ImportRequest,
+    user_id: CurrentUserId,
+) -> ImportResult:
+    """Import parts from validated data. Call preview first to validate."""
+    if len(import_in.rows) > 5000:
+        raise HTTPException(status_code=400, detail="Maximum 5000 rows per import")
+
+    existing_names = {p.name.lower() for p in db.query(Part.name).filter(Part.deleted_at.is_(None)).all()}
+
+    created = 0
+    skipped = 0
+    errors: list[str] = []
+
+    for i, part_in in enumerate(import_in.rows):
+        # Skip duplicates if requested
+        if import_in.skip_duplicates and part_in.name.lower() in existing_names:
+            skipped += 1
+            continue
+
+        try:
+            internal_pn = generate_internal_pn(db, part_in.tier)
+            part = Part(
+                name=part_in.name,
+                internal_pn=internal_pn,
+                external_pn=part_in.external_pn,
+                description=part_in.description,
+                category=part_in.category,
+                unit_of_measure=part_in.unit_of_measure or "EA",
+                tracking_type=part_in.tracking_type or "bulk",
+                tier=part_in.tier,
+                reorder_point=part_in.reorder_point,
+                metadata_=part_in.metadata,
+            )
+            db.add(part)
+            db.flush()
+            log_create(db, part, user_id)
+            existing_names.add(part_in.name.lower())
+            created += 1
+        except Exception as e:
+            errors.append(f"Row {i + 1}: {str(e)}")
+
+    db.commit()
+
+    return ImportResult(created=created, skipped=skipped, errors=errors)
