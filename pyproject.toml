@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.17",
     "aiofiles>=24.1.0",
     "httpx>=0.28.0",
+    "segno>=1.6.0",
 ]
 
 [project.optional-dependencies]
