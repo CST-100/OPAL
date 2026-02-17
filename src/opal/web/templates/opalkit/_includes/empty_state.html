@@ -1,0 +1,23 @@
+{# OPALkit Empty State Component
+
+   Usage:
+   {% set empty_message = "No parts found" %}
+   {% set empty_action_text = "Add Part" %}
+   {% set empty_action_href = "/parts/new" %}
+   {% include 'opalkit/_includes/empty_state.html' %}
+
+   Required context:
+   - empty_message: string - The message to display
+
+   Optional context:
+   - empty_action_text: string - Text for the action button
+   - empty_action_href: string - URL for the action button
+#}
+<div class="empty-state">
+    <p class="text-muted">{{ empty_message }}</p>
+    {%- if empty_action_text and empty_action_href -%}
+    <p style="margin-top: var(--space-md);">
+        <a href="{{ empty_action_href }}" class="btn btn-primary">{{ empty_action_text }}</a>
+    </p>
+    {%- endif -%}
+</div>

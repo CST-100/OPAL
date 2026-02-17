@@ -1,0 +1,30 @@
+{# OPALkit Panel Component
+
+   Usage:
+   {% set panel_title = "PARTS" %}
+   {% set panel_actions %}
+       <a href="/parts/new" class="btn btn-primary">+ NEW PART</a>
+   {% endset %}
+   {% include 'opalkit/_includes/panel.html' %}
+
+   Required context:
+   - panel_title: string - The panel header title
+
+   Optional context:
+   - panel_actions: HTML string - Buttons/actions for the header (right side)
+   - panel_id: string - Optional ID for the panel element
+   - panel_class: string - Additional CSS classes for the panel
+#}
+<div class="panel{% if panel_class %} {{ panel_class }}{% endif %}"{% if panel_id %} id="{{ panel_id }}"{% endif %}>
+    <div class="panel-header">
+        <span>{{ panel_title }}</span>
+        {%- if panel_actions -%}
+        <div class="panel-header-actions">
+            {{ panel_actions }}
+        </div>
+        {%- endif -%}
+    </div>
+    <div class="panel-body">
+        {{ caller() if caller is defined else panel_content|default('') }}
+    </div>
+</div>

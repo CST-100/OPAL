@@ -1,0 +1,416 @@
+{# OPALkit - Reusable UI component macros for OPAL #}
+{# Import with: {% import 'opalkit/_macros.html' as ok %} #}
+
+{# Button macro
+   Usage: {{ ok.btn("Save", variant="primary") }}
+          {{ ok.btn("Edit", href="/parts/1/edit") }}
+          {{ ok.btn("Delete", variant="danger", attrs='onclick="confirmDelete()"') }}
+#}
+{% macro btn(text, href=none, variant="default", size="md", type="button", attrs="") %}
+{%- set classes = ["btn"] -%}
+{%- if variant == "primary" %}{% set classes = classes + ["btn-primary"] %}{% endif -%}
+{%- if variant == "danger" %}{% set classes = classes + ["btn-danger"] %}{% endif -%}
+{%- if size == "sm" %}{% set classes = classes + ["btn-sm"] %}{% endif -%}
+{%- if href -%}
+<a href="{{ href }}" class="{{ classes | join(' ') }}" {{ attrs }}>{{ text }}</a>
+{%- else -%}
+<button type="{{ type }}" class="{{ classes | join(' ') }}" {{ attrs }}>{{ text }}</button>
+{%- endif -%}
+{% endmacro %}
+
+{# Status badge macro
+   Usage: {{ ok.status("ACTIVE") }}
+          {{ ok.status("COMPLETED", "ok") }}
+          {{ ok.status(part.status.value, part.status.value | lower) }}
+
+   Variants: ok, warn, error, info, pending, draft, active, completed, in-progress, inactive
+#}
+{% macro status(value, variant=none) %}
+{%- set variant_class = "" -%}
+{%- if variant -%}
+    {%- set variant_class = "status-" ~ variant -%}
+{%- else -%}
+    {# Auto-detect variant from value #}
+    {%- set v = value | lower if value else "" -%}
+    {%- if v in ["active", "completed", "ok", "received", "published"] -%}
+        {%- set variant_class = "status-ok" -%}
+    {%- elif v in ["pending", "draft", "warn", "ordered", "partial"] -%}
+        {%- set variant_class = "status-warn" -%}
+    {%- elif v in ["error", "aborted", "critical", "cancelled", "closed"] -%}
+        {%- set variant_class = "status-error" -%}
+    {%- elif v in ["in_progress", "in-progress", "info"] -%}
+        {%- set variant_class = "status-info" -%}
+    {%- elif v in ["inactive", "deprecated"] -%}
+        {%- set variant_class = "status-inactive" -%}
+    {%- endif -%}
+{%- endif -%}
+<span class="status-badge {{ variant_class }}">{{ value }}</span>
+{%- endmacro %}
+
+{# Form field macro
+   Usage: {{ ok.field("name", "Part Name", required=true) }}
+          {{ ok.field("description", "Description", type="textarea", rows=4) }}
+          {{ ok.field("category", "Category", type="select", options=categories) }}
+#}
+{% macro field(name, label, type="text", value="", required=false, help=none, placeholder=none, rows=3, options=none, attrs="") %}
+<div class="form-group">
+    <label class="form-label" for="{{ name }}">{{ label }}{% if required %} *{% endif %}</label>
+    {%- if type == "textarea" -%}
+    <textarea
+        id="{{ name }}"
+        name="{{ name }}"
+        class="form-textarea"
+        rows="{{ rows }}"
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if required %}required{% endif %}
+        {{ attrs }}
+    >{{ value }}</textarea>
+    {%- elif type == "select" -%}
+    <select id="{{ name }}" name="{{ name }}" class="form-select" {% if required %}required{% endif %} {{ attrs }}>
+        {%- if placeholder -%}
+        <option value="">{{ placeholder }}</option>
+        {%- endif -%}
+        {%- for opt in options or [] -%}
+        {%- if opt is mapping -%}
+        <option value="{{ opt.value }}" {% if opt.value == value %}selected{% endif %}>{{ opt.label }}</option>
+        {%- else -%}
+        <option value="{{ opt }}" {% if opt == value %}selected{% endif %}>{{ opt }}</option>
+        {%- endif -%}
+        {%- endfor -%}
+    </select>
+    {%- else -%}
+    <input
+        type="{{ type }}"
+        id="{{ name }}"
+        name="{{ name }}"
+        class="form-input"
+        value="{{ value }}"
+        {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+        {% if required %}required{% endif %}
+        {{ attrs }}
+    >
+    {%- endif -%}
+    {%- if help -%}
+    <small class="form-help">{{ help }}</small>
+    {%- endif -%}
+</div>
+{% endmacro %}
+
+{# Timestamp macro - displays ISO 8601 formatted datetime
+   Usage: {{ ok.timestamp(part.created_at) }}
+          {{ ok.timestamp(part.updated_at, label="Updated") }}
+#}
+{% macro timestamp(dt, label=none) %}
+{%- if label -%}
+<span class="text-muted">{{ label }}:</span>
+{%- endif -%}
+<span class="timestamp mono">{{ dt.strftime('%Y-%m-%dT%H:%M:%S') if dt else '-' }}Z</span>
+{%- endmacro %}
+
+{# Monospace text macro
+   Usage: {{ ok.mono(part.internal_pn) }}
+          {{ ok.mono(part.id, color="orange") }}
+#}
+{% macro mono(text, color=none) %}
+{%- set color_class = "text-" ~ color if color else "" -%}
+<span class="mono {{ color_class }}">{{ text if text is not none else '-' }}</span>
+{%- endmacro %}
+
+{# ID cell macro - for table ID columns with link
+   Usage: {{ ok.id_cell(part.id, "/parts/" ~ part.id) }}
+#}
+{% macro id_cell(id, href=none) %}
+{%- if href -%}
+<a href="{{ href }}" class="id-cell mono">{{ id }}</a>
+{%- else -%}
+<span class="id-cell mono">{{ id }}</span>
+{%- endif -%}
+{% endmacro %}
+
+{# Breadcrumb item macro
+   Usage: {{ ok.crumb("HOME", "/") }}
+          {{ ok.crumb("PARTS", "/parts") }}
+          {{ ok.crumb(part.internal_pn) }}  {# No href = current page #}
+#}
+{% macro crumb(text, href=none) %}
+{%- if href -%}
+<span class="breadcrumb-item"><a href="{{ href }}">{{ text }}</a></span>
+{%- else -%}
+<span class="breadcrumb-item">{{ text }}</span>
+{%- endif -%}
+{% endmacro %}
+
+{# Empty state macro
+   Usage: {{ ok.empty("No parts found") }}
+          {{ ok.empty("No inventory records", action_text="Add Inventory", action_href="/inventory/new") }}
+#}
+{% macro empty(message, action_text=none, action_href=none) %}
+<div class="empty-state">
+    <p class="text-muted">{{ message }}</p>
+    {%- if action_text and action_href -%}
+    <p style="margin-top: var(--space-md);">
+        {{ btn(action_text, href=action_href, variant="primary") }}
+    </p>
+    {%- endif -%}
+</div>
+{% endmacro %}
+
+{# Panel header with optional actions
+   Usage: {{ ok.panel_header("PARTS", actions) }}
+   Where actions is HTML string of buttons
+#}
+{% macro panel_header(title, actions=none) %}
+<div class="panel-header">
+    <span>{{ title }}</span>
+    {%- if actions -%}
+    <div class="panel-header-actions">
+        {{ actions }}
+    </div>
+    {%- endif -%}
+</div>
+{% endmacro %}
+
+{# Stat card macro - for dashboard statistics
+   Usage: {{ ok.stat("42", "PARTS", href="/parts") }}
+          {{ ok.stat(open_issues_count, "OPEN ISSUES", href="/issues?status=open", variant="warn" if open_issues_count > 0 else none) }}
+   Variants: warn, error, info (for colored values)
+#}
+{% macro stat(value, label, href=none, variant=none) %}
+{%- set value_class = "stat-value" -%}
+{%- if variant == "warn" %}{% set value_class = value_class ~ " text-warn" %}{% endif -%}
+{%- if variant == "error" or variant == "red" %}{% set value_class = value_class ~ " text-red" %}{% endif -%}
+{%- if variant == "info" %}{% set value_class = value_class ~ " text-info" %}{% endif -%}
+{%- if href -%}
+<a href="{{ href }}" class="stat" style="text-decoration: none; color: inherit;">
+    <div class="{{ value_class }}">{{ value }}</div>
+    <div class="stat-label">{{ label }}</div>
+</a>
+{%- else -%}
+<div class="stat">
+    <div class="{{ value_class }}">{{ value }}</div>
+    <div class="stat-label">{{ label }}</div>
+</div>
+{%- endif -%}
+{% endmacro %}
+
+{# Link macro - for styled links with optional monospace
+   Usage: {{ ok.link("View Part", "/parts/1") }}
+          {{ ok.link(part.internal_pn, "/parts/" ~ part.id, mono=true) }}
+          {{ ok.link("external", "https://example.com", external=true) }}
+#}
+{% macro link(text, href, mono=false, muted=false, external=false) %}
+{%- set classes = [] -%}
+{%- if mono %}{% set classes = classes + ["mono"] %}{% endif -%}
+{%- if muted %}{% set classes = classes + ["text-muted"] %}{% endif -%}
+<a href="{{ href }}"{% if classes %} class="{{ classes | join(' ') }}"{% endif %}{% if external %} target="_blank" rel="noopener"{% endif %}>{{ text }}</a>
+{%- endmacro %}
+
+{# Table header macro - for consistent table headers with optional width
+   Usage: {{ ok.th("NAME") }}
+          {{ ok.th("ID", width="60px") }}
+          {{ ok.th("QTY", width="80px", align="right") }}
+#}
+{% macro th(text, width=none, align=none) %}
+<th{% if width %} style="width: {{ width }};{% if align %} text-align: {{ align }};{% endif %}"{% elif align %} style="text-align: {{ align }};"{% endif %}>{{ text }}</th>
+{%- endmacro %}
+
+{# Table cell macro - for consistent table cells
+   Usage: {{ ok.td(part.name) }}
+          {{ ok.td(part.id, mono=true) }}
+          {{ ok.td(quantity, align="right", mono=true) }}
+#}
+{% macro td(value, mono=false, align=none, href=none) %}
+{%- set classes = [] -%}
+{%- if mono %}{% set classes = classes + ["mono"] %}{% endif -%}
+<td{% if classes %} class="{{ classes | join(' ') }}"{% endif %}{% if align %} style="text-align: {{ align }};"{% endif %}>
+{%- if href -%}<a href="{{ href }}">{{ value if value is not none else '-' }}</a>{%- else -%}{{ value if value is not none else '-' }}{%- endif -%}
+</td>
+{%- endmacro %}
+
+{# Detail row macro - for key/value table rows in detail views
+   Usage: {{ ok.detail_row("NAME", part.name) }}
+          {{ ok.detail_row("PART NUMBER", part.internal_pn, mono=true) }}
+          {{ ok.detail_row("STATUS", ok.status(part.status)) }}
+#}
+{% macro detail_row(label, value, mono=false, th_width="150px") %}
+<tr>
+    <th style="width: {{ th_width }};">{{ label }}</th>
+    <td{% if mono %} class="mono"{% endif %}>{{ value if value is not none else '-' }}</td>
+</tr>
+{% endmacro %}
+
+{# Badge macro - for general badges/tags (not status-specific)
+   Usage: {{ ok.badge("propulsion") }}
+          {{ ok.badge("v1.2", variant="info") }}
+   Variants: default, info, warn, error
+#}
+{% macro badge(text, variant="default", removable=false, onclick=none) %}
+{%- set classes = ["badge"] -%}
+{%- if variant != "default" %}{% set classes = classes + ["badge-" ~ variant] %}{% endif -%}
+<span class="{{ classes | join(' ') }}">{{ text }}{%- if removable -%}<button type="button" onclick="{{ onclick }}" style="background: none; border: none; cursor: pointer; margin-left: 4px; color: inherit;">&times;</button>{%- endif -%}</span>
+{%- endmacro %}
+
+{# Score macro - for risk probability/impact scores
+   Usage: {{ ok.score(3) }}
+          {{ ok.score(risk.probability, max=5) }}
+#}
+{% macro score(value, max=5) %}
+{%- set pct = (value / max * 100) | int -%}
+{%- set color = "ok" if pct <= 40 else ("warn" if pct <= 60 else "error") -%}
+<span class="score score-{{ color }}">{{ value }}</span>
+{%- endmacro %}
+
+{# Severity macro - for risk severity display (P x I)
+   Usage: {{ ok.severity(probability, impact) }}
+#}
+{% macro severity(probability, impact) %}
+{%- set score = probability * impact -%}
+{%- if score >= 15 -%}
+<span class="status-badge status-error">HIGH ({{ score }})</span>
+{%- elif score >= 8 -%}
+<span class="status-badge status-warn">MEDIUM ({{ score }})</span>
+{%- else -%}
+<span class="status-badge status-ok">LOW ({{ score }})</span>
+{%- endif -%}
+{% endmacro %}
+
+{# Toolbar macro - wrapper for filter/search toolbars
+   Usage: {% call ok.toolbar() %}...{% endcall %}
+#}
+{% macro toolbar() %}
+<div class="toolbar">
+    {{ caller() }}
+</div>
+{% endmacro %}
+
+{# Toolbar search input
+   Usage: {{ ok.toolbar_search(name="q", placeholder="Search parts...", hx_get="/parts/table", hx_target="#table-body") }}
+#}
+{% macro toolbar_search(name="q", placeholder="Search...", value="", hx_get=none, hx_target=none, hx_trigger="keyup changed delay:300ms") %}
+<div class="toolbar-search">
+    <input type="text"
+           name="{{ name }}"
+           class="form-input"
+           placeholder="{{ placeholder }}"
+           value="{{ value }}"
+           {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+           {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+           {% if hx_get %}hx-trigger="{{ hx_trigger }}"{% endif %}
+           autocomplete="off">
+</div>
+{%- endmacro %}
+
+{# Toolbar filter select
+   Usage: {{ ok.toolbar_filter("status", [{"value": "", "label": "All"}, {"value": "active", "label": "Active"}], hx_get="/parts/table") }}
+#}
+{% macro toolbar_filter(name, options, value="", hx_get=none, hx_target=none, hx_trigger="change") %}
+<div class="toolbar-filter">
+    <select name="{{ name }}"
+            class="form-select"
+            {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+            {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+            {% if hx_get %}hx-trigger="{{ hx_trigger }}"{% endif %}>
+        {%- for opt in options -%}
+        {%- if opt is mapping -%}
+        <option value="{{ opt.value }}" {% if opt.value == value %}selected{% endif %}>{{ opt.label }}</option>
+        {%- else -%}
+        <option value="{{ opt }}" {% if opt == value %}selected{% endif %}>{{ opt }}</option>
+        {%- endif -%}
+        {%- endfor -%}
+    </select>
+</div>
+{%- endmacro %}
+
+{# Confirm button macro - danger button with confirmation dialog
+   Usage: {{ ok.confirm_btn("DELETE", message="Delete this part?", action="/api/parts/1", method="DELETE") }}
+#}
+{% macro confirm_btn(text, message, action=none, method="POST", redirect=none, size="md") %}
+{%- set classes = ["btn", "btn-danger"] -%}
+{%- if size == "sm" %}{% set classes = classes + ["btn-sm"] %}{% endif -%}
+<button type="button" class="{{ classes | join(' ') }}" onclick="if(confirm('{{ message }}')) { {% if action %}fetch('{{ action }}', {method: '{{ method }}', headers: {'Content-Type': 'application/json', 'X-User-Id': localStorage.getItem('opal_user_id') || ''}}).then(r => { if(r.ok) { {% if redirect %}window.location.href='{{ redirect }}'{% else %}window.location.reload(){% endif %} } else { r.json().then(e => alert(e.detail || 'Operation failed')) } }){% endif %} }">{{ text }}</button>
+{%- endmacro %}
+
+{# Panel macro - full panel wrapper
+   Usage: {% call ok.panel("PARTS", max_width="800px") %}...panel body content...{% endcall %}
+          {% call ok.panel("PARTS", actions=ok.btn("+ NEW", href="/new", variant="primary")) %}...{% endcall %}
+#}
+{% macro panel(title, actions=none, max_width=none, margin_top=none, id=none) %}
+<div class="panel"{% if max_width or margin_top or id %} {% if id %}id="{{ id }}" {% endif %}style="{% if max_width %}max-width: {{ max_width }};{% endif %}{% if margin_top %} margin-top: {{ margin_top }};{% endif %}"{% endif %}>
+    <div class="panel-header">
+        <span>{{ title }}</span>
+        {%- if actions -%}
+        <div class="panel-header-actions">
+            {{ actions }}
+        </div>
+        {%- endif -%}
+    </div>
+    <div class="panel-body">
+        {{ caller() }}
+    </div>
+</div>
+{% endmacro %}
+
+{# Data table macro - wrapper for consistent tables
+   Usage: {% call ok.table() %}...thead and tbody...{% endcall %}
+#}
+{% macro table(id=none) %}
+<table class="data-table"{% if id %} id="{{ id }}"{% endif %}>
+    {{ caller() }}
+</table>
+{% endmacro %}
+
+{# Modal macro - dialog wrapper
+   Usage: {% call ok.modal("add-modal", "ADD ITEM") %}...form content...{% endcall %}
+#}
+{% macro modal(id, title) %}
+<div id="{{ id }}" class="ok-modal" style="display: none;">
+    <div class="ok-modal-backdrop" onclick="document.getElementById('{{ id }}').style.display='none'"></div>
+    <div class="ok-modal-content">
+        <div class="panel">
+            <div class="panel-header">
+                <span>{{ title }}</span>
+                <div class="panel-header-actions">
+                    <button type="button" class="btn btn-sm" onclick="document.getElementById('{{ id }}').style.display='none'">X</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                {{ caller() }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{# Grid macro - responsive grid wrapper
+   Usage: {% call ok.grid(cols=2) %}...grid items...{% endcall %}
+#}
+{% macro grid(cols=2, gap=none) %}
+<div class="grid grid-{{ cols }}"{% if gap %} style="gap: {{ gap }};"{% endif %}>
+    {{ caller() }}
+</div>
+{% endmacro %}
+
+{# Form actions macro - form submit/cancel buttons row
+   Usage: {{ ok.form_actions(cancel_href="/parts", submit_text="CREATE PART") }}
+#}
+{% macro form_actions(cancel_href="/", submit_text="SAVE", cancel_text="CANCEL") %}
+<div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+    {{ btn(cancel_text, href=cancel_href) }}
+    {{ btn(submit_text, variant="primary", type="submit") }}
+</div>
+{% endmacro %}
+
+{# Form error/success message containers
+   Usage: {{ ok.form_messages() }}
+#}
+{% macro form_messages(error_id="form-error", success_id="form-success") %}
+<div id="{{ error_id }}" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+<div id="{{ success_id }}" class="text-green" style="margin-top: var(--space-md); display: none;"></div>
+{% endmacro %}
+
+{# Text helper macros #}
+{% macro muted(text) %}<span class="text-muted">{{ text }}</span>{% endmacro %}
+{% macro red(text) %}<span class="text-red">{{ text }}</span>{% endmacro %}
+{% macro green(text) %}<span class="text-green">{{ text }}</span>{% endmacro %}
+{% macro yellow(text) %}<span class="text-yellow">{{ text }}</span>{% endmacro %}
+{% macro info(text) %}<span class="text-info">{{ text }}</span>{% endmacro %}

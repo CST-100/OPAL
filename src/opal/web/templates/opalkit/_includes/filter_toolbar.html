@@ -1,0 +1,52 @@
+{# OPALkit Filter Toolbar Component
+
+   Usage:
+   {% set toolbar_id = "parts-toolbar" %}
+   {% set toolbar_search_placeholder = "Search parts..." %}
+   {% set toolbar_search_name = "search" %}
+   {% set toolbar_htmx_target = "#parts-table tbody" %}
+   {% set toolbar_htmx_endpoint = "/parts/table" %}
+   {% set toolbar_filters %}
+       <select name="category" class="form-select toolbar-filter">
+           <option value="">All Categories</option>
+       </select>
+   {% endset %}
+   {% set toolbar_actions %}
+       <a href="/parts/new" class="btn btn-primary">+ NEW PART</a>
+   {% endset %}
+   {% include 'opalkit/_includes/filter_toolbar.html' %}
+
+   Required context:
+   - toolbar_htmx_target: string - CSS selector for HTMX target
+   - toolbar_htmx_endpoint: string - URL for HTMX requests
+
+   Optional context:
+   - toolbar_id: string - ID for the toolbar element
+   - toolbar_search_placeholder: string - Placeholder for search input
+   - toolbar_search_name: string - Name attribute for search input (default: "search")
+   - toolbar_filters: HTML string - Additional filter elements (selects, etc.)
+   - toolbar_actions: HTML string - Action buttons (right side)
+   - toolbar_htmx_trigger: string - HTMX trigger (default: "keyup changed delay:300ms, search")
+   - toolbar_htmx_include: string - Additional fields to include in HTMX request
+#}
+<div class="toolbar"{% if toolbar_id %} id="{{ toolbar_id }}"{% endif %}>
+    <input
+        type="search"
+        name="{{ toolbar_search_name|default('search') }}"
+        class="form-input toolbar-search"
+        placeholder="{{ toolbar_search_placeholder|default('Search...') }}"
+        hx-get="{{ toolbar_htmx_endpoint }}"
+        hx-target="{{ toolbar_htmx_target }}"
+        hx-trigger="{{ toolbar_htmx_trigger|default('keyup changed delay:300ms, search') }}"
+        {% if toolbar_htmx_include %}hx-include="{{ toolbar_htmx_include }}"{% endif %}
+    >
+    {%- if toolbar_filters -%}
+    {{ toolbar_filters }}
+    {%- endif -%}
+    <div class="toolbar-spacer"></div>
+    {%- if toolbar_actions -%}
+    <div class="toolbar-actions">
+        {{ toolbar_actions }}
+    </div>
+    {%- endif -%}
+</div>

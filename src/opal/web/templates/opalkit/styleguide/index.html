@@ -1,0 +1,731 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("STYLEGUIDE") }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px;">
+    <h1 style="font-family: var(--font-mono); margin-bottom: var(--space-lg);">OPALkit Component Styleguide</h1>
+
+    <!-- Colors -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>COLORS</span>
+        </div>
+        <div class="panel-body">
+            <div class="grid grid-4" style="gap: var(--space-sm);">
+                <div style="padding: var(--space-md); background: var(--bg-primary); border: 1px solid var(--border-color);">
+                    <div class="mono text-muted">--bg-primary</div>
+                </div>
+                <div style="padding: var(--space-md); background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    <div class="mono text-muted">--bg-secondary</div>
+                </div>
+                <div style="padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                    <div class="mono text-muted">--bg-tertiary</div>
+                </div>
+                <div style="padding: var(--space-md); background: var(--border-color);">
+                    <div class="mono">--border-color</div>
+                </div>
+            </div>
+            <div class="grid grid-4" style="gap: var(--space-sm); margin-top: var(--space-sm);">
+                <div style="padding: var(--space-md); border: 1px solid var(--border-color);">
+                    <div class="mono" style="color: var(--accent-orange);">--accent-orange</div>
+                </div>
+                <div style="padding: var(--space-md); border: 1px solid var(--border-color);">
+                    <div class="mono" style="color: var(--accent-green);">--accent-green</div>
+                </div>
+                <div style="padding: var(--space-md); border: 1px solid var(--border-color);">
+                    <div class="mono" style="color: var(--accent-yellow);">--accent-yellow</div>
+                </div>
+                <div style="padding: var(--space-md); border: 1px solid var(--border-color);">
+                    <div class="mono" style="color: var(--accent-red);">--accent-red</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Typography -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TYPOGRAPHY</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 150px;">STYLE</th>
+                    <th>EXAMPLE</th>
+                    <th style="width: 200px;">USAGE</th>
+                </tr>
+                <tr>
+                    <td>Sans (default)</td>
+                    <td>The quick brown fox jumps over the lazy dog</td>
+                    <td class="mono text-muted">body text</td>
+                </tr>
+                <tr>
+                    <td>Monospace</td>
+                    <td class="mono">OPAL-0001 | 2024-01-15T14:30:00Z</td>
+                    <td class="mono text-muted">.mono</td>
+                </tr>
+                <tr>
+                    <td>Muted</td>
+                    <td class="text-muted">Secondary information</td>
+                    <td class="mono text-muted">.text-muted</td>
+                </tr>
+                <tr>
+                    <td>ID Cell</td>
+                    <td><span class="id-cell mono">42</span></td>
+                    <td class="mono text-muted">.id-cell .mono</td>
+                </tr>
+                <tr>
+                    <td>Timestamp</td>
+                    <td class="timestamp mono">2024-01-15T14:30:00Z</td>
+                    <td class="mono text-muted">.timestamp .mono</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>BUTTONS</span>
+        </div>
+        <div class="panel-body">
+            <div style="display: flex; gap: var(--space-md); align-items: center; margin-bottom: var(--space-md);">
+                {{ ok.btn("DEFAULT") }}
+                {{ ok.btn("PRIMARY", variant="primary") }}
+                {{ ok.btn("DANGER", variant="danger") }}
+                {{ ok.btn("SMALL", size="sm") }}
+                {{ ok.btn("LINK BUTTON", href="#") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{% import 'opalkit/_macros.html' as ok %}
+
+{{ ok.btn("DEFAULT") }}
+{{ ok.btn("PRIMARY", variant="primary") }}
+{{ ok.btn("DANGER", variant="danger") }}
+{{ ok.btn("SMALL", size="sm") }}
+{{ ok.btn("LINK", href="/path") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Badges -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>STATUS BADGES</span>
+        </div>
+        <div class="panel-body">
+            <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-md);">
+                {{ ok.status("ACTIVE") }}
+                {{ ok.status("COMPLETED") }}
+                {{ ok.status("PENDING") }}
+                {{ ok.status("DRAFT") }}
+                {{ ok.status("IN_PROGRESS") }}
+                {{ ok.status("ERROR") }}
+                {{ ok.status("CANCELLED") }}
+                {{ ok.status("INACTIVE") }}
+            </div>
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                The status macro auto-detects the variant from the value. Override with explicit variant:
+            </p>
+            <div style="display: flex; gap: var(--space-md); flex-wrap: wrap; margin-bottom: var(--space-md);">
+                {{ ok.status("CUSTOM", "ok") }}
+                {{ ok.status("CUSTOM", "warn") }}
+                {{ ok.status("CUSTOM", "error") }}
+                {{ ok.status("CUSTOM", "info") }}
+                {{ ok.status("CUSTOM", "inactive") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.status("ACTIVE") }}           {# Auto-detects: ok #}
+{{ ok.status("PENDING") }}          {# Auto-detects: warn #}
+{{ ok.status("ERROR") }}            {# Auto-detects: error #}
+{{ ok.status("CUSTOM", "ok") }}     {# Explicit variant #}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Fields -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>FORM FIELDS</span>
+        </div>
+        <div class="panel-body">
+            <div class="grid grid-2">
+                {{ ok.field("example_text", "TEXT INPUT", placeholder="Enter text...", help="Helper text appears here") }}
+                {{ ok.field("example_required", "REQUIRED FIELD", required=true, placeholder="This field is required") }}
+            </div>
+            <div class="grid grid-2">
+                {{ ok.field("example_select", "SELECT", type="select", options=["Option 1", "Option 2", "Option 3"], placeholder="Choose...") }}
+                {{ ok.field("example_number", "NUMBER", type="number", value="42") }}
+            </div>
+            {{ ok.field("example_textarea", "TEXTAREA", type="textarea", rows=3, placeholder="Enter multi-line text...") }}
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem; margin-top: var(--space-md);">
+<pre style="margin: 0;">{% raw %}{{ ok.field("name", "PART NAME", required=true) }}
+{{ ok.field("description", "DESCRIPTION", type="textarea", rows=4) }}
+{{ ok.field("category", "CATEGORY", type="select", options=categories, placeholder="Select...") }}
+{{ ok.field("quantity", "QUANTITY", type="number", value="1", help="Enter quantity") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timestamps -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TIMESTAMPS &amp; MONO TEXT</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 150px;">MACRO</th>
+                    <th>OUTPUT</th>
+                    <th style="width: 300px;">CODE</th>
+                </tr>
+                <tr>
+                    <td>timestamp</td>
+                    <td>{{ ok.timestamp(none) }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.timestamp(obj.created_at) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>mono</td>
+                    <td>{{ ok.mono("OPAL-0001") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.mono(part.opal_number) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>mono (colored)</td>
+                    <td>{{ ok.mono("42", color="orange") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.mono(part.id, color="orange") }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>id_cell</td>
+                    <td>{{ ok.id_cell("42", "#") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.id_cell(part.id, "/parts/" ~ part.id) }}{% endraw %}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Panel Component -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>PANEL COMPONENT</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Panels are the primary container for content. Use panel-header-actions for buttons.
+            </p>
+            <!-- Example panel -->
+            <div class="panel" style="margin-bottom: var(--space-md);">
+                <div class="panel-header">
+                    <span>EXAMPLE PANEL</span>
+                    <div class="panel-header-actions">
+                        {{ ok.btn("ACTION", variant="primary", size="sm") }}
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <p>Panel content goes here.</p>
+                </div>
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}<div class="panel">
+    <div class="panel-header">
+        <span>TITLE</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("ACTION", variant="primary") }}
+        </div>
+    </div>
+    <div class="panel-body">
+        Content here
+    </div>
+</div>{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar Component -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TOOLBAR COMPONENT</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Toolbars contain search, filters, and actions. Use toolbar-spacer to push actions right.
+            </p>
+            <!-- Example toolbar -->
+            <div class="toolbar" style="margin-bottom: var(--space-md);">
+                <input type="search" class="form-input toolbar-search" placeholder="Search...">
+                <select class="form-select toolbar-filter">
+                    <option>All Categories</option>
+                </select>
+                <div class="toolbar-spacer"></div>
+                <div class="toolbar-actions">
+                    {{ ok.btn("+ NEW", variant="primary") }}
+                </div>
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}<div class="toolbar">
+    <input type="search" class="form-input toolbar-search" placeholder="Search...">
+    <select class="form-select toolbar-filter">...</select>
+    <div class="toolbar-spacer"></div>
+    <div class="toolbar-actions">
+        {{ ok.btn("+ NEW", variant="primary") }}
+    </div>
+</div>{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>EMPTY STATE</span>
+        </div>
+        <div class="panel-body">
+            <div style="border: 1px dashed var(--border-color); margin-bottom: var(--space-md);">
+                {{ ok.empty("No items found", action_text="Add Item", action_href="#") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.empty("No parts found") }}
+{{ ok.empty("No items", action_text="Add Item", action_href="/items/new") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>DATA TABLE</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table" style="margin-bottom: var(--space-md);">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>NAME</th>
+                        <th>CATEGORY</th>
+                        <th>STATUS</th>
+                        <th style="width: 180px;">CREATED</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ ok.id_cell("1", "#") }}</td>
+                        <td>Example Item</td>
+                        <td class="mono">HARDWARE</td>
+                        <td>{{ ok.status("ACTIVE") }}</td>
+                        <td class="timestamp mono">2024-01-15T14:30:00Z</td>
+                    </tr>
+                    <tr>
+                        <td>{{ ok.id_cell("2", "#") }}</td>
+                        <td>Another Item</td>
+                        <td class="mono">SOFTWARE</td>
+                        <td>{{ ok.status("PENDING") }}</td>
+                        <td class="timestamp mono">2024-01-14T09:15:00Z</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>NAME</th>
+            <th>STATUS</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ ok.id_cell(item.id, "/items/" ~ item.id) }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ ok.status(item.status) }}</td>
+        </tr>
+    </tbody>
+</table>{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>MODAL</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Modals are used for confirmations and forms. Click the button to see an example.
+            </p>
+            {{ ok.btn("OPEN MODAL", attrs='onclick="openModal(\'example-modal\')"') }}
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem; margin-top: var(--space-md);">
+<pre style="margin: 0;">{% raw %}{% set modal_id = "confirm-delete" %}
+{% set modal_title = "Confirm Delete" %}
+{% set modal_size = "sm" %}
+{% set modal_content %}
+    <p>Are you sure?</p>
+{% endset %}
+{% set modal_actions %}
+    <button class="btn" onclick="closeModal('confirm-delete')">Cancel</button>
+    <button class="btn btn-danger">Delete</button>
+{% endset %}
+{% include 'opalkit/_includes/modal.html' %}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>STAT CARDS</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Stat cards display key metrics on dashboards. Use variants for colored values.
+            </p>
+            <div class="grid grid-4" style="gap: var(--space-sm); margin-bottom: var(--space-md);">
+                {{ ok.stat("42", "PARTS", href="#") }}
+                {{ ok.stat("7", "OPEN ISSUES", href="#", variant="warn") }}
+                {{ ok.stat("3", "CRITICAL", href="#", variant="error") }}
+                {{ ok.stat("12", "IN PROGRESS", href="#", variant="info") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.stat("42", "PARTS", href="/parts") }}
+{{ ok.stat(open_issues, "OPEN ISSUES", href="/issues", variant="warn" if open_issues > 0 else none) }}
+{{ ok.stat(critical_count, "CRITICAL", href="/risks", variant="error") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Links -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>LINKS</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table" style="margin-bottom: var(--space-md);">
+                <tr>
+                    <th style="width: 150px;">STYLE</th>
+                    <th>OUTPUT</th>
+                    <th style="width: 300px;">CODE</th>
+                </tr>
+                <tr>
+                    <td>Default link</td>
+                    <td>{{ ok.link("View Part", "#") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.link("View", href) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>Mono link</td>
+                    <td>{{ ok.link("RV1-F-0001", "#", mono=true) }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.link(pn, href, mono=true) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>Muted link</td>
+                    <td>{{ ok.link("secondary", "#", muted=true) }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.link(text, href, muted=true) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>External link</td>
+                    <td>{{ ok.link("Docs", "https://example.com", external=true) }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.link(text, url, external=true) }}{% endraw %}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Table Helpers -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TABLE HELPERS</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Table header and cell macros for consistent column widths and alignment.
+            </p>
+            <table class="data-table" style="margin-bottom: var(--space-md);">
+                <thead>
+                    <tr>
+                        {{ ok.th("ID", width="60px") }}
+                        {{ ok.th("NAME") }}
+                        {{ ok.th("QTY", width="80px", align="right") }}
+                        {{ ok.th("STATUS", width="100px") }}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        {{ ok.td("1", mono=true) }}
+                        {{ ok.td("Example Part", href="#") }}
+                        {{ ok.td("42", mono=true, align="right") }}
+                        <td>{{ ok.status("ACTIVE") }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.th("ID", width="60px") }}
+{{ ok.th("QTY", width="80px", align="right") }}
+{{ ok.td(part.id, mono=true) }}
+{{ ok.td(part.name, href="/parts/" ~ part.id) }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Row -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>DETAIL ROW</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Key/value rows for detail views.
+            </p>
+            <table class="data-table" style="margin-bottom: var(--space-md);">
+                {{ ok.detail_row("NAME", "Example Part") }}
+                {{ ok.detail_row("PART NUMBER", "RV1-F-0001", mono=true) }}
+                {{ ok.detail_row("STATUS", ok.status("ACTIVE")) }}
+                {{ ok.detail_row("QUANTITY", "42", mono=true) }}
+            </table>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.detail_row("NAME", part.name) }}
+{{ ok.detail_row("PART NUMBER", part.internal_pn, mono=true) }}
+{{ ok.detail_row("STATUS", ok.status(part.status)) }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>BADGES</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Badges for tags, categories, and labels. Different from status badges.
+            </p>
+            <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-md);">
+                {{ ok.badge("propulsion") }}
+                {{ ok.badge("v1.2", variant="info") }}
+                {{ ok.badge("warning", variant="warn") }}
+                {{ ok.badge("critical", variant="error") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.badge("propulsion") }}
+{{ ok.badge("v1.2", variant="info") }}
+{{ ok.badge(category, variant="warn") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scores -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>SCORES &amp; SEVERITY</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Score displays for risk probability/impact values. Severity calculates P × I.
+            </p>
+            <table class="data-table" style="margin-bottom: var(--space-md);">
+                <thead>
+                    <tr>
+                        <th>RISK</th>
+                        <th style="width: 80px;">P</th>
+                        <th style="width: 80px;">I</th>
+                        <th style="width: 150px;">SEVERITY</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Low Risk</td>
+                        <td>{{ ok.score(1) }}</td>
+                        <td>{{ ok.score(2) }}</td>
+                        <td>{{ ok.severity(1, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td>Medium Risk</td>
+                        <td>{{ ok.score(3) }}</td>
+                        <td>{{ ok.score(3) }}</td>
+                        <td>{{ ok.severity(3, 3) }}</td>
+                    </tr>
+                    <tr>
+                        <td>High Risk</td>
+                        <td>{{ ok.score(4) }}</td>
+                        <td>{{ ok.score(5) }}</td>
+                        <td>{{ ok.severity(4, 5) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.score(risk.probability) }}
+{{ ok.score(risk.impact) }}
+{{ ok.severity(risk.probability, risk.impact) }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Button -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>CONFIRM BUTTON</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Danger button with built-in confirmation dialog. Handles API calls automatically.
+            </p>
+            <div style="margin-bottom: var(--space-md);">
+                {{ ok.confirm_btn("DELETE PART", message="Are you sure you want to delete this part?") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.confirm_btn("DELETE", message="Delete this part?", action="/api/parts/1", method="DELETE", redirect="/parts") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar Macros -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TOOLBAR MACROS</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Toolbar search and filter macros with HTMX support.
+            </p>
+            <div class="toolbar" style="margin-bottom: var(--space-md);">
+                {{ ok.toolbar_search(placeholder="Search parts...") }}
+                {{ ok.toolbar_filter("status", [{"value": "", "label": "All Status"}, {"value": "active", "label": "Active"}, {"value": "inactive", "label": "Inactive"}]) }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.toolbar_search(placeholder="Search...", hx_get="/parts/table", hx_target="#table-body") }}
+{{ ok.toolbar_filter("status", status_options, value=current_status, hx_get="/parts/table") }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>FORM ACTIONS &amp; MESSAGES</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Standard form submit/cancel buttons and error/success message containers.
+            </p>
+            <div style="border: 1px dashed var(--border-color); padding: var(--space-md); margin-bottom: var(--space-md);">
+                {{ ok.form_actions(cancel_href="/", submit_text="CREATE PART") }}
+            </div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem;">
+<pre style="margin: 0;">{% raw %}{{ ok.form_actions(cancel_href="/parts", submit_text="SAVE") }}
+{{ ok.form_messages() }}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Helpers -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>TEXT HELPERS</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr>
+                    <th style="width: 150px;">MACRO</th>
+                    <th>OUTPUT</th>
+                    <th style="width: 250px;">CODE</th>
+                </tr>
+                <tr>
+                    <td>muted</td>
+                    <td>{{ ok.muted("Secondary text") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.muted(text) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>red</td>
+                    <td>{{ ok.red("Error text") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.red(text) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>green</td>
+                    <td>{{ ok.green("Success text") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.green(text) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>yellow</td>
+                    <td>{{ ok.yellow("Warning text") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.yellow(text) }}{% endraw %}</td>
+                </tr>
+                <tr>
+                    <td>info</td>
+                    <td>{{ ok.info("Info text") }}</td>
+                    <td class="mono text-muted">{% raw %}{{ ok.info(text) }}{% endraw %}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- Panel Macro -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>PANEL MACRO (CALL BLOCK)</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Full panel wrapper using Jinja2 call blocks for cleaner templates.
+            </p>
+            {% call ok.panel("EXAMPLE PANEL", actions=ok.btn("ACTION", variant="primary", size="sm"), max_width="400px") %}
+            <p>Panel content goes here using the call block syntax.</p>
+            {% endcall %}
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem; margin-top: var(--space-md);">
+<pre style="margin: 0;">{% raw %}{% call ok.panel("TITLE", actions=ok.btn("NEW", variant="primary")) %}
+    Panel content here
+{% endcall %}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid Macro -->
+    <div class="panel" style="margin-bottom: var(--space-lg);">
+        <div class="panel-header">
+            <span>GRID MACRO</span>
+        </div>
+        <div class="panel-body">
+            <p class="text-muted" style="margin-bottom: var(--space-md);">
+                Responsive grid wrapper for layout.
+            </p>
+            {% call ok.grid(cols=3, gap="var(--space-sm)") %}
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); border: 1px solid var(--border-color);">Column 1</div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); border: 1px solid var(--border-color);">Column 2</div>
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); border: 1px solid var(--border-color);">Column 3</div>
+            {% endcall %}
+            <div style="background: var(--bg-tertiary); padding: var(--space-md); font-family: var(--font-mono); font-size: 0.75rem; margin-top: var(--space-md);">
+<pre style="margin: 0;">{% raw %}{% call ok.grid(cols=2) %}
+    <div>Column 1</div>
+    <div>Column 2</div>
+{% endcall %}{% endraw %}</pre>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Example Modal -->
+{% set modal_id = "example-modal" %}
+{% set modal_title = "EXAMPLE MODAL" %}
+{% set modal_size = "sm" %}
+{% set modal_content %}
+    <p>This is an example modal dialog.</p>
+    <p class="text-muted" style="margin-top: var(--space-sm);">Click outside or press the X to close.</p>
+{% endset %}
+{% set modal_actions %}
+    <button class="btn" onclick="closeModal('example-modal')">CANCEL</button>
+    <button class="btn btn-primary" onclick="closeModal('example-modal')">CONFIRM</button>
+{% endset %}
+{% include 'opalkit/_includes/modal.html' %}
+
+<script>
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+</script>
+{% endblock %}

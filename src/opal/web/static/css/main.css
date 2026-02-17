@@ -319,6 +319,45 @@ select option {
     color: var(--status-info);
 }
 
+/* Status badge variant (alias for .status, used in some templates) */
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid currentColor;
+}
+
+.status-badge.status-ok,
+.status-badge.status-completed,
+.status-badge.status-active {
+    color: var(--status-ok);
+}
+
+.status-badge.status-warn,
+.status-badge.status-pending,
+.status-badge.status-draft {
+    color: var(--status-warn);
+}
+
+.status-badge.status-error,
+.status-badge.status-aborted,
+.status-badge.status-critical {
+    color: var(--status-error);
+}
+
+.status-badge.status-info,
+.status-badge.status-in-progress {
+    color: var(--status-info);
+}
+
+.status-badge.status-inactive {
+    color: var(--text-muted);
+}
+
 /* Buttons */
 .btn {
     font-family: var(--font-mono);
@@ -357,6 +396,11 @@ select option {
     color: var(--bg-primary);
 }
 
+.btn-sm {
+    padding: 2px 6px;
+    font-size: 0.75rem;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: var(--space-md);
@@ -391,6 +435,41 @@ select option {
     border-color: var(--accent-orange);
 }
 
+.form-help {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* Toolbar - flex container for filters and actions */
+.toolbar {
+    display: flex;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: var(--space-md);
+}
+
+.toolbar-search {
+    max-width: 350px;
+}
+
+.toolbar-filter {
+    max-width: 180px;
+}
+
+.toolbar-spacer {
+    flex: 1;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+}
+
 /* Cards/Panels */
 .panel {
     background: var(--bg-secondary);
@@ -399,6 +478,9 @@ select option {
 }
 
 .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
@@ -407,6 +489,12 @@ select option {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+}
+
+.panel-header-actions {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
 }
 
 .panel-body {
@@ -531,6 +619,51 @@ select option {
     font-family: var(--font-mono);
 }
 
+.cmd-group-header {
+    padding: var(--space-xs) var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cmd-sublabel {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+.cmd-status {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    padding: 1px 4px;
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.cmd-type-search {
+    color: var(--accent-blue);
+}
+
+/* Audit detail rows */
+.audit-detail-row td {
+    border-top: none !important;
+}
+
+.audit-detail-row .data-table {
+    margin: 0;
+}
+
+.audit-row:hover + .audit-detail-row {
+    background: var(--bg-secondary);
+}
+
 .cmd-footer {
     display: flex;
     gap: var(--space-md);
@@ -558,7 +691,11 @@ select option {
 .text-yellow { color: var(--accent-yellow); }
 .text-red { color: var(--accent-red); }
 
+.mt-xs { margin-top: var(--space-xs); }
+.mt-sm { margin-top: var(--space-sm); }
 .mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+.mt-xl { margin-top: var(--space-xl); }
 .mb-md { margin-bottom: var(--space-md); }
 .p-md { padding: var(--space-md); }
 
@@ -1062,4 +1199,185 @@ select option {
 
 .part-search-clear:hover {
     color: var(--accent-red);
+}
+
+/* OPALkit Modal Component */
+.ok-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9000;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 15vh;
+}
+
+.ok-modal.active {
+    display: flex;
+}
+
+.ok-modal-dialog {
+    position: relative;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.ok-modal-sm {
+    width: 400px;
+    max-width: 90vw;
+}
+
+.ok-modal-md {
+    width: 600px;
+    max-width: 90vw;
+}
+
+.ok-modal-lg {
+    width: 800px;
+    max-width: 90vw;
+}
+
+.ok-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+}
+
+.ok-modal-content {
+    position: relative;
+    z-index: 1;
+    width: 500px;
+    max-width: 90vw;
+}
+
+/* OPALkit Score Component - for risk P/I values */
+.score {
+    display: inline-block;
+    min-width: 24px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-align: center;
+    border: 1px solid var(--border-color);
+}
+
+.score-ok {
+    color: var(--status-ok);
+    border-color: var(--status-ok);
+}
+
+.score-warn {
+    color: var(--status-warn);
+    border-color: var(--status-warn);
+}
+
+.score-error {
+    color: var(--status-error);
+    border-color: var(--status-error);
+}
+
+/* OPALkit Badge Component - for tags/categories */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.badge-info {
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+.badge-warn {
+    color: var(--status-warn);
+    border-color: var(--status-warn);
+}
+
+.badge-error {
+    color: var(--status-error);
+    border-color: var(--status-error);
+}
+
+/* Utility: ensure text-warn works */
+.text-warn {
+    color: var(--status-warn);
+}
+
+/* Light theme */
+:root[data-theme="light"] {
+    --bg-primary: #f5f5f5;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e8e8e8;
+    --border-color: #ccc;
+    --border-light: #ddd;
+
+    --text-primary: #1a1a1a;
+    --text-secondary: #555;
+    --text-muted: #999;
+
+    --accent-blue: #2563eb;
+    --accent-green: #16a34a;
+    --accent-yellow: #d97706;
+    --accent-red: #dc2626;
+    --accent-orange: #c2410c;
+}
+
+:root[data-theme="light"] ::selection {
+    background: var(--accent-orange);
+    color: #fff;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.theme-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+/* Diff view styles */
+.diff-added {
+    background: rgba(74, 222, 128, 0.1);
+    border-left: 3px solid var(--accent-green);
+}
+
+.diff-removed {
+    background: rgba(248, 113, 113, 0.1);
+    border-left: 3px solid var(--accent-red);
+}
+
+.diff-modified {
+    background: rgba(251, 191, 36, 0.1);
+    border-left: 3px solid var(--accent-yellow);
+}
+
+.diff-unchanged {
+    opacity: 0.5;
+}
+
+.diff-field-changed {
+    background: rgba(251, 191, 36, 0.15);
+    padding: 1px 4px;
 }

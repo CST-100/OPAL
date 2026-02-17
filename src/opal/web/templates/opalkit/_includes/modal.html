@@ -1,0 +1,54 @@
+{# OPALkit Modal Component
+
+   Usage:
+   {% set modal_id = "confirm-delete" %}
+   {% set modal_title = "Confirm Delete" %}
+   {% set modal_size = "sm" %}
+   {% set modal_content %}
+       <p>Are you sure you want to delete this item?</p>
+   {% endset %}
+   {% set modal_actions %}
+       <button class="btn" onclick="closeModal('confirm-delete')">Cancel</button>
+       <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+   {% endset %}
+   {% include 'opalkit/_includes/modal.html' %}
+
+   Required context:
+   - modal_id: string - Unique ID for the modal
+   - modal_title: string - Title shown in the modal header
+
+   Optional context:
+   - modal_size: string - Size variant: "sm" (400px), "md" (600px), "lg" (800px). Default: "md"
+   - modal_content: HTML string - Body content of the modal
+   - modal_actions: HTML string - Footer buttons/actions
+
+   JavaScript functions (add to your page):
+
+   function openModal(id) {
+       document.getElementById(id).classList.add('active');
+   }
+
+   function closeModal(id) {
+       document.getElementById(id).classList.remove('active');
+   }
+#}
+<div id="{{ modal_id }}" class="ok-modal" onclick="if(event.target === this) closeModal('{{ modal_id }}')">
+    <div class="ok-modal-dialog ok-modal-{{ modal_size|default('md') }}">
+        <div class="panel">
+            <div class="panel-header">
+                <span>{{ modal_title }}</span>
+                <div class="panel-header-actions">
+                    <button class="btn btn-sm" onclick="closeModal('{{ modal_id }}')">&times;</button>
+                </div>
+            </div>
+            <div class="panel-body">
+                {{ modal_content|default('') }}
+            </div>
+            {%- if modal_actions -%}
+            <div style="padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: var(--space-sm);">
+                {{ modal_actions }}
+            </div>
+            {%- endif -%}
+        </div>
+    </div>
+</div>
