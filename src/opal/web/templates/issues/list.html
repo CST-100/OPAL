@@ -1,17 +1,67 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">ISSUES</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("ISSUES") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        ISSUES
-        <button class="btn btn-primary" style="float: right;">+ NEW ISSUE</button>
+        <span>ISSUES</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ NEW ISSUE", href="/issues/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
+        <div class="toolbar">
+            <input type="text"
+                   id="search-input"
+                   class="form-input toolbar-search"
+                   placeholder="Search issues by title..."
+                   hx-get="/issues/table"
+                   hx-trigger="keyup changed delay:300ms, search"
+                   hx-target="#issues-table-body"
+                   hx-include="#type-filter, #status-filter, #priority-filter"
+                   name="search">
+            <select id="type-filter"
+                    name="issue_type"
+                    class="form-select toolbar-filter"
+                    hx-get="/issues/table"
+                    hx-trigger="change"
+                    hx-target="#issues-table-body"
+                    hx-include="#search-input, #status-filter, #priority-filter">
+                <option value="">All types</option>
+                {% for t in types %}
+                <option value="{{ t }}">{{ t | upper | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+            <select id="status-filter"
+                    name="status"
+                    class="form-select toolbar-filter"
+                    hx-get="/issues/table"
+                    hx-trigger="change"
+                    hx-target="#issues-table-body"
+                    hx-include="#search-input, #type-filter, #priority-filter">
+                <option value="">All statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+            <select id="priority-filter"
+                    name="priority"
+                    class="form-select toolbar-filter"
+                    hx-get="/issues/table"
+                    hx-trigger="change"
+                    hx-target="#issues-table-body"
+                    hx-include="#search-input, #type-filter, #status-filter">
+                <option value="">All priorities</option>
+                {% for p in priorities %}
+                <option value="{{ p }}">{{ p | upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <table class="data-table">
             <thead>
                 <tr>
@@ -20,15 +70,12 @@
                     <th>TITLE</th>
                     <th>STATUS</th>
                     <th>PRIORITY</th>
-                    <th>LINKED TO</th>
                     <th>CREATED</th>
                 </tr>
             </thead>
-            <tbody id="issues-table-body">
+            <tbody id="issues-table-body" hx-get="/issues/table" hx-trigger="load">
                 <tr>
-                    <td colspan="7" class="empty-state">
-                        <p class="text-muted">No issues yet</p>
-                    </td>
+                    <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
         </table>

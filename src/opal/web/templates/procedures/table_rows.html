@@ -1,23 +1,20 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if procedures %}
 {% for p in procedures %}
 <tr>
-    <td class="id-cell"><a href="/procedures/{{ p.id }}">{{ p.id }}</a></td>
+    <td>{{ ok.id_cell(p.id, "/procedures/" ~ p.id) }}</td>
     <td><a href="/procedures/{{ p.id }}">{{ p.name }}</a></td>
-    <td>
-        <span class="status status-{% if p.status == 'active' %}ok{% elif p.status == 'deprecated' %}error{% else %}warn{% endif %}">
-            {{ p.status | upper }}
-        </span>
-    </td>
+    <td>{{ ok.status(p.status | upper) }}</td>
     <td class="mono">{% if p.current_version_id %}v{{ p.version_number }}{% else %}-{% endif %}</td>
     <td class="mono" style="text-align: center;">{{ p.step_count }}</td>
-    <td class="timestamp">{{ p.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
-    <td class="timestamp">{{ p.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+    <td>{{ ok.timestamp(p.created_at) }}</td>
+    <td>{{ ok.timestamp(p.updated_at) }}</td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="7" class="empty-state">
-        <p class="text-muted">No procedures found</p>
+    <td colspan="7">
+        {{ ok.empty("No procedures found") }}
     </td>
 </tr>
 {% endif %}

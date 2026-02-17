@@ -1,19 +1,20 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
-<span class="breadcrumb-item">{{ procedure.name }}</span>
+{{ ok.crumb("HOME") }}
+{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb(procedure.name) }}
 {% endblock %}
 
 {% block content %}
 <div class="grid grid-2">
     <div class="panel">
         <div class="panel-header">
-            {{ procedure.name }}
-            <span class="status status-{% if procedure.status.value == 'active' %}ok{% elif procedure.status.value == 'deprecated' %}error{% else %}warn{% endif %}" style="float: right;">
-                {{ procedure.status.value | upper }}
-            </span>
+            <span>{{ procedure.name }}</span>
+            <div class="panel-header-actions">
+                {{ ok.status(procedure.status.value | upper, "ok" if procedure.status.value == "active" else ("error" if procedure.status.value == "deprecated" else "warn")) }}
+            </div>
         </div>
         <div class="panel-body">
             <table class="data-table">
@@ -37,11 +38,11 @@
                 </tr>
                 <tr>
                     <th>CREATED</th>
-                    <td class="timestamp">{{ procedure.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    <td>{{ ok.timestamp(procedure.created_at) }}</td>
                 </tr>
                 <tr>
                     <th>UPDATED</th>
-                    <td class="timestamp">{{ procedure.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    <td>{{ ok.timestamp(procedure.updated_at) }}</td>
                 </tr>
             </table>
             {% if procedure.description %}
@@ -51,15 +52,16 @@
             </div>
             {% endif %}
             <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm);">
-                <a href="/procedures/{{ procedure.id }}/edit" class="btn">EDIT</a>
-                <button class="btn btn-primary" onclick="publishVersion()">PUBLISH VERSION</button>
+                {{ ok.btn("EDIT", href="/procedures/" ~ procedure.id ~ "/edit") }}
+                {{ ok.btn("CLONE", attrs='onclick="cloneProcedure()"') }}
+                {{ ok.btn("PUBLISH VERSION", variant="primary", attrs='onclick="publishVersion()"') }}
             </div>
         </div>
     </div>
 
     <div class="panel">
         <div class="panel-header">
-            VERSIONS
+            <span>VERSIONS</span>
         </div>
         <div class="panel-body">
             {% if versions %}
@@ -74,17 +76,15 @@
                 <tbody>
                     {% for v in versions %}
                     <tr>
-                        <td class="mono">v{{ v.version_number }}{% if v.id == procedure.current_version_id %} <span class="status status-ok">CURRENT</span>{% endif %}</td>
-                        <td class="timestamp">{{ v.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
-                        <td><a href="/procedures/versions/{{ v.id }}" class="btn">VIEW</a></td>
+                        <td class="mono">v{{ v.version_number }}{% if v.id == procedure.current_version_id %} {{ ok.status("CURRENT", "ok") }}{% endif %}</td>
+                        <td>{{ ok.timestamp(v.created_at) }}</td>
+                        <td>{{ ok.btn("VIEW", href="/procedures/versions/" ~ v.id) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
-            <div class="empty-state">
-                <p class="text-muted">No versions published yet</p>
-            </div>
+            {{ ok.empty("No versions published yet") }}
             {% endif %}
         </div>
     </div>
@@ -92,8 +92,10 @@
 
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        OPERATIONS (DRAFT)
-        <button class="btn btn-primary" style="float: right;" onclick="showAddOp()">+ ADD OP</button>
+        <span>OPERATIONS (DRAFT)</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD OP", variant="primary", attrs='onclick="showAddOp()"') }}
+        </div>
     </div>
     <div class="panel-body">
         {% if ops %}
@@ -109,9 +111,9 @@
                     {% endif %}
                     <span class="op-progress">{{ op_data.sub_steps|length }} steps</span>
                     <span class="op-actions">
-                        <button class="btn btn-sm" onclick="showAddStep({{ op.id }})">+ STEP</button>
-                        <button class="btn btn-sm" onclick="editStep({{ op.id }})">EDIT</button>
-                        <button class="btn btn-sm text-red" onclick="deleteStep({{ op.id }})">X</button>
+                        {{ ok.btn("+ STEP", size="sm", attrs='onclick="showAddStep(' ~ op.id ~ ')"') }}
+                        {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ op.id ~ ')"') }}
+                        {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteStep(' ~ op.id ~ ')"') }}
                     </span>
                 </div>
                 {% if op.instructions %}
@@ -134,8 +136,8 @@
                             <td>{{ step.title }}</td>
                             <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
                             <td>
-                                <button class="btn btn-sm" onclick="editStep({{ step.id }})">EDIT</button>
-                                <button class="btn btn-sm text-red" onclick="deleteStep({{ step.id }})">X</button>
+                                {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ step.id ~ ')"') }}
+                                {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteStep(' ~ step.id ~ ')"') }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -146,9 +148,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="empty-state">
-            <p class="text-muted">No operations defined yet</p>
-        </div>
+        {{ ok.empty("No operations defined yet") }}
         {% endif %}
     </div>
 </div>
@@ -156,8 +156,10 @@
 {% if contingency_ops %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        CONTINGENCY OPERATIONS
-        <button class="btn" style="float: right;" onclick="showAddOp(true)">+ ADD CONTINGENCY</button>
+        <span>CONTINGENCY OPERATIONS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"') }}
+        </div>
     </div>
     <div class="panel-body">
         <div id="contingency-ops-list">
@@ -166,16 +168,16 @@
             <div class="op-block op-contingency" data-op-id="{{ op.id }}">
                 <div class="op-header">
                     <span class="op-number mono">OP {{ op.step_number }}</span>
-                    <span class="status status-warn">CONTINGENCY</span>
+                    {{ ok.status("CONTINGENCY", "warn") }}
                     <span class="op-title">{{ op.title }}</span>
                     {% if op.estimated_duration_minutes %}
                     <span class="op-duration mono">{{ op.estimated_duration_minutes }}m</span>
                     {% endif %}
                     <span class="op-progress">{{ op_data.sub_steps|length }} steps</span>
                     <span class="op-actions">
-                        <button class="btn btn-sm" onclick="showAddStep({{ op.id }})">+ STEP</button>
-                        <button class="btn btn-sm" onclick="editStep({{ op.id }})">EDIT</button>
-                        <button class="btn btn-sm text-red" onclick="deleteStep({{ op.id }})">X</button>
+                        {{ ok.btn("+ STEP", size="sm", attrs='onclick="showAddStep(' ~ op.id ~ ')"') }}
+                        {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ op.id ~ ')"') }}
+                        {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteStep(' ~ op.id ~ ')"') }}
                     </span>
                 </div>
                 {% if op.instructions %}
@@ -198,8 +200,8 @@
                             <td>{{ step.title }}</td>
                             <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
                             <td>
-                                <button class="btn btn-sm" onclick="editStep({{ step.id }})">EDIT</button>
-                                <button class="btn btn-sm text-red" onclick="deleteStep({{ step.id }})">X</button>
+                                {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ step.id ~ ')"') }}
+                                {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteStep(' ~ step.id ~ ')"') }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -214,21 +216,23 @@
 {% else %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        CONTINGENCY OPERATIONS
-        <button class="btn" style="float: right;" onclick="showAddOp(true)">+ ADD CONTINGENCY</button>
+        <span>CONTINGENCY OPERATIONS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"') }}
+        </div>
     </div>
     <div class="panel-body">
-        <div class="empty-state">
-            <p class="text-muted">No contingency operations defined</p>
-        </div>
+        {{ ok.empty("No contingency operations defined") }}
     </div>
 </div>
 {% endif %}
 
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        KIT (BILL OF MATERIALS)
-        <button class="btn btn-primary" style="float: right;" onclick="showAddKit()">+ ADD PART</button>
+        <span>KIT (BILL OF MATERIALS)</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddKit()"') }}
+        </div>
     </div>
     <div class="panel-body">
         {% if kit_items %}
@@ -249,15 +253,13 @@
                     <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
                     <td class="mono">{{ item.part_external_pn or '-' }}</td>
                     <td class="mono" style="text-align: right;">{{ item.quantity_required }}</td>
-                    <td><button class="btn text-red" onclick="removeKitItem({{ item.part_id }})">X</button></td>
+                    <td>{{ ok.btn("X", variant="danger", attrs='onclick="removeKitItem(' ~ item.part_id ~ ')"') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
         {% else %}
-        <div class="empty-state">
-            <p class="text-muted">No parts in kit</p>
-        </div>
+        {{ ok.empty("No parts in kit") }}
         {% endif %}
     </div>
 </div>
@@ -283,8 +285,8 @@
                         <input type="number" id="op-duration" name="estimated_duration_minutes" class="form-input" min="1">
                     </div>
                     <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                        <button type="button" class="btn" onclick="hideAddOp()">CANCEL</button>
-                        <button type="submit" class="btn btn-primary">ADD</button>
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddOp()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
                     </div>
                 </form>
                 <div id="op-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -314,8 +316,8 @@
                         <input type="number" id="step-duration" name="estimated_duration_minutes" class="form-input" min="1">
                     </div>
                     <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                        <button type="button" class="btn" onclick="hideAddStep()">CANCEL</button>
-                        <button type="submit" class="btn btn-primary">ADD</button>
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddStep()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
                     </div>
                 </form>
                 <div id="step-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -358,8 +360,8 @@
                         <input type="number" id="kit-qty" name="quantity_required" class="form-input" step="0.0001" min="0.0001" required>
                     </div>
                     <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                        <button type="button" class="btn" onclick="hideAddKit()">CANCEL</button>
-                        <button type="submit" class="btn btn-primary">ADD</button>
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddKit()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
                     </div>
                 </form>
                 <div id="kit-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -442,7 +444,32 @@ async function updateStatus(status) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to update status');
+            alert(formatApiError(error.detail, 'Failed to update status'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function cloneProcedure() {
+    const newName = prompt('Enter name for the cloned procedure:', 'Copy of {{ procedure.name | replace("'", "\\'") }}');
+    if (newName === null) return;
+
+    try {
+        const body = {};
+        if (newName.trim()) body.new_name = newName.trim();
+
+        const response = await fetch(`/api/procedures/${procedureId}/clone`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(body),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            window.location.href = '/procedures/' + data.id;
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to clone procedure'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -461,7 +488,7 @@ async function publishVersion() {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to publish version');
+            alert(formatApiError(error.detail, 'Failed to publish version'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -503,7 +530,7 @@ async function addOp(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to add operation';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add operation');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -547,7 +574,7 @@ async function addStep(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to add step';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add step');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -572,7 +599,7 @@ async function deleteStep(stepId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to delete step');
+            alert(formatApiError(error.detail, 'Failed to delete step'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -616,7 +643,7 @@ async function addKitItem(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to add part to kit';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add part to kit');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -637,7 +664,7 @@ async function removeKitItem(partId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to remove part');
+            alert(formatApiError(error.detail, 'Failed to remove part'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);

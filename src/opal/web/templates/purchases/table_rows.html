@@ -1,3 +1,4 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if purchases %}
 {% for po in purchases %}
 <tr>
@@ -10,22 +11,18 @@
         {% endif %}
     </td>
     <td>
-        <span class="status status-{% if po.status|status_value == 'received' %}ok{% elif po.status|status_value == 'cancelled' %}error{% elif po.status|status_value == 'ordered' or po.status|status_value == 'partial' %}info{% elif po.status|status_value == 'on_hold' %}warn{% else %}warn{% endif %}">
-            {{ po.status|status_value|upper }}
-        </span>
+        {{ ok.status(po.status|status_value|upper) }}
         {% if po.is_overdue %}
-        <span class="status status-error" style="margin-left: 4px;">OVERDUE</span>
+        {{ ok.status("OVERDUE", "error") }}
         {% endif %}
     </td>
     <td class="mono {% if po.is_overdue %}text-red{% endif %}">{{ po.target_date.strftime('%Y-%m-%d') if po.target_date else '-' }}</td>
     <td class="mono" style="text-align: center;">{{ po.lines | length }}</td>
-    <td class="timestamp">{{ po.created_at.strftime('%Y-%m-%dT%H:%M') }}Z</td>
+    <td>{{ ok.timestamp(po.created_at) }}</td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="6" class="empty-state">
-        <p class="text-muted">No purchase orders</p>
-    </td>
+    <td colspan="6">{{ ok.empty("No purchase orders") }}</td>
 </tr>
 {% endif %}

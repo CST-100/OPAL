@@ -1,0 +1,122 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("INVENTORY", "/inventory") }}
+{{ ok.crumb(record.opal_number or record.id, "/inventory/opal/" ~ record.opal_number) }}
+{{ ok.crumb("ADJUST") }}
+{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 600px; margin: 0 auto;">
+    <div class="panel-header">
+        <span>ADJUST QUANTITY</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table" style="margin-bottom: var(--space-lg);">
+            <tr>
+                <th style="width: 140px;">OPAL #</th>
+                <td class="mono">{{ record.opal_number or '-' }}</td>
+            </tr>
+            <tr>
+                <th>PART</th>
+                <td><a href="/parts/{{ record.part_id }}">{{ record.part.name }}</a></td>
+            </tr>
+            <tr>
+                <th>LOCATION</th>
+                <td class="mono">{{ record.location }}</td>
+            </tr>
+            <tr>
+                <th>CURRENT QTY</th>
+                <td class="mono" style="font-size: 1.2rem; font-weight: 600;">{{ '%g' % record.quantity }}</td>
+            </tr>
+            <tr>
+                <th>TRACKING</th>
+                <td>{{ ok.status(record.part.tracking_type.value | upper if record.part.tracking_type else 'BULK') }}</td>
+            </tr>
+        </table>
+
+        <form id="adjust-form" onsubmit="event.preventDefault(); submitAdjust();">
+            <div class="form-group">
+                <label class="form-label" for="reason">REASON <span class="text-red">*</span></label>
+                <select id="reason" name="reason" class="form-select" required>
+                    <option value="">Select reason...</option>
+                    <option value="cycle_count">CYCLE COUNT - Physical count correction</option>
+                    <option value="damage">DAMAGE - Damaged stock (negative)</option>
+                    <option value="scrap">SCRAP - Scrapped stock (negative)</option>
+                    <option value="found">FOUND - Found stock (positive)</option>
+                    <option value="correction">CORRECTION - General correction</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="adjustment">ADJUSTMENT <span class="text-red">*</span></label>
+                <input type="number" id="adjustment" name="adjustment" class="form-input"
+                       step="0.0001" required placeholder="e.g. -5 to remove, +3 to add">
+                <small class="form-help">Positive to add, negative to subtract. New qty: <span id="new-qty" class="mono">{{ '%g' % record.quantity }}</span></small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="notes">NOTES</label>
+                <textarea id="notes" name="notes" class="form-input" rows="3" placeholder="Optional notes about this adjustment"></textarea>
+            </div>
+
+            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                {{ ok.btn("CANCEL", href="/inventory/opal/" ~ record.opal_number) }}
+                {{ ok.btn("APPLY ADJUSTMENT", variant="primary", type="submit") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const currentQty = {{ record.quantity }};
+const inventoryId = {{ record.id }};
+
+document.getElementById('adjustment').addEventListener('input', function() {
+    const adj = parseFloat(this.value) || 0;
+    const newQty = currentQty + adj;
+    const span = document.getElementById('new-qty');
+    span.textContent = newQty.toFixed(4).replace(/\.?0+$/, '');
+    span.style.color = newQty < 0 ? 'var(--accent-red)' : '';
+});
+
+async function submitAdjust() {
+    const reason = document.getElementById('reason').value;
+    const adjustment = parseFloat(document.getElementById('adjustment').value);
+    const notes = document.getElementById('notes').value.trim() || null;
+
+    if (!reason) {
+        alert('Please select a reason');
+        return;
+    }
+    if (isNaN(adjustment) || adjustment === 0) {
+        alert('Please enter a non-zero adjustment');
+        return;
+    }
+
+    const body = { adjustment, reason, notes };
+
+    try {
+        const response = await fetch(`/api/inventory/${inventoryId}/adjust`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+            window.location.href = '/inventory/opal/{{ record.opal_number }}';
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to adjust inventory'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endblock %}

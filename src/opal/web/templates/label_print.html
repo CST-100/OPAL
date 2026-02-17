@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Label - {{ identifier }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #fff;
+            color: #000;
+        }
+        .label {
+            border: 2px solid #000;
+            padding: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .label-qr img {
+            width: 96px;
+            height: 96px;
+            display: block;
+        }
+        .label-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .label-id {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .label-name {
+            font-size: 0.875rem;
+        }
+        .label-location {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        @media print {
+            body { min-height: auto; }
+            .label { border: 2px solid #000; }
+            @page { margin: 0.25in; size: 4in 2in; }
+        }
+    </style>
+</head>
+<body>
+    <div class="label">
+        <div class="label-qr">
+            <img src="/api/{{ entity_type }}/{{ entity_id }}/qrcode" alt="QR">
+        </div>
+        <div class="label-info">
+            <div class="label-id">{{ identifier }}</div>
+            <div class="label-name">{{ name }}</div>
+            {% if location %}
+            <div class="label-location">{{ location }}</div>
+            {% endif %}
+        </div>
+    </div>
+    <script>window.print();</script>
+</body>
+</html>

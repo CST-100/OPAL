@@ -1,38 +1,36 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">INVENTORY</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("INVENTORY") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
-    <div class="panel-header">PHYSICAL INVENTORY - TRACEABLE ITEMS</div>
+    <div class="panel-header">
+        <span>PHYSICAL INVENTORY - TRACEABLE ITEMS</span>
+    </div>
     <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md); flex-wrap: wrap; align-items: center;">
-            <!-- OPAL Number Search -->
-            <div style="display: flex; gap: var(--space-xs); align-items: center;">
-                <input type="text"
-                       id="opal-search"
-                       name="opal_search"
-                       placeholder="Search OPAL-XXXXX..."
-                       class="form-input"
-                       style="width: 180px;"
-                       hx-get="/inventory/table"
-                       hx-trigger="input changed delay:300ms, keyup[key=='Enter']"
-                       hx-target="#inventory-table-body"
-                       hx-include="#location-filter">
-                <span class="text-muted" style="font-size: 0.85em;">or scan QR</span>
-            </div>
+        <div class="toolbar">
+            <input type="text"
+                   id="opal-search"
+                   name="opal_search"
+                   placeholder="Search OPAL-XXXXX..."
+                   class="form-input toolbar-search"
+                   hx-get="/inventory/table"
+                   hx-trigger="input changed delay:300ms, keyup[key=='Enter']"
+                   hx-target="#inventory-table-body"
+                   hx-include="#location-filter,#source-filter,#expiration-filter,#calibration-filter">
+            <span class="text-muted" style="font-size: 0.85em;">or scan QR</span>
 
             <select id="location-filter"
                     name="location"
-                    class="form-select"
-                    style="max-width: 200px;"
+                    class="form-select toolbar-filter"
                     hx-get="/inventory/table"
                     hx-trigger="change"
                     hx-target="#inventory-table-body"
-                    hx-include="#opal-search">
+                    hx-include="#opal-search,#source-filter,#expiration-filter,#calibration-filter">
                 <option value="">All locations</option>
                 {% for loc in locations %}
                 <option value="{{ loc }}">{{ loc }}</option>
@@ -41,16 +39,38 @@
 
             <select id="source-filter"
                     name="source_type"
-                    class="form-select"
-                    style="max-width: 160px;"
+                    class="form-select toolbar-filter"
                     hx-get="/inventory/table"
                     hx-trigger="change"
                     hx-target="#inventory-table-body"
-                    hx-include="#opal-search,#location-filter">
+                    hx-include="#opal-search,#location-filter,#expiration-filter,#calibration-filter">
                 <option value="">All sources</option>
                 <option value="purchase">From PO</option>
                 <option value="production">Produced</option>
                 <option value="manual">Manual entry</option>
+            </select>
+
+            <select id="expiration-filter"
+                    name="expiration"
+                    class="form-select toolbar-filter"
+                    hx-get="/inventory/table"
+                    hx-trigger="change"
+                    hx-target="#inventory-table-body"
+                    hx-include="#opal-search,#location-filter,#source-filter,#calibration-filter">
+                <option value="">All expiration</option>
+                <option value="expired">Expired</option>
+                <option value="expiring">Expiring soon (30d)</option>
+            </select>
+
+            <select id="calibration-filter"
+                    name="calibration"
+                    class="form-select toolbar-filter"
+                    hx-get="/inventory/table"
+                    hx-trigger="change"
+                    hx-target="#inventory-table-body"
+                    hx-include="#opal-search,#location-filter,#source-filter,#expiration-filter">
+                <option value="">All calibration</option>
+                <option value="overdue">Cal overdue</option>
             </select>
         </div>
 
@@ -68,12 +88,14 @@
                     <th style="width: 90px; text-align: right;">QTY</th>
                     <th style="width: 100px;">SOURCE</th>
                     <th style="width: 90px;">LOT</th>
+                    <th style="width: 100px;">EXPIRATION</th>
+                    <th style="width: 80px;">CAL</th>
                     <th style="width: 160px;">RECEIVED</th>
                 </tr>
             </thead>
             <tbody id="inventory-table-body" hx-get="/inventory/table" hx-trigger="load">
                 <tr>
-                    <td colspan="7" class="text-muted">Loading...</td>
+                    <td colspan="9" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
         </table>

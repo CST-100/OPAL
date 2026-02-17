@@ -1,19 +1,20 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
-<span class="breadcrumb-item">{{ risk.id }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("RISKS", "/risks") }}
+{{ ok.crumb(risk.id) }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px;">
     <div class="panel-header">
-        RISK #{{ risk.id }}
-        {% set score = risk.probability * risk.impact %}
-        <span class="status status-{% if score <= 5 %}success{% elif score <= 12 %}warn{% else %}error{% endif %}" style="float: right;">
-            SCORE: {{ score }}
-        </span>
+        <span>RISK #{{ risk.id }}</span>
+        <div class="panel-header-actions">
+            {% set score = risk.probability * risk.impact %}
+            {{ ok.status("SCORE: " ~ score, "ok" if score <= 5 else ("warn" if score <= 12 else "error")) }}
+        </div>
     </div>
     <div class="panel-body">
         <h2 style="margin-bottom: var(--space-md);">{{ risk.title }}</h2>
@@ -57,25 +58,18 @@
             <tr>
                 <th>SCORE</th>
                 <td>
-                    <span id="score-value" style="font-weight: bold; font-size: 1.2rem;">
-                        {% set score = risk.probability * risk.impact %}
-                        {% if score <= 5 %}
-                        <span style="color: var(--success);">{{ score }} (LOW)</span>
-                        {% elif score <= 12 %}
-                        <span style="color: var(--warning);">{{ score }} (MEDIUM)</span>
-                        {% else %}
-                        <span style="color: var(--error);">{{ score }} (HIGH)</span>
-                        {% endif %}
+                    <span id="score-value">
+                        {{ ok.severity(risk.probability, risk.impact) }}
                     </span>
                 </td>
             </tr>
             <tr>
                 <th>CREATED</th>
-                <td class="timestamp">{{ risk.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(risk.created_at) }}</td>
             </tr>
             <tr>
                 <th>UPDATED</th>
-                <td class="timestamp">{{ risk.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(risk.updated_at) }}</td>
             </tr>
             {% if risk.linked_issue_id %}
             <tr>
@@ -100,8 +94,8 @@
         </div>
 
         <div style="display: flex; gap: var(--space-sm);">
-            <a href="/risks" class="btn">BACK</a>
-            <button class="btn text-red" onclick="deleteRisk()">DELETE</button>
+            {{ ok.btn("BACK", href="/risks") }}
+            {{ ok.btn("DELETE", variant="danger", attrs='onclick="deleteRisk()"') }}
         </div>
     </div>
 </div>
@@ -144,7 +138,7 @@ async function updateRisk(field, value) {
         });
         if (!response.ok) {
             const error = await response.json();
-            alert(error.detail || 'Failed to update risk');
+            alert(formatApiError(error.detail, 'Failed to update risk'));
             window.location.reload();
         } else {
             if (field === 'probability' || field === 'impact') {
@@ -169,7 +163,7 @@ async function deleteRisk() {
             window.location.href = '/risks';
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to delete risk');
+            alert(formatApiError(error.detail, 'Failed to delete risk'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);

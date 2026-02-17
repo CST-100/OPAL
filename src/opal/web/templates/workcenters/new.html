@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/workcenters">WORKCENTERS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("WORKCENTERS", "/workcenters") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
-    <div class="panel-header">NEW WORKCENTER</div>
+    <div class="panel-header"><span>NEW WORKCENTER</span></div>
     <div class="panel-body">
         <form id="workcenter-form" onsubmit="createWorkcenter(event)">
             <div class="form-group">
@@ -42,7 +43,7 @@
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                <a href="/workcenters" class="btn">CANCEL</a>
+                {{ ok.btn("CANCEL", href="/workcenters") }}
                 <button type="submit" class="btn btn-primary">CREATE WORKCENTER</button>
             </div>
         </form>
@@ -86,7 +87,7 @@ async function createWorkcenter(event) {
             window.location.href = '/workcenters/' + result.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create workcenter';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create workcenter');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

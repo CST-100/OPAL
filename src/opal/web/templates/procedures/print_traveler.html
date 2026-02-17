@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Traveler - {{ procedure_name }} v{{ version_number }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            font-size: 11pt;
+            color: #000;
+            background: #fff;
+            line-height: 1.4;
+            padding: 0.5in;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .header-left h1 {
+            font-size: 16pt;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .header-meta { font-size: 9pt; }
+        .header-meta td { padding: 2px 8px 2px 0; }
+        .header-meta .label { font-weight: 700; text-transform: uppercase; }
+        .header-right {
+            text-align: right;
+        }
+        .qr-code img { width: 80px; height: 80px; }
+        .field-line {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            min-width: 180px;
+            margin-left: 4px;
+        }
+
+        h2 {
+            font-size: 12pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+
+        /* Kit table */
+        .kit-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 16px;
+        }
+        .kit-table th, .kit-table td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            text-align: left;
+        }
+        .kit-table th {
+            background: #e0e0e0;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9pt;
+        }
+        .kit-table .check-col {
+            width: 40px;
+            text-align: center;
+        }
+
+        /* Step section */
+        .step {
+            border: 1px solid #000;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #e0e0e0;
+            padding: 6px 10px;
+            font-weight: 700;
+            font-size: 11pt;
+            border-bottom: 1px solid #000;
+        }
+        .step-number {
+            font-size: 14pt;
+            min-width: 30px;
+        }
+        .step-body {
+            padding: 8px 10px;
+        }
+        .step-instructions {
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+        }
+
+        /* Data capture fields */
+        .data-field {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+        }
+        .data-field-label {
+            font-weight: 700;
+            min-width: 120px;
+            text-transform: uppercase;
+        }
+        .data-field-input {
+            flex: 1;
+            border-bottom: 1px solid #000;
+            min-height: 18px;
+        }
+        .data-field-checkbox {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #000;
+            display: inline-block;
+        }
+
+        /* Sign-off row */
+        .signoff {
+            display: flex;
+            gap: 16px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #ccc;
+            font-size: 9pt;
+        }
+        .signoff-field {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+        .signoff-line {
+            border-bottom: 1px solid #000;
+            min-width: 100px;
+        }
+
+        /* Contingency marker */
+        .contingency-marker {
+            background: #fff;
+            border: 2px solid #000;
+            padding: 1px 6px;
+            font-size: 9pt;
+            font-weight: 700;
+        }
+
+        /* Footer signatures */
+        .footer-signatures {
+            margin-top: 32px;
+            border-top: 3px solid #000;
+            padding-top: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .sig-block {
+            text-align: center;
+            min-width: 200px;
+        }
+        .sig-line {
+            border-bottom: 1px solid #000;
+            height: 40px;
+            margin-bottom: 4px;
+        }
+        .sig-label {
+            font-size: 9pt;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        /* Sub-step indent */
+        .sub-step {
+            margin-left: 20px;
+        }
+
+        @media print {
+            body { padding: 0; }
+            .step { page-break-inside: avoid; }
+            h2 { page-break-after: avoid; }
+            @page { margin: 0.5in; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <h1>{{ procedure_name }}</h1>
+            <table class="header-meta">
+                <tr>
+                    <td class="label">Version:</td>
+                    <td>v{{ version_number }}</td>
+                    <td class="label" style="padding-left: 24px;">Published:</td>
+                    <td>{{ published_at }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Work Order:</td>
+                    <td><span class="field-line">&nbsp;</span></td>
+                    <td class="label" style="padding-left: 24px;">Date:</td>
+                    <td><span class="field-line">&nbsp;</span></td>
+                </tr>
+            </table>
+        </div>
+        <div class="header-right">
+            <div class="qr-code">
+                <img src="{{ qr_data_uri }}" alt="QR Code">
+            </div>
+            <div style="font-size: 8pt; margin-top: 4px;">OPAL TRAVELER</div>
+        </div>
+    </div>
+
+    {% if description %}
+    <p style="margin-bottom: 12px; font-size: 10pt;">{{ description }}</p>
+    {% endif %}
+
+    <!-- Kit / BOM -->
+    {% if kit_items %}
+    <h2>KIT / BILL OF MATERIALS</h2>
+    <table class="kit-table">
+        <thead>
+            <tr>
+                <th class="check-col">KIT</th>
+                <th>PART NAME</th>
+                <th style="width: 120px;">INTERNAL PN</th>
+                <th style="width: 80px; text-align: right;">QTY REQ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in kit_items %}
+            <tr>
+                <td class="check-col"><span class="data-field-checkbox"></span></td>
+                <td>{{ item.part_name }}</td>
+                <td>{{ item.part_pn or '-' }}</td>
+                <td style="text-align: right;">{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Steps -->
+    <h2>OPERATIONS</h2>
+    {% for step in steps %}
+    {% if not step.is_contingency %}
+    <div class="step{% if step.level > 0 %} sub-step{% endif %}">
+        <div class="step-header">
+            <span class="step-number">{{ step.step_number }}</span>
+            <span>{{ step.title }}</span>
+            {% if step.estimated_duration_minutes %}
+            <span style="margin-left: auto; font-size: 9pt; font-weight: normal;">EST: {{ step.estimated_duration_minutes }}min</span>
+            {% endif %}
+        </div>
+        <div class="step-body">
+            {% if step.instructions %}
+            <div class="step-instructions">{{ step.instructions }}</div>
+            {% endif %}
+
+            {% if step.required_data_schema %}
+            {% for field_name, field_def in step.required_data_schema.items() %}
+            <div class="data-field">
+                <span class="data-field-label">{{ field_name }}:</span>
+                {% if field_def.type is defined and field_def.type == 'boolean' %}
+                <span class="data-field-checkbox"></span>
+                {% else %}
+                <span class="data-field-input">&nbsp;</span>
+                {% endif %}
+                {% if field_def.unit is defined %}
+                <span style="font-size: 9pt;">{{ field_def.unit }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="signoff">
+                <div class="signoff-field">
+                    <span>Operator:</span>
+                    <span class="signoff-line">&nbsp;</span>
+                </div>
+                <div class="signoff-field">
+                    <span>Time:</span>
+                    <span class="signoff-line">&nbsp;</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Contingency Steps -->
+    {% set contingency_steps = steps | selectattr('is_contingency') | list %}
+    {% if contingency_steps %}
+    <h2>CONTINGENCY OPERATIONS</h2>
+    {% for step in contingency_steps %}
+    <div class="step">
+        <div class="step-header">
+            <span class="contingency-marker">C</span>
+            <span class="step-number">{{ step.step_number }}</span>
+            <span>{{ step.title }}</span>
+        </div>
+        <div class="step-body">
+            {% if step.instructions %}
+            <div class="step-instructions">{{ step.instructions }}</div>
+            {% endif %}
+
+            {% if step.required_data_schema %}
+            {% for field_name, field_def in step.required_data_schema.items() %}
+            <div class="data-field">
+                <span class="data-field-label">{{ field_name }}:</span>
+                {% if field_def.type is defined and field_def.type == 'boolean' %}
+                <span class="data-field-checkbox"></span>
+                {% else %}
+                <span class="data-field-input">&nbsp;</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="signoff">
+                <div class="signoff-field">
+                    <span>Operator:</span>
+                    <span class="signoff-line">&nbsp;</span>
+                </div>
+                <div class="signoff-field">
+                    <span>Time:</span>
+                    <span class="signoff-line">&nbsp;</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Footer Signatures -->
+    <div class="footer-signatures">
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">OPERATOR</div>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">INSPECTOR</div>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">DATE</div>
+        </div>
+    </div>
+</body>
+</html>

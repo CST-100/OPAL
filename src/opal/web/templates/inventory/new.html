@@ -1,25 +1,26 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/inventory">INVENTORY</a></span>
-<span class="breadcrumb-item">ADD INVENTORY</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("INVENTORY", "/inventory") }}
+{{ ok.crumb("ADD INVENTORY") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px; margin: 0 auto;">
     <div class="panel-header">
-        ADD INVENTORY
+        <span>ADD INVENTORY</span>
     </div>
     <div class="panel-body">
         <form id="inventory-form" onsubmit="event.preventDefault(); submitInventoryForm();">
             <!-- Part Selection -->
             <div class="form-group">
-                <label class="form-label" for="part_id">PART <span class="text-red">*</span></label>
+                <label class="form-label" for="part_id">PART *</label>
                 {% if selected_part %}
                 <input type="hidden" id="part_id" name="part_id" value="{{ selected_part.id }}">
                 <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
-                    <span class="mono"><strong>{{ selected_part.internal_pn }}</strong></span> - {{ selected_part.name }}
+                    {{ ok.mono(selected_part.internal_pn) }} - {{ selected_part.name }}
                     <br>
                     <small class="text-muted">
                         Tracking: {{ selected_part.tracking_type.value if selected_part.tracking_type else 'BULK' }}
@@ -51,7 +52,7 @@
 
             <!-- Quantity -->
             <div class="form-group">
-                <label class="form-label" for="quantity">QUANTITY <span class="text-red">*</span></label>
+                <label class="form-label" for="quantity">QUANTITY *</label>
                 <input type="number" id="quantity" name="quantity" class="form-input" required min="1" step="1" value="1">
                 <small class="form-help" id="quantity-help">
                     {% if selected_part and selected_part.tracking_type and selected_part.tracking_type.value == 'SERIALIZED' %}
@@ -64,7 +65,7 @@
 
             <!-- Location -->
             <div class="form-group">
-                <label class="form-label" for="location">LOCATION <span class="text-red">*</span></label>
+                <label class="form-label" for="location">LOCATION *</label>
                 <input type="text" id="location" name="location" class="form-input" required
                        list="location-list" placeholder="e.g., SHELF-A1, BIN-001">
                 <datalist id="location-list">
@@ -76,18 +77,22 @@
             </div>
 
             <!-- Lot Number (optional) -->
+            {{ ok.field("lot_number", "LOT NUMBER", placeholder="Optional: Supplier lot or batch number") }}
+
+            <!-- Expiration Date (optional) -->
             <div class="form-group">
-                <label class="form-label" for="lot_number">LOT NUMBER</label>
-                <input type="text" id="lot_number" name="lot_number" class="form-input" placeholder="Optional: Supplier lot or batch number">
+                <label class="form-label" for="expiration_date">EXPIRATION DATE</label>
+                <input type="date" id="expiration_date" name="expiration_date" class="form-input">
+                <small class="form-help">For perishable materials (adhesives, solder paste, etc.)</small>
             </div>
 
             <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
                 {% if selected_part %}
-                <a href="/parts/{{ selected_part.id }}" class="btn">CANCEL</a>
+                {{ ok.btn("CANCEL", href="/parts/" ~ selected_part.id) }}
                 {% else %}
-                <a href="/inventory" class="btn">CANCEL</a>
+                {{ ok.btn("CANCEL", href="/inventory") }}
                 {% endif %}
-                <button type="submit" class="btn btn-primary">ADD INVENTORY</button>
+                {{ ok.btn("ADD INVENTORY", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -141,7 +146,8 @@ async function submitInventoryForm() {
         part_id: parseInt(partId),
         quantity: parseFloat(formData.get('quantity')),
         location: formData.get('location'),
-        lot_number: formData.get('lot_number') || null
+        lot_number: formData.get('lot_number') || null,
+        expiration_date: formData.get('expiration_date') || null,
     };
 
     try {
@@ -178,7 +184,7 @@ async function submitInventoryForm() {
             }
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to add inventory'));
+            alert('Error: ' + formatApiError(error.detail, 'Failed to add inventory'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);

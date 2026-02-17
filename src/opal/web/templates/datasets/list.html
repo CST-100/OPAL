@@ -1,22 +1,25 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">DATASETS</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("DATASETS") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
-    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="panel-header">
         <span>DATASETS</span>
-        <a href="/datasets/new" class="btn btn-primary">NEW DATASET</a>
+        <div class="panel-header-actions">
+            {{ ok.btn("NEW DATASET", href="/datasets/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
-        <div class="filter-bar" style="margin-bottom: var(--space-md);">
-            <input type="text" id="search" placeholder="Search datasets..." class="form-input" style="width: 200px;"
+        <div class="toolbar">
+            <input type="text" id="search" placeholder="Search datasets..." class="form-input toolbar-search"
                    hx-get="/datasets/table" hx-trigger="keyup changed delay:300ms" hx-target="#datasets-table"
                    hx-include="[name='procedure_id']">
-            <select name="procedure_id" class="form-select" style="width: 200px;"
+            <select name="procedure_id" class="form-select toolbar-filter"
                     hx-get="/datasets/table" hx-trigger="change" hx-target="#datasets-table"
                     hx-include="#search">
                 <option value="">All procedures</option>

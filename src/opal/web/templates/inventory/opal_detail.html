@@ -1,9 +1,10 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/inventory">INVENTORY</a></span>
-<span class="breadcrumb-item">{{ opal_number }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("INVENTORY", "/inventory") }}
+{{ ok.crumb(opal_number) }}
 {% endblock %}
 
 {% block content %}
@@ -11,8 +12,20 @@
     <div class="panel-header">
         <span style="font-size: 1.3em;">{{ opal_number }}</span>
         <span class="text-muted" style="margin-left: var(--space-md);">Physical Item Traceability</span>
+        <div class="panel-header-actions">
+            {% if record.part.is_tooling %}
+            {{ ok.btn("RECORD CALIBRATION", variant="primary", attrs='onclick="recordCalibration()"') }}
+            {% endif %}
+            {{ ok.btn("PRINT LABEL", attrs='onclick="window.open(\'/label?type=inventory&id=' ~ record.id ~ '\', \'_blank\', \'width=500,height=300\')"') }}
+            {{ ok.btn("ADJUST QTY", href="/inventory/" ~ record.id ~ "/adjust") }}
+        </div>
     </div>
     <div class="panel-body">
+        <!-- QR Code -->
+        <div style="float: right; margin-left: var(--space-md); margin-bottom: var(--space-md);">
+            <img src="/api/inventory/{{ record.id }}/qrcode" alt="QR Code" style="width: 96px; height: 96px;">
+        </div>
+
         <!-- Item Info -->
         <div class="detail-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-xl);">
             <div>
@@ -26,15 +39,15 @@
             </div>
             <div>
                 <label class="detail-label">CURRENT LOCATION</label>
-                <div class="detail-value mono">{{ record.location }}</div>
+                <div class="detail-value">{{ ok.mono(record.location) }}</div>
             </div>
             <div>
                 <label class="detail-label">QUANTITY</label>
-                <div class="detail-value mono" style="font-size: 1.2em;">{{ record.quantity }}</div>
+                <div class="detail-value" style="font-size: 1.2em;">{{ ok.mono(record.quantity) }}</div>
             </div>
             <div>
                 <label class="detail-label">LOT NUMBER</label>
-                <div class="detail-value mono">{{ record.lot_number or '-' }}</div>
+                <div class="detail-value">{{ ok.mono(record.lot_number) }}</div>
             </div>
             <div>
                 <label class="detail-label">SOURCE</label>
@@ -42,15 +55,15 @@
                     {% if record.source_type %}
                         {% set source = record.source_type.value if record.source_type.value is defined else record.source_type %}
                         {% if source == 'purchase' and source_po %}
-                        <a href="/purchases/{{ source_po.id }}" class="status-badge status-in_progress" style="text-decoration: none;">
-                            PO-{{ source_po.number }}
+                        <a href="/purchases/{{ source_po.id }}" style="text-decoration: none;">
+                            {{ ok.status("PO-" ~ source_po.number, "info") }}
                         </a>
                         {% elif source == 'purchase' %}
-                        <span class="status-badge status-in_progress">From PO</span>
+                        {{ ok.status("From PO", "info") }}
                         {% elif source == 'production' %}
-                        <span class="status-badge status-completed">Produced</span>
+                        {{ ok.status("Produced", "ok") }}
                         {% elif source == 'manual' %}
-                        <span class="status-badge status-pending">Manual Entry</span>
+                        {{ ok.status("Manual Entry", "warn") }}
                         {% else %}
                         {{ source }}
                         {% endif %}
@@ -59,9 +72,51 @@
                     {% endif %}
                 </div>
             </div>
+            {% if record.expiration_date %}
+            <div>
+                <label class="detail-label">EXPIRATION DATE</label>
+                <div class="detail-value">
+                    <span class="mono">{{ record.expiration_date }}</span>
+                    {% if record.expiration_date < today %}
+                    {{ ok.status("EXPIRED", "error") }}
+                    {% elif (record.expiration_date - today).days <= 30 %}
+                    {{ ok.status("EXPIRING", "warn") }}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% if record.part.is_tooling %}
+            <div>
+                <label class="detail-label">LAST CALIBRATED</label>
+                <div class="detail-value">
+                    {% if record.last_calibrated_at %}
+                    {{ ok.timestamp(record.last_calibrated_at) }}
+                    {% else %}
+                    <span class="text-muted">Never</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                <label class="detail-label">CALIBRATION DUE</label>
+                <div class="detail-value">
+                    {% if record.calibration_due_at %}
+                    {{ ok.timestamp(record.calibration_due_at) }}
+                    {% if record.calibration_due_at <= now %}
+                    {{ ok.status("OVERDUE", "error") }}
+                    {% elif (record.calibration_due_at - now).days <= 30 %}
+                    {{ ok.status("CAL DUE", "warn") }}
+                    {% else %}
+                    {{ ok.status("CAL OK", "ok") }}
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted">Not set</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
             <div>
                 <label class="detail-label">RECEIVED</label>
-                <div class="detail-value timestamp">{{ record.created_at.strftime('%Y-%m-%d %H:%M:%S') if record.created_at else '-' }}</div>
+                <div class="detail-value">{{ ok.timestamp(record.created_at) }}</div>
             </div>
         </div>
 
@@ -80,7 +135,7 @@
             {% for event in history %}
             <div class="timeline-item" style="display: flex; gap: var(--space-md); padding: var(--space-md); border-left: 3px solid var(--color-border); margin-left: var(--space-md); margin-bottom: var(--space-sm);">
                 <div style="min-width: 160px;">
-                    <span class="timestamp">{{ event.timestamp.strftime('%Y-%m-%d %H:%M') if event.timestamp else '-' }}</span>
+                    {{ ok.timestamp(event.timestamp) }}
                 </div>
                 <div>
                     {% if event.event == 'created' %}
@@ -125,7 +180,7 @@
             {% endfor %}
 
             {% if not history %}
-            <p class="text-muted">No history available</p>
+            {{ ok.empty("No history available") }}
             {% endif %}
         </div>
     </div>
@@ -143,4 +198,29 @@
     font-size: 1em;
 }
 </style>
+
+{% if record.part.is_tooling %}
+<script>
+async function recordCalibration() {
+    if (!confirm('Record calibration for {{ opal_number }}?')) return;
+    try {
+        const response = await fetch('/api/inventory/{{ record.id }}/calibrate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            }
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to record calibration'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
+{% endif %}
 {% endblock %}

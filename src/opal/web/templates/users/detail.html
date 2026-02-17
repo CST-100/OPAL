@@ -1,16 +1,19 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/users">USERS</a></span>
-<span class="breadcrumb-item">{{ user.name }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("USERS", "/users") }}
+{{ ok.crumb(user.name) }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px;">
     <div class="panel-header">
-        USER #{{ user.id }}
-        <a href="/users/{{ user.id }}/edit" class="btn" style="float: right;">EDIT</a>
+        <span>USER #{{ user.id }}</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("EDIT", href="/users/" ~ user.id ~ "/edit") }}
+        </div>
     </div>
     <div class="panel-body">
         <table class="data-table">
@@ -34,9 +37,9 @@
                 <th>STATUS</th>
                 <td>
                     {% if user.is_active %}
-                    <span class="status-badge status-active">ACTIVE</span>
+                    {{ ok.status("ACTIVE", "ok") }}
                     {% else %}
-                    <span class="status-badge status-inactive">INACTIVE</span>
+                    {{ ok.status("INACTIVE", "inactive") }}
                     {% endif %}
                 </td>
             </tr>
@@ -47,7 +50,7 @@
             <table class="data-table">
                 <tr>
                     <th style="width: 150px;">LAST SEEN</th>
-                    <td class="timestamp">{{ user.last_seen_at.strftime('%Y-%m-%dT%H:%M:%S') if user.last_seen_at else '-' }}{% if user.last_seen_at %}Z{% endif %}</td>
+                    <td>{{ ok.timestamp(user.last_seen_at) }}</td>
                 </tr>
                 <tr>
                     <th>ACTIVITY</th>
@@ -59,11 +62,11 @@
         <table class="data-table" style="margin-top: var(--space-lg);">
             <tr>
                 <th style="width: 150px;">CREATED</th>
-                <td class="timestamp">{{ user.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(user.created_at) }}</td>
             </tr>
             <tr>
                 <th>UPDATED</th>
-                <td class="timestamp">{{ user.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(user.updated_at) }}</td>
             </tr>
         </table>
     </div>

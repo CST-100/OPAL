@@ -1,3 +1,4 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if suppliers %}
 {% for s in suppliers %}
 <tr>
@@ -9,17 +10,15 @@
     <td class="mono" style="text-align: right;">{{ s.purchase_count }}</td>
     <td>
         {% if s.is_active %}
-        <span class="status-badge status-active">ACTIVE</span>
+        {{ ok.status("ACTIVE", "ok") }}
         {% else %}
-        <span class="status-badge status-inactive">INACTIVE</span>
+        {{ ok.status("INACTIVE", "inactive") }}
         {% endif %}
     </td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="7" class="empty-state">
-        <p class="text-muted">No suppliers found</p>
-    </td>
+    <td colspan="7">{{ ok.empty("No suppliers found") }}</td>
 </tr>
 {% endif %}

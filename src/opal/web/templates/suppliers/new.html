@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/suppliers">SUPPLIERS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("SUPPLIERS", "/suppliers") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
-    <div class="panel-header">NEW SUPPLIER</div>
+    <div class="panel-header"><span>NEW SUPPLIER</span></div>
     <div class="panel-body">
         <form id="supplier-form" onsubmit="createSupplier(event)">
             <div class="form-group">
@@ -63,7 +64,7 @@
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                <a href="/suppliers" class="btn">CANCEL</a>
+                {{ ok.btn("CANCEL", href="/suppliers") }}
                 <button type="submit" class="btn btn-primary">CREATE SUPPLIER</button>
             </div>
         </form>

@@ -1,0 +1,78 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("AUDIT LOG") }}
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <span>AUDIT LOG</span>
+    </div>
+    <div class="panel-body">
+        <div class="toolbar">
+            <select id="table-filter"
+                    name="table_name"
+                    class="form-select toolbar-filter"
+                    hx-get="/audit/table"
+                    hx-trigger="change"
+                    hx-target="#audit-table-body"
+                    hx-include="#action-filter, #date-from, #date-to">
+                <option value="">All entities</option>
+                {% for tn in table_names %}
+                <option value="{{ tn }}">{{ TABLE_DISPLAY_NAMES.get(tn, tn) }}</option>
+                {% endfor %}
+            </select>
+            <select id="action-filter"
+                    name="action"
+                    class="form-select toolbar-filter"
+                    hx-get="/audit/table"
+                    hx-trigger="change"
+                    hx-target="#audit-table-body"
+                    hx-include="#table-filter, #date-from, #date-to">
+                <option value="">All actions</option>
+                <option value="create">CREATE</option>
+                <option value="update">UPDATE</option>
+                <option value="delete">DELETE</option>
+            </select>
+            <input type="date"
+                   id="date-from"
+                   name="date_from"
+                   class="form-input toolbar-filter"
+                   hx-get="/audit/table"
+                   hx-trigger="change"
+                   hx-target="#audit-table-body"
+                   hx-include="#table-filter, #action-filter, #date-to"
+                   placeholder="From">
+            <input type="date"
+                   id="date-to"
+                   name="date_to"
+                   class="form-input toolbar-filter"
+                   hx-get="/audit/table"
+                   hx-trigger="change"
+                   hx-target="#audit-table-body"
+                   hx-include="#table-filter, #action-filter, #date-from"
+                   placeholder="To">
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 80px;">ACTION</th>
+                    <th style="width: 140px;">ENTITY</th>
+                    <th style="width: 60px;">ID</th>
+                    <th>SUMMARY</th>
+                    <th style="width: 100px;">USER</th>
+                    <th style="width: 180px;">TIME</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table-body" hx-get="/audit/table" hx-trigger="load">
+                <tr>
+                    <td colspan="6" class="text-muted">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

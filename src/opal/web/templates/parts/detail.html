@@ -1,9 +1,10 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
-<span class="breadcrumb-item">{{ part.internal_pn }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PARTS", "/parts") }}
+{{ ok.crumb(part.internal_pn) }}
 {% endblock %}
 
 {% block content %}
@@ -11,17 +12,21 @@
     <!-- Left Column: Part Details -->
     <div class="panel">
         <div class="panel-header">
-            PART #{{ part.id }}
-            <div style="float: right; display: flex; gap: var(--space-sm);">
-                <a href="/parts/{{ part.id }}/edit" class="btn">EDIT</a>
-                <button class="btn btn-danger" onclick="if(confirm('Delete this part?')) { htmx.ajax('DELETE', '/api/parts/{{ part.id }}', {target: 'body', swap: 'none'}).then(() => window.location.href='/parts') }">DELETE</button>
+            <span>PART #{{ part.id }}</span>
+            <div class="panel-header-actions">
+                {{ ok.btn("PRINT LABEL", attrs='onclick="window.open(\'/label?type=part&id=' ~ part.id ~ '\', \'_blank\', \'width=500,height=300\')"') }}
+                {{ ok.btn("EDIT", href="/parts/" ~ part.id ~ "/edit") }}
+                {{ ok.btn("DELETE", variant="danger", attrs='onclick="if(confirm(\'Delete this part?\')) { htmx.ajax(\'DELETE\', \'/api/parts/' ~ part.id ~ '\', {target: \'body\', swap: \'none\'}).then(() => window.location.href=\'/parts\') }"') }}
             </div>
         </div>
         <div class="panel-body">
+            <div style="float: right; margin-left: var(--space-md);">
+                <img src="/api/parts/{{ part.id }}/qrcode" alt="QR Code" style="width: 80px; height: 80px;">
+            </div>
             <table class="data-table">
                 <tr>
                     <th style="width: 180px;">ID</th>
-                    <td class="id-cell mono">{{ part.id }}</td>
+                    <td>{{ ok.id_cell(part.id) }}</td>
                 </tr>
                 <tr>
                     <th>INTERNAL PN</th>
@@ -29,7 +34,7 @@
                 </tr>
                 <tr>
                     <th>EXTERNAL PN</th>
-                    <td class="mono">{{ part.external_pn or '-' }}</td>
+                    <td>{{ ok.mono(part.external_pn) }}</td>
                 </tr>
                 <tr>
                     <th>NAME</th>
@@ -41,16 +46,32 @@
                 </tr>
                 <tr>
                     <th>TIER</th>
-                    <td class="mono">{{ 'Tier ' ~ part.tier if part.tier is not none else '-' }}</td>
+                    <td>{{ ok.mono('Tier ' ~ part.tier if part.tier is not none else '-') }}</td>
                 </tr>
                 <tr>
                     <th>UNIT OF MEASURE</th>
-                    <td class="mono">{{ part.unit_of_measure or 'EA' }}</td>
+                    <td>{{ ok.mono(part.unit_of_measure or 'EA') }}</td>
                 </tr>
                 <tr>
                     <th>TRACKING TYPE</th>
-                    <td><span class="status-badge">{{ part.tracking_type.value if part.tracking_type else 'BULK' }}</span></td>
+                    <td>{{ ok.status(part.tracking_type.value if part.tracking_type else 'BULK') }}</td>
                 </tr>
+                {% if part.reorder_point is not none %}
+                <tr>
+                    <th>REORDER POINT</th>
+                    <td class="mono">{{ '%g' % part.reorder_point }}</td>
+                </tr>
+                {% endif %}
+                {% if part.is_tooling %}
+                <tr>
+                    <th>TOOLING</th>
+                    <td>{{ ok.status("TOOLING", "info") }}</td>
+                </tr>
+                <tr>
+                    <th>CAL INTERVAL</th>
+                    <td class="mono">{{ part.calibration_interval_days or '-' }}{% if part.calibration_interval_days %} days{% endif %}</td>
+                </tr>
+                {% endif %}
                 {% if part.parent_id %}
                 <tr>
                     <th>PARENT ASSEMBLY</th>
@@ -76,11 +97,11 @@
             <table class="data-table" style="margin-top: var(--space-lg);">
                 <tr>
                     <th style="width: 180px;">CREATED</th>
-                    <td class="timestamp">{{ part.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    <td>{{ ok.timestamp(part.created_at) }}</td>
                 </tr>
                 <tr>
                     <th>UPDATED</th>
-                    <td class="timestamp">{{ part.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                    <td>{{ ok.timestamp(part.updated_at) }}</td>
                 </tr>
             </table>
         </div>
@@ -91,8 +112,10 @@
         <!-- Stock Summary Panel -->
         <div class="panel" style="margin-bottom: var(--space-md);">
             <div class="panel-header">
-                STOCK SUMMARY
-                <a href="/inventory/new?part_id={{ part.id }}" class="btn btn-primary" style="float: right;">+ ADD INVENTORY</a>
+                <span>STOCK SUMMARY</span>
+                <div class="panel-header-actions">
+                    {{ ok.btn("+ ADD INVENTORY", href="/inventory/new?part_id=" ~ part.id, variant="primary") }}
+                </div>
             </div>
             <div class="panel-body">
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -108,7 +131,7 @@
         <!-- Inventory Records Panel -->
         <div class="panel" style="margin-bottom: var(--space-md);">
             <div class="panel-header">
-                INVENTORY RECORDS ({{ inventory_records | length }})
+                <span>INVENTORY RECORDS ({{ inventory_records | length }})</span>
             </div>
             <div class="panel-body">
                 {% if inventory_records %}
@@ -127,15 +150,13 @@
                             <td class="mono"><a href="/inventory/opal/{{ inv.opal_number }}">{{ inv.opal_number }}</a></td>
                             <td>{{ inv.location or '-' }}</td>
                             <td class="mono" style="text-align: right;">{{ '%g' % inv.quantity }}</td>
-                            <td class="mono">{{ inv.lot_number or '-' }}</td>
+                            <td>{{ ok.mono(inv.lot_number) }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
                 {% else %}
-                <div class="empty-state">
-                    <p class="text-muted">No inventory records</p>
-                </div>
+                {{ ok.empty("No inventory records") }}
                 {% endif %}
             </div>
         </div>
@@ -144,7 +165,7 @@
         {% if part.components %}
         <div class="panel" style="margin-bottom: var(--space-md);">
             <div class="panel-header">
-                SUB-COMPONENTS ({{ part.components | length }})
+                <span>SUB-COMPONENTS ({{ part.components | length }})</span>
             </div>
             <div class="panel-body">
                 <table class="data-table">
@@ -173,7 +194,7 @@
         {% if part.parent_id %}
         <div class="panel">
             <div class="panel-header">
-                WHERE USED
+                <span>WHERE USED</span>
             </div>
             <div class="panel-body">
                 <table class="data-table">
@@ -187,4 +208,101 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Where Used: Procedure Usage -->
+{% if kit_usages %}
+<div class="panel mt-md">
+    <div class="panel-header">
+        <span>PROCEDURE USAGE ({{ kit_usages | length }})</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PROCEDURE</th>
+                    <th style="width: 100px; text-align: right;">QTY REQUIRED</th>
+                    <th style="width: 100px;">STATUS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for kit in kit_usages %}
+                <tr>
+                    <td><a href="/procedures/{{ kit.procedure.id }}">{{ kit.procedure.name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ '%g' % kit.quantity_required }}</td>
+                    <td>{{ ok.status(kit.procedure.status.value if kit.procedure.status.value is defined else kit.procedure.status) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Where Used: Step Usage -->
+{% if step_kit_usages %}
+<div class="panel mt-md">
+    <div class="panel-header">
+        <span>STEP USAGE ({{ step_kit_usages | length }})</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PROCEDURE</th>
+                    <th>STEP</th>
+                    <th style="width: 100px; text-align: right;">QTY</th>
+                    <th style="width: 100px;">TYPE</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sk in step_kit_usages %}
+                <tr>
+                    <td><a href="/procedures/{{ sk.step.procedure.id }}">{{ sk.step.procedure.name }}</a></td>
+                    <td>{{ ok.mono(sk.step.step_number) }} - {{ sk.step.title }}</td>
+                    <td class="mono" style="text-align: right;">{{ '%g' % sk.quantity_required }}</td>
+                    <td>{{ ok.status(sk.usage_type.value | upper if sk.usage_type.value is defined else sk.usage_type | upper) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Where Used: Consumption History -->
+{% if consumption_history %}
+<div class="panel mt-md">
+    <div class="panel-header">
+        <span>CONSUMPTION HISTORY ({{ consumption_history | length }}{% if consumption_history | length == 50 %}+{% endif %})</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 160px;">TIMESTAMP</th>
+                    <th style="width: 80px; text-align: right;">QTY</th>
+                    <th>SOURCE</th>
+                    <th>NOTES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in consumption_history %}
+                <tr>
+                    <td>{{ ok.timestamp(c.created_at) }}</td>
+                    <td class="mono" style="text-align: right;">{{ '%g' % c.quantity }}</td>
+                    <td>
+                        {% if c.procedure_instance_id %}
+                        <a href="/executions/{{ c.procedure_instance_id }}">Execution #{{ c.procedure_instance_id }}</a>
+                        {% else %}
+                        <span class="text-muted">Manual Adjustment</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-secondary">{{ c.notes or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

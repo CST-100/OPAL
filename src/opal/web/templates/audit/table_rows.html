@@ -1,0 +1,83 @@
+{% import 'opalkit/_macros.html' as ok %}
+{% if entries %}
+{% for entry in entries %}
+{% set action_val = entry.action.value if entry.action.value is defined else entry.action %}
+<tr class="audit-row" onclick="toggleAuditDetail(this)" style="cursor: pointer;">
+    <td>
+{{ ok.status(action_val | upper, "ok" if action_val == 'create' else ("info" if action_val == 'update' else "error")) }}
+    </td>
+    <td class="mono">{{ TABLE_DISPLAY_NAMES.get(entry.table_name, entry.table_name) }}</td>
+    <td>
+        {% if entry._url %}
+        <a href="{{ entry._url }}" class="id-cell mono" onclick="event.stopPropagation()">{{ entry.record_id }}</a>
+        {% else %}
+        <span class="id-cell mono">{{ entry.record_id }}</span>
+        {% endif %}
+    </td>
+    <td class="mono" style="font-size: 0.75rem;">{{ entry._summary }}</td>
+    <td>{{ entry._user_name or '-' }}</td>
+    <td>{{ ok.timestamp(entry.timestamp) }}</td>
+</tr>
+<tr class="audit-detail-row" style="display: none;">
+    <td colspan="6" style="padding: 0;">
+        <div style="padding: var(--space-sm) var(--space-md); background: var(--bg-tertiary);">
+            {% if action_val == 'create' and entry.new_values %}
+            <table class="data-table" style="font-size: 0.75rem;">
+                <thead><tr><th>FIELD</th><th>VALUE</th></tr></thead>
+                <tbody>
+                {% for key, val in entry.new_values.items() %}
+                <tr>
+                    <td class="mono">{{ key }}</td>
+                    <td class="mono text-green" title="{{ val }}">{{ val | string | truncate(200) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% elif action_val == 'update' and entry.new_values %}
+            <table class="data-table" style="font-size: 0.75rem;">
+                <thead><tr><th>FIELD</th><th>OLD</th><th>NEW</th></tr></thead>
+                <tbody>
+                {% for key, new_val in entry.new_values.items() %}
+                {% set old_val = entry.old_values.get(key, '-') if entry.old_values else '-' %}
+                <tr>
+                    <td class="mono">{{ key }}</td>
+                    <td class="mono text-red" title="{{ old_val }}">{{ old_val | string | truncate(200) }}</td>
+                    <td class="mono text-green" title="{{ new_val }}">{{ new_val | string | truncate(200) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% elif action_val == 'delete' and entry.old_values %}
+            <table class="data-table" style="font-size: 0.75rem;">
+                <thead><tr><th>FIELD</th><th>VALUE</th></tr></thead>
+                <tbody>
+                {% for key, val in entry.old_values.items() %}
+                <tr>
+                    <td class="mono">{{ key }}</td>
+                    <td class="mono text-red" title="{{ val }}">{{ val | string | truncate(200) }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <span class="text-muted">No detail available</span>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endfor %}
+<script>
+function toggleAuditDetail(row) {
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('audit-detail-row')) {
+        detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+}
+</script>
+{% else %}
+<tr>
+    <td colspan="6">
+        {{ ok.empty("No audit entries found") }}
+    </td>
+</tr>
+{% endif %}

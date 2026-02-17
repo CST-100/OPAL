@@ -1,6 +1,7 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% for dataset in datasets %}
 <tr onclick="window.location='/datasets/{{ dataset.id }}'" style="cursor: pointer;">
-    <td>{{ dataset.id }}</td>
+    <td>{{ ok.id_cell(dataset.id) }}</td>
     <td>{{ dataset.name }}</td>
     <td>
         {% if dataset.procedure %}
@@ -9,9 +10,9 @@
         <span class="text-muted">-</span>
         {% endif %}
     </td>
-    <td class="text-center">{{ dataset.data_points | length }}</td>
-    <td class="timestamp">{{ dataset.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+    <td class="text-center">{{ ok.mono(dataset.data_points | length) }}</td>
+    <td>{{ ok.timestamp(dataset.updated_at) }}</td>
 </tr>
 {% else %}
-<tr><td colspan="5" class="text-muted">No datasets found</td></tr>
+<tr><td colspan="5">{{ ok.empty("No datasets found") }}</td></tr>
 {% endfor %}

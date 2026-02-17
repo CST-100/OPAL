@@ -1,16 +1,17 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
-<span class="breadcrumb-item"><a href="/parts/{{ part.id }}">{{ part.internal_pn }}</a></span>
-<span class="breadcrumb-item">EDIT</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PARTS", "/parts") }}
+{{ ok.crumb(part.internal_pn, "/parts/" ~ part.id) }}
+{{ ok.crumb("EDIT") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px; margin: 0 auto;">
     <div class="panel-header">
-        EDIT PART #{{ part.id }}
+        <span>EDIT PART #{{ part.id }}</span>
     </div>
     <div class="panel-body">
         <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
@@ -69,6 +70,28 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label" for="reorder_point">REORDER POINT</label>
+                <input type="number" id="reorder_point" name="reorder_point" class="form-input" step="0.0001" min="0" value="{{ '%g' % part.reorder_point if part.reorder_point is not none else '' }}" placeholder="Optional - quantity threshold for low stock alert">
+                <small class="form-help">When total stock falls below this quantity, the part shows as LOW STOCK</small>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <input type="checkbox" id="is_tooling" name="is_tooling" {% if part.is_tooling %}checked{% endif %} onchange="toggleCalibrationFields()">
+                        TOOLING ITEM
+                    </label>
+                    <small class="form-help">Check if this part is a tool requiring calibration tracking</small>
+                </div>
+
+                <div class="form-group" id="calibration-fields" style="{% if not part.is_tooling %}display: none;{% endif %}">
+                    <label class="form-label" for="calibration_interval_days">CALIBRATION INTERVAL (DAYS)</label>
+                    <input type="number" id="calibration_interval_days" name="calibration_interval_days" class="form-input" min="1" value="{{ part.calibration_interval_days or '' }}" placeholder="e.g., 365 for annual">
+                    <small class="form-help">Days between required calibrations</small>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label" for="parent_id">PARENT ASSEMBLY</label>
                 <select id="parent_id" name="parent_id" class="form-select">
                     <option value="">None (top-level part)</option>
@@ -84,8 +107,8 @@
             </div>
 
             <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
-                <a href="/parts/{{ part.id }}" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
+                {{ ok.btn("CANCEL", href="/parts/" ~ part.id) }}
+                {{ ok.btn("SAVE CHANGES", variant="primary", type="submit") }}
             </div>
         </form>
     </div>
@@ -95,6 +118,11 @@
 function autoResize(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+function toggleCalibrationFields() {
+    var show = document.getElementById('is_tooling').checked;
+    document.getElementById('calibration-fields').style.display = show ? '' : 'none';
 }
 
 // Auto-resize textareas on page load if they have content
@@ -114,7 +142,10 @@ async function submitPartForm() {
         category: formData.get('category') || null,
         unit_of_measure: formData.get('unit_of_measure') || 'EA',
         tracking_type: formData.get('tracking_type') || 'BULK',
-        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null
+        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null,
+        reorder_point: formData.get('reorder_point') ? parseFloat(formData.get('reorder_point')) : null,
+        is_tooling: document.getElementById('is_tooling').checked,
+        calibration_interval_days: formData.get('calibration_interval_days') ? parseInt(formData.get('calibration_interval_days')) : null
     };
 
     // Parse metadata if provided

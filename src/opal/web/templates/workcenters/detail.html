@@ -1,16 +1,19 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/workcenters">WORKCENTERS</a></span>
-<span class="breadcrumb-item">{{ workcenter.code }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("WORKCENTERS", "/workcenters") }}
+{{ ok.crumb(workcenter.code) }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px;">
     <div class="panel-header">
-        WORKCENTER: {{ workcenter.code }}
-        <a href="/workcenters/{{ workcenter.id }}/edit" class="btn" style="float: right;">EDIT</a>
+        <span>WORKCENTER: {{ workcenter.code }}</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("EDIT", href="/workcenters/" ~ workcenter.id ~ "/edit") }}
+        </div>
     </div>
     <div class="panel-body">
         <table class="data-table">
@@ -34,9 +37,9 @@
                 <th>STATUS</th>
                 <td>
                     {% if workcenter.is_active %}
-                    <span class="status-badge status-active">ACTIVE</span>
+                    {{ ok.status("ACTIVE", "active") }}
                     {% else %}
-                    <span class="status-badge status-inactive">INACTIVE</span>
+                    {{ ok.status("INACTIVE", "inactive") }}
                     {% endif %}
                 </td>
             </tr>
@@ -54,11 +57,11 @@
         <table class="data-table" style="margin-top: var(--space-lg);">
             <tr>
                 <th style="width: 150px;">CREATED</th>
-                <td class="timestamp">{{ workcenter.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(workcenter.created_at) }}</td>
             </tr>
             <tr>
                 <th>UPDATED</th>
-                <td class="timestamp">{{ workcenter.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(workcenter.updated_at) }}</td>
             </tr>
         </table>
     </div>

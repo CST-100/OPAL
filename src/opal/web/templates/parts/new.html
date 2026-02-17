@@ -1,15 +1,16 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/parts">PARTS</a></span>
-<span class="breadcrumb-item">NEW PART</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PARTS", "/parts") }}
+{{ ok.crumb("NEW PART") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px; margin: 0 auto;">
     <div class="panel-header">
-        NEW PART
+        <span>NEW PART</span>
     </div>
     <div class="panel-body">
         <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
@@ -46,7 +47,7 @@
                     <select id="tier" name="tier" class="form-select" required>
                         <option value="">Select tier...</option>
                         {% for tier in tiers %}
-                        <option value="{{ tier.number }}">Tier {{ tier.number }} - {{ tier.name }}</option>
+                        <option value="{{ tier.level }}">Tier {{ tier.level }} - {{ tier.name }}</option>
                         {% endfor %}
                     </select>
                     <small class="form-help">Internal PN will be auto-generated based on tier</small>
@@ -70,6 +71,28 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label" for="reorder_point">REORDER POINT</label>
+                <input type="number" id="reorder_point" name="reorder_point" class="form-input" step="0.0001" min="0" placeholder="Optional - quantity threshold for low stock alert">
+                <small class="form-help">When total stock falls below this quantity, the part shows as LOW STOCK</small>
+            </div>
+
+            <div class="grid grid-2" style="gap: var(--space-md);">
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; gap: var(--space-sm);">
+                        <input type="checkbox" id="is_tooling" name="is_tooling" onchange="toggleCalibrationFields()">
+                        TOOLING ITEM
+                    </label>
+                    <small class="form-help">Check if this part is a tool requiring calibration tracking</small>
+                </div>
+
+                <div class="form-group" id="calibration-fields" style="display: none;">
+                    <label class="form-label" for="calibration_interval_days">CALIBRATION INTERVAL (DAYS)</label>
+                    <input type="number" id="calibration_interval_days" name="calibration_interval_days" class="form-input" min="1" placeholder="e.g., 365 for annual">
+                    <small class="form-help">Days between required calibrations</small>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label" for="parent_id">PARENT ASSEMBLY</label>
                 <select id="parent_id" name="parent_id" class="form-select">
                     <option value="">None (top-level part)</option>
@@ -87,8 +110,8 @@
             </div>
 
             <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
-                <a href="/parts" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE PART</button>
+                {{ ok.btn("CANCEL", href="/parts") }}
+                {{ ok.btn("CREATE PART", variant="primary", type="submit") }}
             </div>
         </form>
     </div>
@@ -98,6 +121,11 @@
 function autoResize(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
+}
+
+function toggleCalibrationFields() {
+    var show = document.getElementById('is_tooling').checked;
+    document.getElementById('calibration-fields').style.display = show ? '' : 'none';
 }
 
 async function submitPartForm() {
@@ -113,7 +141,10 @@ async function submitPartForm() {
         category: formData.get('category') || null,
         unit_of_measure: formData.get('unit_of_measure') || 'EA',
         tracking_type: formData.get('tracking_type') || 'BULK',
-        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null
+        parent_id: formData.get('parent_id') ? parseInt(formData.get('parent_id')) : null,
+        reorder_point: formData.get('reorder_point') ? parseFloat(formData.get('reorder_point')) : null,
+        is_tooling: document.getElementById('is_tooling').checked,
+        calibration_interval_days: formData.get('calibration_interval_days') ? parseInt(formData.get('calibration_interval_days')) : null
     };
 
     // Parse metadata if provided
@@ -142,7 +173,7 @@ async function submitPartForm() {
             window.location.href = '/parts/' + data.id;
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to create part'));
+            alert('Error: ' + formatApiError(error.detail, 'Failed to create part'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);

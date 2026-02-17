@@ -1,3 +1,4 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if records %}
 {% for rec in records %}
 <tr>
@@ -16,17 +17,17 @@
         <br><span class="text-muted" style="font-size: 0.85em;">{{ rec.part.external_pn }}</span>
         {% endif %}
     </td>
-    <td class="mono">{{ rec.location }}</td>
+    <td>{{ ok.mono(rec.location) }}</td>
     <td class="mono" style="text-align: right;">{{ rec.quantity }}</td>
     <td>
         {% if rec.source_type %}
             {% set source = rec.source_type.value if rec.source_type.value is defined else rec.source_type %}
             {% if source == 'purchase' %}
-            <span class="status-badge status-in_progress">PO</span>
+            {{ ok.status("PO", "info") }}
             {% elif source == 'production' %}
-            <span class="status-badge status-completed">PROD</span>
+            {{ ok.status("PROD", "ok") }}
             {% elif source == 'manual' %}
-            <span class="status-badge status-pending">MANUAL</span>
+            {{ ok.status("MANUAL", "warn") }}
             {% else %}
             <span class="text-muted">{{ source }}</span>
             {% endif %}
@@ -34,14 +35,40 @@
         <span class="text-muted">-</span>
         {% endif %}
     </td>
-    <td class="mono">{{ rec.lot_number or '-' }}</td>
-    <td class="timestamp">{{ rec.created_at.strftime('%Y-%m-%d %H:%M') if rec.created_at else '-' }}</td>
+    <td>{{ ok.mono(rec.lot_number) }}</td>
+    <td>
+        {% if rec.expiration_date %}
+            {% if rec.expiration_date < today %}
+            {{ ok.status("EXPIRED", "error") }}
+            {% elif (rec.expiration_date - today).days <= 30 %}
+            {{ ok.status("EXPIRING", "warn") }}
+            {% else %}
+            <span class="mono text-muted">{{ rec.expiration_date }}</span>
+            {% endif %}
+        {% else %}
+        <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if rec.part.is_tooling and rec.calibration_due_at %}
+            {% if rec.calibration_due_at <= now %}
+            {{ ok.status("OVERDUE", "error") }}
+            {% elif (rec.calibration_due_at - now).days <= 30 %}
+            {{ ok.status("CAL DUE", "warn") }}
+            {% else %}
+            {{ ok.status("CAL OK", "ok") }}
+            {% endif %}
+        {% else %}
+        <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>{{ ok.timestamp(rec.created_at) }}</td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="7" class="empty-state">
-        <p class="text-muted">No inventory records found</p>
+    <td colspan="9">
+        {{ ok.empty("No inventory records found") }}
     </td>
 </tr>
 {% endif %}

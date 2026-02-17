@@ -1,23 +1,25 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">PROCEDURES</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PROCEDURES") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        PROCEDURES
-        <a href="/procedures/new" class="btn btn-primary" style="float: right;">+ NEW PROCEDURE</a>
+        <span>PROCEDURES</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ NEW PROCEDURE", href="/procedures/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
+        <div class="toolbar">
             <input type="text"
                    id="search-input"
-                   class="form-input"
+                   class="form-input toolbar-search"
                    placeholder="Search procedures..."
-                   style="max-width: 300px;"
                    hx-get="/procedures/table"
                    hx-trigger="keyup changed delay:300ms, search"
                    hx-target="#procedures-table-body"
@@ -25,8 +27,7 @@
                    name="search">
             <select id="status-filter"
                     name="status"
-                    class="form-select"
-                    style="max-width: 200px;"
+                    class="form-select toolbar-filter"
                     hx-get="/procedures/table"
                     hx-trigger="change"
                     hx-target="#procedures-table-body"

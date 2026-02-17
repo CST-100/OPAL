@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/issues">ISSUES</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("ISSUES", "/issues") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 700px;">
-    <div class="panel-header">NEW ISSUE</div>
+    <div class="panel-header"><span>NEW ISSUE</span></div>
     <div class="panel-body">
         <form id="new-issue-form" onsubmit="createIssue(event)">
             <div class="form-group">
@@ -59,8 +60,8 @@
             </div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/issues" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE</button>
+                {{ ok.btn("CANCEL", href="/issues") }}
+                {{ ok.btn("CREATE", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -106,7 +107,7 @@ async function createIssue(event) {
             window.location.href = '/issues/' + issue.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create issue';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create issue');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

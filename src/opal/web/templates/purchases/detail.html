@@ -1,22 +1,23 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/purchases">PURCHASES</a></span>
-<span class="breadcrumb-item">{{ purchase.reference or ('PO-' ~ purchase.id) }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PURCHASES", "/purchases") }}
+{{ ok.crumb(purchase.reference or ('PO-' ~ purchase.id)) }}
 {% endblock %}
 
 {% block content %}
 <div class="grid grid-2">
     <div class="panel">
         <div class="panel-header">
-            {{ purchase.reference or ('PO-' ~ purchase.id) }}
-            {% if purchase.is_overdue %}
-            <span class="status status-error" style="float: right; margin-left: var(--space-sm);">OVERDUE</span>
-            {% endif %}
-            <span class="status status-{% if purchase.status|status_value == 'received' %}ok{% elif purchase.status|status_value == 'cancelled' %}error{% elif purchase.status|status_value in ['ordered', 'partial'] %}info{% elif purchase.status|status_value == 'on_hold' %}warn{% else %}warn{% endif %}" style="float: right;">
-                {{ purchase.status|status_value|upper }}
-            </span>
+            <span>{{ purchase.reference or ('PO-' ~ purchase.id) }}</span>
+            <div class="panel-header-actions">
+                {% if purchase.is_overdue %}
+                {{ ok.status("OVERDUE", "error") }}
+                {% endif %}
+                {{ ok.status(purchase.status|status_value|upper) }}
+            </div>
         </div>
         <div class="panel-body">
             <table class="data-table">
@@ -61,17 +62,17 @@
                 <table class="data-table">
                     <tr>
                         <th style="width: 140px;">CREATED</th>
-                        <td class="timestamp">{{ purchase.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                        <td>{{ ok.timestamp(purchase.created_at) }}</td>
                         <td>{% if purchase.created_by %}by {{ purchase.created_by.name }}{% endif %}</td>
                     </tr>
                     <tr>
                         <th>ORDERED</th>
-                        <td class="timestamp">{{ purchase.ordered_at.strftime('%Y-%m-%dT%H:%M:%S') + 'Z' if purchase.ordered_at else '-' }}</td>
+                        <td>{{ ok.timestamp(purchase.ordered_at) }}</td>
                         <td></td>
                     </tr>
                     <tr>
                         <th>RECEIVED</th>
-                        <td class="timestamp">{{ purchase.received_at.strftime('%Y-%m-%dT%H:%M:%S') + 'Z' if purchase.received_at else '-' }}</td>
+                        <td>{{ ok.timestamp(purchase.received_at) }}</td>
                         <td>{% if purchase.received_by %}by {{ purchase.received_by.name }}{% endif %}</td>
                     </tr>
                 </table>
@@ -87,10 +88,10 @@
 
             <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); flex-wrap: wrap;">
                 {% if purchase.status|status_value == 'draft' %}
-                <button class="btn btn-primary" onclick="placeOrder()">PLACE ORDER</button>
-                <button class="btn text-red" onclick="cancelPO()">CANCEL PO</button>
+                {{ ok.btn("PLACE ORDER", variant="primary", attrs='onclick="placeOrder()"') }}
+                {{ ok.btn("CANCEL PO", variant="danger", attrs='onclick="cancelPO()"') }}
                 {% elif purchase.status|status_value in ['ordered', 'partial'] %}
-                <button class="btn text-red" onclick="cancelPO()">CANCEL PO</button>
+                {{ ok.btn("CANCEL PO", variant="danger", attrs='onclick="cancelPO()"') }}
                 {% endif %}
             </div>
         </div>
@@ -98,9 +99,11 @@
 
     <div class="panel">
         <div class="panel-header">
-            LINE ITEMS
+            <span>LINE ITEMS</span>
             {% if purchase.status|status_value in ['draft', 'ordered'] %}
-            <button class="btn btn-primary" style="float: right;" onclick="showAddLine()">+ ADD LINE</button>
+            <div class="panel-header-actions">
+                {{ ok.btn("+ ADD LINE", variant="primary", attrs='onclick="showAddLine()"') }}
+            </div>
             {% endif %}
         </div>
         <div class="panel-body">
@@ -124,11 +127,11 @@
                         <td class="mono" style="text-align: right;">{{ line.qty_received }}</td>
                         <td>
                             {% if line.qty_received >= line.qty_ordered %}
-                            <span class="status status-ok">COMPLETE</span>
+                            {{ ok.status("COMPLETE", "ok") }}
                             {% elif line.qty_received > 0 %}
-                            <span class="status status-info">PARTIAL</span>
+                            {{ ok.status("PARTIAL", "info") }}
                             {% else %}
-                            <span class="status status-warn">PENDING</span>
+                            {{ ok.status("PENDING", "warn") }}
                             {% endif %}
                         </td>
                     </tr>
@@ -136,9 +139,7 @@
                 </tbody>
             </table>
             {% else %}
-            <div class="empty-state">
-                <p class="text-muted">No line items</p>
-            </div>
+            {{ ok.empty("No line items") }}
             {% endif %}
         </div>
     </div>
@@ -146,7 +147,7 @@
 
 {% if purchase.status|status_value in ['ordered', 'partial'] %}
 <div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">RECEIVE ITEMS</div>
+    <div class="panel-header"><span>RECEIVE ITEMS</span></div>
     <div class="panel-body">
         <form id="receive-form" onsubmit="receiveItems(event)">
             <table class="data-table">
@@ -176,8 +177,8 @@
                 </tbody>
             </table>
             <div style="display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-md);">
-                <button type="button" class="btn" onclick="fillAllOutstanding()">FILL ALL</button>
-                <button type="submit" class="btn btn-primary">RECEIVE</button>
+                {{ ok.btn("FILL ALL", attrs='onclick="fillAllOutstanding()"') }}
+                {{ ok.btn("RECEIVE", variant="primary", type="submit") }}
             </div>
         </form>
         <div id="receive-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -189,7 +190,7 @@
 <div id="add-line-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
         <div class="panel">
-            <div class="panel-header">ADD LINE ITEM</div>
+            <div class="panel-header"><span>ADD LINE ITEM</span></div>
             <div class="panel-body">
                 <form id="add-line-form" onsubmit="addLine(event)">
                     <div class="form-group">
@@ -223,8 +224,8 @@
                         <input type="number" id="line-cost" name="unit_cost" class="form-input" step="0.01" min="0">
                     </div>
                     <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                        <button type="button" class="btn" onclick="hideAddLine()">CANCEL</button>
-                        <button type="submit" class="btn btn-primary">ADD</button>
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddLine()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
                     </div>
                 </form>
                 <div id="line-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -328,7 +329,7 @@ async function placeOrder() {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to place order');
+            alert(formatApiError(error.detail, 'Failed to place order'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -349,7 +350,7 @@ async function cancelPO() {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to cancel order');
+            alert(formatApiError(error.detail, 'Failed to cancel order'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -390,7 +391,7 @@ async function addLine(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to add line';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add line');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -448,7 +449,7 @@ async function receiveItems(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to receive items';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to receive items');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

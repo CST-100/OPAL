@@ -1,8 +1,9 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">DOCUMENTATION</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("DOCUMENTATION") }}
 {% endblock %}
 
 {% block content %}

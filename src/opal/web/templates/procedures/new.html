@@ -1,14 +1,17 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME") }}
+{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 800px;">
-    <div class="panel-header">NEW PROCEDURE</div>
+    <div class="panel-header">
+        <span>NEW PROCEDURE</span>
+    </div>
     <div class="panel-body">
         <form id="new-procedure-form" onsubmit="createProcedure(event)">
             <div class="form-group">
@@ -52,8 +55,8 @@
             </div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/procedures" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">SAVE DRAFT</button>
+                {{ ok.btn("CANCEL", href="/procedures") }}
+                {{ ok.btn("SAVE DRAFT", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -100,7 +103,7 @@ async function createProcedure(event) {
             window.location.href = '/procedures/' + procedure.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create procedure';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create procedure');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

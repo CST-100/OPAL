@@ -1,22 +1,24 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">PURCHASES</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PURCHASES") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        PURCHASE ORDERS
-        <a href="/purchases/new" class="btn btn-primary" style="float: right;">+ NEW PO</a>
+        <span>PURCHASE ORDERS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ NEW PO", href="/purchases/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
+        <div class="toolbar">
             <select id="status-filter"
                     name="status"
-                    class="form-select"
-                    style="max-width: 200px;"
+                    class="form-select toolbar-filter"
                     hx-get="/purchases/table"
                     hx-trigger="change"
                     hx-target="#purchases-table-body">

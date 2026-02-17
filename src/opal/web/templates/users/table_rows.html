@@ -1,23 +1,22 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if users_list %}
 {% for u in users_list %}
 <tr>
     <td class="id-cell"><a href="/users/{{ u.id }}">{{ u.id }}</a></td>
     <td><a href="/users/{{ u.id }}">{{ u.name }}</a></td>
     <td class="mono">{{ u.email or '-' }}</td>
-    <td class="timestamp">{{ u.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+    <td>{{ ok.timestamp(u.created_at) }}</td>
     <td>
         {% if u.is_active %}
-        <span class="status-badge status-active">ACTIVE</span>
+        {{ ok.status("ACTIVE", "ok") }}
         {% else %}
-        <span class="status-badge status-inactive">INACTIVE</span>
+        {{ ok.status("INACTIVE", "inactive") }}
         {% endif %}
     </td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="5" class="empty-state">
-        <p class="text-muted">No users found</p>
-    </td>
+    <td colspan="5">{{ ok.empty("No users found") }}</td>
 </tr>
 {% endif %}

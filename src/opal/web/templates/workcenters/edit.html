@@ -1,15 +1,16 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/workcenters">WORKCENTERS</a></span>
-<span class="breadcrumb-item"><a href="/workcenters/{{ workcenter.id }}">{{ workcenter.code }}</a></span>
-<span class="breadcrumb-item">EDIT</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("WORKCENTERS", "/workcenters") }}
+{{ ok.crumb(workcenter.code, "/workcenters/" ~ workcenter.id) }}
+{{ ok.crumb("EDIT") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
-    <div class="panel-header">EDIT WORKCENTER: {{ workcenter.code }}</div>
+    <div class="panel-header"><span>EDIT WORKCENTER: {{ workcenter.code }}</span></div>
     <div class="panel-body">
         <form id="workcenter-form" onsubmit="updateWorkcenter(event)">
             <div class="form-group">
@@ -43,7 +44,7 @@
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                <a href="/workcenters/{{ workcenter.id }}" class="btn">CANCEL</a>
+                {{ ok.btn("CANCEL", href="/workcenters/" ~ workcenter.id) }}
                 <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
             </div>
         </form>
@@ -86,7 +87,7 @@ async function updateWorkcenter(event) {
             window.location.href = '/workcenters/{{ workcenter.id }}';
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to update workcenter';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to update workcenter');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

@@ -1,17 +1,18 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">RISKS</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("RISKS") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
-    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="panel-header">
         <span>RISK REGISTER</span>
-        <div style="display: flex; gap: var(--space-sm);">
-            <a href="/risks/matrix" class="btn">MATRIX VIEW</a>
-            <a href="/risks/new" class="btn btn-primary">NEW RISK</a>
+        <div class="panel-header-actions">
+            {{ ok.btn("MATRIX VIEW", href="/risks/matrix") }}
+            {{ ok.btn("NEW RISK", href="/risks/new", variant="primary") }}
         </div>
     </div>
     <div class="panel-body">

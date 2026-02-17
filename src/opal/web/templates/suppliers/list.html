@@ -1,15 +1,18 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">SUPPLIERS</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("SUPPLIERS") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        SUPPLIERS
-        <a href="/suppliers/new" class="btn btn-primary" style="float: right;">+ NEW SUPPLIER</a>
+        <span>SUPPLIERS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ NEW SUPPLIER", href="/suppliers/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
         <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">

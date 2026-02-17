@@ -1,21 +1,25 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
-<span class="breadcrumb-item"><a href="/procedures/{{ procedure.id }}">{{ procedure.name }}</a></span>
-<span class="breadcrumb-item">v{{ version.version_number }}</span>
+{{ ok.crumb("HOME") }}
+{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
+{{ ok.crumb("v" ~ version.version_number) }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        {{ version.content.procedure_name }} - VERSION {{ version.version_number }}
-        {% if procedure.current_version_id == version.id %}
-        <span class="status status-ok" style="float: right;">CURRENT</span>
-        {% else %}
-        <span class="status status-warn" style="float: right;">ARCHIVED</span>
-        {% endif %}
+        <span>{{ version.content.procedure_name }} - VERSION {{ version.version_number }}</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("PRINT TRAVELER", attrs='onclick="window.open(\'/procedures/' ~ procedure.id ~ '/versions/' ~ version.id ~ '/print\', \'_blank\')"') }}
+            {% if procedure.current_version_id == version.id %}
+            {{ ok.status("CURRENT", "ok") }}
+            {% else %}
+            {{ ok.status("ARCHIVED", "warn") }}
+            {% endif %}
+        </div>
     </div>
     <div class="panel-body">
         <table class="data-table" style="margin-bottom: var(--space-md);">
@@ -25,7 +29,7 @@
             </tr>
             <tr>
                 <th>PUBLISHED</th>
-                <td class="timestamp">{{ version.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+                <td>{{ ok.timestamp(version.created_at) }}</td>
             </tr>
             {% if version.content.procedure_description %}
             <tr>
@@ -54,9 +58,9 @@
                     <td class="text-secondary">{{ step.instructions or '-' }}</td>
                     <td>
                         {% if step.is_contingency %}
-                        <span class="status status-warn">CONTINGENCY</span>
+                        {{ ok.status("CONTINGENCY", "warn") }}
                         {% else %}
-                        <span class="status status-info">NORMAL</span>
+                        {{ ok.status("NORMAL", "info") }}
                         {% endif %}
                     </td>
                     <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
@@ -65,9 +69,21 @@
             </tbody>
         </table>
 
-        <div style="margin-top: var(--space-lg);">
-            <a href="/procedures/{{ procedure.id }}" class="btn">BACK TO PROCEDURE</a>
+        {% if versions and versions | length > 1 %}
+        <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-md); align-items: center;">
+            {{ ok.btn("BACK TO PROCEDURE", href="/procedures/" ~ procedure.id) }}
+            <span class="text-muted mono" style="font-size: 0.75rem;">COMPARE WITH:</span>
+            {% for v in versions %}
+            {% if v.id != version.id %}
+            <a href="/procedures/{{ procedure.id }}/versions/{{ version.id }}/diff/{{ v.id }}" class="btn btn-sm">v{{ v.version_number }}</a>
+            {% endif %}
+            {% endfor %}
         </div>
+        {% else %}
+        <div style="margin-top: var(--space-lg);">
+            {{ ok.btn("BACK TO PROCEDURE", href="/procedures/" ~ procedure.id) }}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

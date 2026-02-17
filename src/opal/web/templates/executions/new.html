@@ -1,14 +1,17 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/executions">EXECUTIONS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("EXECUTIONS", "/executions") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
-    <div class="panel-header">START NEW EXECUTION</div>
+    <div class="panel-header">
+        <span>START NEW EXECUTION</span>
+    </div>
     <div class="panel-body">
         <form id="new-execution-form" onsubmit="startExecution(event)">
             <div class="form-group">
@@ -21,10 +24,7 @@
                 </select>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="work-order">WORK ORDER NUMBER</label>
-                <input type="text" id="work-order" name="work_order_number" class="form-input" placeholder="Optional - for grouping related executions">
-            </div>
+            {{ ok.field("work_order_number", "WORK ORDER NUMBER", placeholder="Optional - for grouping related executions") }}
 
             {% if not procedures %}
             <div class="text-yellow" style="margin-bottom: var(--space-md);">
@@ -33,8 +33,8 @@
             {% endif %}
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/executions" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary" {% if not procedures %}disabled{% endif %}>START</button>
+                {{ ok.btn("CANCEL", href="/executions") }}
+                {{ ok.btn("START", variant="primary", type="submit", attrs='{% if not procedures %}disabled{% endif %}') }}
             </div>
         </form>
 
@@ -76,7 +76,7 @@ async function startExecution(event) {
             window.location.href = '/executions/' + instance.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to start execution';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to start execution');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

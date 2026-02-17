@@ -1,16 +1,19 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
-<span class="breadcrumb-item">MATRIX</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("RISKS", "/risks") }}
+{{ ok.crumb("MATRIX") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
-    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="panel-header">
         <span>RISK MATRIX</span>
-        <a href="/risks" class="btn">LIST VIEW</a>
+        <div class="panel-header-actions">
+            {{ ok.btn("LIST VIEW", href="/risks") }}
+        </div>
     </div>
     <div class="panel-body">
         <div style="display: flex; gap: var(--space-lg);">
@@ -105,7 +108,7 @@
             <!-- Stats Panel -->
             <div style="width: 250px;">
                 <div class="panel" style="margin: 0;">
-                    <div class="panel-header">SUMMARY</div>
+                    <div class="panel-header"><span>SUMMARY</span></div>
                     <div class="panel-body">
                         <table class="data-table">
                             <tr>
@@ -130,7 +133,7 @@
 
                 <div id="cell-risks" style="margin-top: var(--space-md); display: none;">
                     <div class="panel" style="margin: 0;">
-                        <div class="panel-header">RISKS IN CELL</div>
+                        <div class="panel-header"><span>RISKS IN CELL</span></div>
                         <div class="panel-body" id="cell-risks-list">
                         </div>
                     </div>

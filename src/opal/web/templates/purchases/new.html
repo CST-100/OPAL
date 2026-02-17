@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/purchases">PURCHASES</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PURCHASES", "/purchases") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 900px;">
-    <div class="panel-header">NEW PURCHASE ORDER</div>
+    <div class="panel-header"><span>NEW PURCHASE ORDER</span></div>
     <div class="panel-body">
         <form id="new-po-form" onsubmit="createPO(event)">
             <div class="grid grid-2" style="gap: var(--space-lg);">
@@ -75,12 +76,12 @@
                     <tbody id="lines-body">
                     </tbody>
                 </table>
-                <button type="button" class="btn" onclick="addLine()" style="margin-top: var(--space-sm);">+ ADD LINE</button>
+                {{ ok.btn("+ ADD LINE", attrs='onclick="addLine()" style="margin-top: var(--space-sm);"') }}
             </div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/purchases" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE PO</button>
+                {{ ok.btn("CANCEL", href="/purchases") }}
+                {{ ok.btn("CREATE PO", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -190,7 +191,7 @@ function addLine() {
         <td><input type="number" name="lines[${currentLine}][qty_ordered]" class="form-input" step="0.0001" min="0.0001" required></td>
         <td><input type="number" name="lines[${currentLine}][unit_cost]" class="form-input" step="0.01" min="0"></td>
         <td><input type="text" name="lines[${currentLine}][destination]" class="form-input" placeholder="Location"></td>
-        <td><button type="button" class="btn text-red" onclick="removeLine(${currentLine})">X</button></td>
+        <td><button type="button" class="btn btn-danger" onclick="removeLine(${currentLine})">X</button></td>
     `;
     tbody.appendChild(row);
     htmx.process(row);  // Process HTMX attributes on new elements
@@ -266,7 +267,7 @@ async function createPO(event) {
             window.location.href = '/purchases/' + po.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create purchase order';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create purchase order');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

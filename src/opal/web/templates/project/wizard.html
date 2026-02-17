@@ -1,9 +1,10 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">PROJECT</span>
-<span class="breadcrumb-item">{% if existing_config %}EDIT{% else %}NEW{% endif %}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PROJECT", "/project") }}
+{{ ok.crumb("EDIT" if existing_config else "NEW") }}
 {% endblock %}
 
 {% block content %}
@@ -66,13 +67,13 @@
                             <td><input type="text" class="form-input mono tier-code" value="{{ tier.code }}" maxlength="3" style="text-transform: uppercase;" required></td>
                             <td><input type="text" class="form-input tier-desc" value="{{ tier.description }}"></td>
                             <td>
-                                <button type="button" class="btn btn-sm" onclick="removeTier(this)" {% if loop.length <= 1 %}disabled{% endif %}>X</button>
+                                {{ ok.btn("X", size="sm", attrs='onclick="removeTier(this)"' ~ (' disabled' if loop.length <= 1 else '')) }}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                <button type="button" class="btn" onclick="addTier()" style="margin-top: var(--space-sm);">+ ADD TIER</button>
+                {{ ok.btn("+ ADD TIER", attrs='onclick="addTier()" style="margin-top: var(--space-sm);"') }}
             </div>
 
             <!-- Section 3: Part Numbering -->
@@ -147,7 +148,7 @@
                     </div>
                     <div style="display: flex; gap: var(--space-sm);">
                         <input type="text" id="category-input" class="form-input" placeholder="Enter category name">
-                        <button type="button" class="btn" onclick="addCategory()">ADD</button>
+                        {{ ok.btn("ADD", attrs='onclick="addCategory()"') }}
                     </div>
                     <small class="text-muted">Common categories: propulsion, structures, avionics, electrical, ground-support</small>
                 </div>
@@ -178,21 +179,19 @@
                             <td><input type="text" class="form-input req-desc" value="{{ req.description }}"></td>
                             <td><input type="text" class="form-input req-cat" value="{{ req.category }}"></td>
                             <td>
-                                <button type="button" class="btn btn-sm" onclick="removeRequirement(this)">X</button>
+                                {{ ok.btn("X", size="sm", attrs='onclick="removeRequirement(this)"') }}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-                <button type="button" class="btn" onclick="addRequirement()" style="margin-top: var(--space-sm);">+ ADD REQUIREMENT</button>
+                {{ ok.btn("+ ADD REQUIREMENT", attrs='onclick="addRequirement()" style="margin-top: var(--space-sm);"') }}
             </div>
 
             <!-- Submit -->
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; border-top: 1px solid var(--border-color); padding-top: var(--space-lg);">
-                <a href="/" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">
-                    {% if existing_config %}SAVE CHANGES{% else %}CREATE PROJECT{% endif %}
-                </button>
+                {{ ok.btn("CANCEL", href="/") }}
+                {{ ok.btn("SAVE CHANGES" if existing_config else "CREATE PROJECT", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -445,7 +444,7 @@ async function saveProject(event) {
             {% endif %}
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to save project configuration';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to save project configuration');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

@@ -1,12 +1,19 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% for risk in risks %}
 <tr onclick="window.location='/risks/{{ risk.id }}'" style="cursor: pointer;">
     <td>{{ risk.id }}</td>
     <td>{{ risk.title }}</td>
     <td>
         {% set status_val = risk.status.value if risk.status.value is defined else risk.status %}
-        <span class="status status-{% if status_val == 'closed' %}success{% elif status_val == 'mitigating' %}warn{% elif status_val == 'analyzing' %}info{% else %}draft{% endif %}">
-            {{ status_val | upper | replace('_', ' ') }}
-        </span>
+        {% if status_val == 'closed' %}
+            {{ ok.status(status_val | upper | replace('_', ' '), "ok") }}
+        {% elif status_val == 'mitigating' %}
+            {{ ok.status(status_val | upper | replace('_', ' '), "warn") }}
+        {% elif status_val == 'analyzing' %}
+            {{ ok.status(status_val | upper | replace('_', ' '), "info") }}
+        {% else %}
+            {{ ok.status(status_val | upper | replace('_', ' '), "draft") }}
+        {% endif %}
     </td>
     <td class="text-center">{{ risk.probability }}</td>
     <td class="text-center">{{ risk.impact }}</td>
@@ -16,15 +23,15 @@
     <td>
         {% set score = risk.probability * risk.impact %}
         {% if score <= 5 %}
-        <span class="status status-success">LOW</span>
+        {{ ok.status("LOW", "ok") }}
         {% elif score <= 12 %}
-        <span class="status status-warn">MEDIUM</span>
+        {{ ok.status("MEDIUM", "warn") }}
         {% else %}
-        <span class="status status-error">HIGH</span>
+        {{ ok.status("HIGH", "error") }}
         {% endif %}
     </td>
-    <td class="timestamp">{{ risk.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
+    <td>{{ ok.timestamp(risk.updated_at) }}</td>
 </tr>
 {% else %}
-<tr><td colspan="8" class="text-muted">No risks found</td></tr>
+<tr><td colspan="8">{{ ok.empty("No risks found") }}</td></tr>
 {% endfor %}

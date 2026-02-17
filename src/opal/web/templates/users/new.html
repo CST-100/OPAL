@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/users">USERS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("USERS", "/users") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
-    <div class="panel-header">NEW USER</div>
+    <div class="panel-header"><span>NEW USER</span></div>
     <div class="panel-body">
         <form id="user-form" onsubmit="createUser(event)">
             <div class="form-group">
@@ -25,8 +26,8 @@
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                <a href="/users" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE USER</button>
+                {{ ok.btn("CANCEL", href="/users") }}
+                {{ ok.btn("CREATE USER", variant="primary", type="submit") }}
             </div>
         </form>
     </div>
@@ -66,7 +67,7 @@ async function createUser(event) {
             window.location.href = '/users/' + result.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create user';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create user');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

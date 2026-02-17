@@ -1,23 +1,20 @@
+{% import 'opalkit/_macros.html' as ok %}
 {% if instances %}
 {% for inst in instances %}
 <tr>
-    <td class="id-cell"><a href="/executions/{{ inst.id }}">{{ inst.id }}</a></td>
+    <td>{{ ok.id_cell(inst.id, "/executions/" ~ inst.id) }}</td>
     <td><a href="/executions/{{ inst.id }}">{{ inst.procedure_name }}</a></td>
-    <td class="mono">v{{ inst.version_number }}</td>
-    <td class="mono">{{ inst.work_order }}</td>
-    <td>
-        <span class="status status-{% if inst.status == 'completed' %}ok{% elif inst.status == 'aborted' %}error{% elif inst.status == 'in_progress' %}info{% else %}warn{% endif %}">
-            {{ inst.status | upper | replace('_', ' ') }}
-        </span>
-    </td>
-    <td class="mono">{{ inst.completed_steps }}/{{ inst.total_steps }}</td>
-    <td class="timestamp">{% if inst.started_at %}{{ inst.started_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}{{ inst.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% endif %}</td>
+    <td>{{ ok.mono("v" ~ inst.version_number) }}</td>
+    <td>{{ ok.mono(inst.work_order) }}</td>
+    <td>{{ ok.status(inst.status | upper | replace('_', ' ')) }}</td>
+    <td>{{ ok.mono(inst.completed_steps ~ "/" ~ inst.total_steps) }}</td>
+    <td>{% if inst.started_at %}{{ ok.timestamp(inst.started_at) }}{% else %}{{ ok.timestamp(inst.created_at) }}{% endif %}</td>
 </tr>
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="7" class="empty-state">
-        <p class="text-muted">No executions found</p>
+    <td colspan="7">
+        {{ ok.empty("No executions found") }}
     </td>
 </tr>
 {% endif %}

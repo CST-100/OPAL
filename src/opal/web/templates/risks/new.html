@@ -1,14 +1,15 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/risks">RISKS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("RISKS", "/risks") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 700px;">
-    <div class="panel-header">NEW RISK</div>
+    <div class="panel-header"><span>NEW RISK</span></div>
     <div class="panel-body">
         <form id="new-risk-form" onsubmit="createRisk(event)">
             <div class="form-group">
@@ -65,8 +66,8 @@
             </div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/risks" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE</button>
+                {{ ok.btn("CANCEL", href="/risks") }}
+                {{ ok.btn("CREATE", type="submit", variant="primary") }}
             </div>
         </form>
 
@@ -131,7 +132,7 @@ async function createRisk(event) {
             window.location.href = '/risks/' + risk.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create risk';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create risk');
             errorDiv.style.display = 'block';
         }
     } catch (e) {

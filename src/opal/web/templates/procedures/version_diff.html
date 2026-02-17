@@ -1,0 +1,125 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
+{{ ok.crumb("DIFF v" ~ version_a.version_number ~ " → v" ~ version_b.version_number) }}
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <span>DIFF: v{{ version_a.version_number }} → v{{ version_b.version_number }}</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("BACK", href="/procedures/" ~ procedure.id) }}
+        </div>
+    </div>
+    <div class="panel-body">
+        <!-- Summary -->
+        <div style="margin-bottom: var(--space-md); font-family: var(--font-mono); font-size: 0.875rem;">
+            <span>v{{ version_a.version_number }} published {{ ok.timestamp(version_a.created_at) }}</span>
+            <span style="margin: 0 var(--space-sm);">→</span>
+            <span>v{{ version_b.version_number }} published {{ ok.timestamp(version_b.created_at) }}</span>
+        </div>
+
+        <!-- Procedure-level changes -->
+        {% if proc_changes %}
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">PROCEDURE CHANGES</div>
+            <div class="panel-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">FIELD</th>
+                            <th>v{{ version_a.version_number }}</th>
+                            <th>v{{ version_b.version_number }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for field in proc_changes %}
+                        <tr class="diff-modified">
+                            <td class="mono">{{ field }}</td>
+                            <td>{{ version_a.content.get(field, '-') }}</td>
+                            <td>{{ version_b.content.get(field, '-') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Step diffs -->
+        <div class="panel">
+            <div class="panel-header">
+                STEP CHANGES
+                <span class="text-muted" style="margin-left: var(--space-md); font-weight: normal; font-size: 0.75rem;">
+                    {{ added_count }} added, {{ removed_count }} removed, {{ modified_count }} modified, {{ unchanged_count }} unchanged
+                </span>
+            </div>
+            <div class="panel-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">#</th>
+                            <th style="width: 80px;">STATUS</th>
+                            <th>v{{ version_a.version_number }}</th>
+                            <th>v{{ version_b.version_number }}</th>
+                            <th style="width: 150px;">CHANGED FIELDS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in step_diffs %}
+                        <tr class="diff-{{ d.status }}">
+                            <td class="mono">{{ (d.step_a or d.step_b).step_number }}</td>
+                            <td>
+                                {% if d.status == 'added' %}
+                                {{ ok.status("ADDED", "ok") }}
+                                {% elif d.status == 'removed' %}
+                                {{ ok.status("REMOVED", "error") }}
+                                {% elif d.status == 'modified' %}
+                                {{ ok.status("MODIFIED", "warn") }}
+                                {% else %}
+                                <span class="text-muted">unchanged</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if d.step_a %}
+                                <strong>{{ d.step_a.title }}</strong>
+                                {% if d.status == 'removed' %}
+                                <br><span class="text-muted" style="font-size: 0.85em;">{{ d.step_a.instructions[:100] if d.step_a.instructions else '' }}{{ '...' if d.step_a.instructions and d.step_a.instructions|length > 100 else '' }}</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if d.step_b %}
+                                <strong>{{ d.step_b.title }}</strong>
+                                {% if d.status == 'added' %}
+                                <br><span class="text-muted" style="font-size: 0.85em;">{{ d.step_b.instructions[:100] if d.step_b.instructions else '' }}{{ '...' if d.step_b.instructions and d.step_b.instructions|length > 100 else '' }}</span>
+                                {% endif %}
+                                {% elif d.status == 'removed' %}
+                                <span class="text-muted">-</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if d.changed_fields %}
+                                <span class="mono text-secondary" style="font-size: 0.75rem;">{{ d.changed_fields | join(', ') }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

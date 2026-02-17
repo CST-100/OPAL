@@ -1,32 +1,34 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item">PARTS</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("PARTS") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        PARTS
-        <a href="/parts/new" class="btn btn-primary" style="float: right;">+ NEW PART</a>
+        <span>PARTS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("IMPORT CSV", href="/parts/import") }}
+            {{ ok.btn("+ NEW PART", href="/parts/new", variant="primary") }}
+        </div>
     </div>
     <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md); flex-wrap: wrap;">
+        <div class="toolbar">
             <input type="text"
                    id="search-input"
-                   class="form-input"
+                   class="form-input toolbar-search"
                    placeholder="Search parts by name, PN, description..."
-                   style="max-width: 350px;"
                    hx-get="/parts/table"
                    hx-trigger="keyup changed delay:300ms, search"
                    hx-target="#parts-table-body"
-                   hx-include="#category-filter, #tier-filter, #top-level-filter"
+                   hx-include="#category-filter, #tier-filter, #top-level-filter, #low-stock-filter"
                    name="search">
             <select id="category-filter"
                     name="category"
-                    class="form-select"
-                    style="max-width: 180px;"
+                    class="form-select toolbar-filter"
                     hx-get="/parts/table"
                     hx-trigger="change"
                     hx-target="#parts-table-body"
@@ -38,8 +40,7 @@
             </select>
             <select id="tier-filter"
                     name="tier"
-                    class="form-select"
-                    style="max-width: 150px;"
+                    class="form-select toolbar-filter"
                     hx-get="/parts/table"
                     hx-trigger="change"
                     hx-target="#parts-table-body"
@@ -51,15 +52,24 @@
             </select>
             <select id="top-level-filter"
                     name="top_level"
-                    class="form-select"
-                    style="max-width: 180px;"
+                    class="form-select toolbar-filter"
                     hx-get="/parts/table"
                     hx-trigger="change"
                     hx-target="#parts-table-body"
-                    hx-include="#search-input, #category-filter, #tier-filter">
+                    hx-include="#search-input, #category-filter, #tier-filter, #low-stock-filter">
                 <option value="">All parts</option>
                 <option value="true">Top-level only</option>
                 <option value="false">Sub-components only</option>
+            </select>
+            <select id="low-stock-filter"
+                    name="low_stock"
+                    class="form-select toolbar-filter"
+                    hx-get="/parts/table"
+                    hx-trigger="change"
+                    hx-target="#parts-table-body"
+                    hx-include="#search-input, #category-filter, #tier-filter, #top-level-filter">
+                <option value="">All stock levels</option>
+                <option value="true">Low stock only</option>
             </select>
         </div>
         <table class="data-table">

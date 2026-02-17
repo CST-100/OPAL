@@ -1,16 +1,19 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/procedures">PROCEDURES</a></span>
-<span class="breadcrumb-item"><a href="/procedures/{{ procedure.id }}">{{ procedure.name }}</a></span>
-<span class="breadcrumb-item">STEP {{ step.step_number }}</span>
+{{ ok.crumb("HOME") }}
+{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
+{{ ok.crumb("STEP " ~ step.step_number) }}
 {% endblock %}
 
 {% block content %}
 <div class="grid grid-2">
     <div class="panel">
-        <div class="panel-header">EDIT STEP {{ step.step_number }}</div>
+        <div class="panel-header">
+            <span>EDIT STEP {{ step.step_number }}</span>
+        </div>
         <div class="panel-body">
             <form id="edit-step-form" onsubmit="updateStep(event)">
                 <div class="form-group">
@@ -38,8 +41,8 @@
                 </div>
 
                 <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                    <a href="/procedures/{{ procedure.id }}" class="btn">CANCEL</a>
-                    <button type="submit" class="btn btn-primary">SAVE</button>
+                    {{ ok.btn("CANCEL", href="/procedures/" ~ procedure.id) }}
+                    {{ ok.btn("SAVE", variant="primary", type="submit") }}
                 </div>
             </form>
 
@@ -49,8 +52,10 @@
 
     <div class="panel">
         <div class="panel-header">
-            STEP PARTS
-            <button class="btn btn-primary" style="float: right;" onclick="showAddPart()">+ ADD PART</button>
+            <span>STEP PARTS</span>
+            <div class="panel-header-actions">
+                {{ ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddPart()"') }}
+            </div>
         </div>
         <div class="panel-body">
             <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
@@ -74,22 +79,20 @@
                             <td class="mono">{{ item.quantity_required }}</td>
                             <td>
                                 {% if item.usage_type == 'tooling' %}
-                                <span class="status status-info">TOOLING</span>
+                                {{ ok.status("TOOLING", "info") }}
                                 {% else %}
-                                <span class="status status-ok">CONSUME</span>
+                                {{ ok.status("CONSUME", "ok") }}
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-sm text-red" onclick="removePart({{ item.part_id }})">X</button>
+                                {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="removePart(' ~ item.part_id ~ ')"') }}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
                 {% else %}
-                <div class="empty-state">
-                    <p class="text-muted">No step-specific parts defined</p>
-                </div>
+                {{ ok.empty("No step-specific parts defined") }}
                 {% endif %}
             </div>
         </div>
@@ -128,8 +131,8 @@
                         <input type="text" id="part-notes" name="notes" class="form-input" placeholder="Optional notes">
                     </div>
                     <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                        <button type="button" class="btn" onclick="hideAddPart()">CANCEL</button>
-                        <button type="submit" class="btn btn-primary">ADD</button>
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddPart()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
                     </div>
                 </form>
                 <div id="part-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
@@ -174,7 +177,7 @@ async function updateStep(event) {
             window.location.href = `/procedures/${procedureId}`;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to update step';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to update step');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -216,7 +219,7 @@ async function addPart(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to add part';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add part');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -237,7 +240,7 @@ async function removePart(partId) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to remove part');
+            alert(formatApiError(error.detail, 'Failed to remove part'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);

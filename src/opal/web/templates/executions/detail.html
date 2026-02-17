@@ -1,20 +1,21 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/executions">EXECUTIONS</a></span>
-<span class="breadcrumb-item">{{ instance.id }}</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("EXECUTIONS", "/executions") }}
+{{ ok.crumb(instance.id) }}
 {% endblock %}
 
 {% block content %}
 <div class="grid grid-2">
     <div class="panel">
         <div class="panel-header">
-            EXECUTION #{{ instance.id }}
+            <span>EXECUTION #{{ instance.id }}</span>
             {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-            <span class="status status-{% if status_val == 'completed' %}ok{% elif status_val == 'aborted' %}error{% elif status_val == 'in_progress' %}info{% else %}warn{% endif %}" style="float: right;">
-                {{ status_val | upper | replace('_', ' ') }}
-            </span>
+            <div class="panel-header-actions">
+                {{ ok.status(status_val | upper | replace('_', ' ')) }}
+            </div>
         </div>
         <div class="panel-body">
             <table class="data-table">
@@ -54,11 +55,13 @@
 
     <div class="panel">
         <div class="panel-header">
-            COLLABORATION
-            <span id="connection-status" class="connection-status" style="float: right;">
-                <span class="connection-dot"></span>
-                <span id="connection-text">OFFLINE</span>
-            </span>
+            <span>COLLABORATION</span>
+            <div class="panel-header-actions">
+                <span id="connection-status" class="connection-status">
+                    <span class="connection-dot"></span>
+                    <span id="connection-text">OFFLINE</span>
+                </span>
+            </div>
         </div>
         <div class="panel-body">
             {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
@@ -77,7 +80,7 @@
 </div>
 
 <div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">PROGRESS</div>
+    <div class="panel-header"><span>PROGRESS</span></div>
     <div class="panel-body">
         {% set completed = steps | selectattr('status', 'in', ['completed', 'skipped']) | list | length %}
         {% set total = steps | length %}
@@ -96,7 +99,7 @@
 </div>
 
 <div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">OPERATIONS</div>
+    <div class="panel-header"><span>OPERATIONS</span></div>
     <div class="panel-body">
         {% for op_data in ops %}
         {% set op = op_data.step %}
@@ -105,9 +108,7 @@
                 <span class="op-number mono">OP {{ op.step_number }}</span>
                 <span class="op-title">{{ op.title }}</span>
                 <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-                <span class="status status-{% if op.status == 'completed' or op.status == 'signed_off' %}ok{% elif op.status == 'in_progress' %}info{% elif op.status == 'skipped' %}warn{% elif op.status == 'awaiting_signoff' %}signoff{% else %}draft{% endif %}">
-                    {{ op.status | upper | replace('_', ' ') }}
-                </span>
+{{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
                 {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
                 {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
                 <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
@@ -124,9 +125,7 @@
                     <div class="step-row-header">
                         <span class="step-number mono">{{ step.step_number }}</span>
                         <span class="step-title">{{ step.title }}</span>
-                        <span class="status status-{% if step.status == 'completed' %}ok{% elif step.status == 'in_progress' %}info{% elif step.status == 'skipped' %}warn{% else %}draft{% endif %}" style="margin-left: auto;">
-                            {{ step.status | upper | replace('_', ' ') }}
-                        </span>
+{{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status == 'completed' else ("info" if step.status == 'in_progress' else ("warn" if step.status == 'skipped' else "default"))) }}
                     </div>
                     {% if step.instructions %}
                     <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
@@ -182,19 +181,17 @@
 
 {% if contingency_ops %}
 <div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">CONTINGENCY OPERATIONS</div>
+    <div class="panel-header"><span>CONTINGENCY OPERATIONS</span></div>
     <div class="panel-body">
         {% for op_data in contingency_ops %}
         {% set op = op_data.step %}
         <div class="op-block op-contingency" id="op-{{ op.order }}" data-op-order="{{ op.order }}">
             <div class="op-header">
                 <span class="op-number mono">OP {{ op.step_number }}</span>
-                <span class="status status-warn">CONTINGENCY</span>
+{{ ok.status("CONTINGENCY", "warn") }}
                 <span class="op-title">{{ op.title }}</span>
                 <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-                <span class="status status-{% if op.status == 'completed' or op.status == 'signed_off' %}ok{% elif op.status == 'in_progress' %}info{% elif op.status == 'skipped' %}warn{% elif op.status == 'awaiting_signoff' %}signoff{% else %}draft{% endif %}">
-                    {{ op.status | upper | replace('_', ' ') }}
-                </span>
+{{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
                 {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
                 {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
                 <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
@@ -210,9 +207,7 @@
                     <div class="step-row-header">
                         <span class="step-number mono">{{ step.step_number }}</span>
                         <span class="step-title">{{ step.title }}</span>
-                        <span class="status status-{% if step.status == 'completed' %}ok{% elif step.status == 'in_progress' %}info{% elif step.status == 'skipped' %}warn{% else %}draft{% endif %}" style="margin-left: auto;">
-                            {{ step.status | upper | replace('_', ' ') }}
-                        </span>
+{{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status == 'completed' else ("info" if step.status == 'in_progress' else ("warn" if step.status == 'skipped' else "default"))) }}
                     </div>
                     {% if step.instructions %}
                     <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
@@ -269,12 +264,14 @@
 {% if kit_items %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        KIT / PARTS CONSUMPTION
-        {% if consumptions %}
-        <span class="status status-ok" style="float: right;">CONSUMED</span>
-        {% elif instance.status.value == 'completed' %}
-        <span class="status status-warn" style="float: right;">PENDING</span>
-        {% endif %}
+        <span>KIT / PARTS CONSUMPTION</span>
+        <div class="panel-header-actions">
+            {% if consumptions %}
+            {{ ok.status("CONSUMED", "ok") }}
+            {% elif instance.status.value == 'completed' %}
+            {{ ok.status("PENDING", "warn") }}
+            {% endif %}
+        </div>
     </div>
     <div class="panel-body">
         {% if consumptions %}
@@ -346,12 +343,14 @@
 {% if output_items %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        ASSEMBLY OUTPUT
-        {% if productions %}
-        <span class="status status-ok" style="float: right;">PRODUCED</span>
-        {% elif instance.status.value == 'completed' %}
-        <span class="status status-warn" style="float: right;">PENDING</span>
-        {% endif %}
+        <span>ASSEMBLY OUTPUT</span>
+        <div class="panel-header-actions">
+            {% if productions %}
+            {{ ok.status("PRODUCED", "ok") }}
+            {% elif instance.status.value == 'completed' %}
+            {{ ok.status("PENDING", "warn") }}
+            {% endif %}
+        </div>
     </div>
     <div class="panel-body">
         {% if productions %}
@@ -424,6 +423,28 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Attachments Panel -->
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>ATTACHMENTS</span>
+        <div class="panel-header-actions">
+            <span id="attachment-count" class="text-muted mono">0</span>
+        </div>
+    </div>
+    <div class="panel-body">
+        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+        {% if status_val in ['pending', 'in_progress'] %}
+        <div style="margin-bottom: var(--space-md); display: flex; gap: var(--space-sm); align-items: center;">
+            <input type="file" id="attachment-file" class="form-input" style="flex: 1;">
+            {{ ok.btn("UPLOAD", variant="primary", attrs='onclick="uploadAttachment()"') }}
+        </div>
+        {% endif %}
+        <div id="attachments-list">
+            <span class="text-muted">Loading...</span>
+        </div>
+    </div>
+</div>
 
 <!-- NC Modal -->
 <div id="nc-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
@@ -507,7 +528,7 @@ async function startStep(stepNumber) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to start step');
+            alert(formatApiError(error.detail, 'Failed to start step'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -525,7 +546,7 @@ async function completeStep(stepNumber) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to complete step');
+            alert(formatApiError(error.detail, 'Failed to complete step'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -542,7 +563,7 @@ async function signoffStep(stepNumber) {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to sign off step');
+            alert(formatApiError(error.detail, 'Failed to sign off step'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -562,7 +583,7 @@ async function abortExecution() {
             window.location.reload();
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to abort execution');
+            alert(formatApiError(error.detail, 'Failed to abort execution'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -604,7 +625,7 @@ async function submitNC(event) {
             hideNCModal();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to log NC';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to log NC');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -645,7 +666,7 @@ async function submitSkip(event) {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to skip step';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to skip step');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -754,7 +775,7 @@ async function consumeParts() {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to consume parts';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to consume parts');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -814,7 +835,7 @@ async function produceOutput() {
             window.location.reload();
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to record output';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to record output');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
@@ -934,7 +955,7 @@ async function joinExecution() {
             window.opalEvents.setActivity(`executing:${instanceId}`);
         } else {
             const error = await response.json();
-            alert(error.detail || 'Failed to join execution');
+            alert(formatApiError(error.detail, 'Failed to join execution'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -957,6 +978,114 @@ async function leaveExecution() {
 
 // Initialize collaboration on page load
 document.addEventListener('DOMContentLoaded', initCollaboration);
+
+// ============ Attachments ============
+
+async function loadAttachments() {
+    try {
+        const response = await fetch(`/api/attachments?procedure_instance_id=${instanceId}`, {
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            renderAttachments(data);
+        }
+    } catch (e) {
+        console.error('Failed to load attachments:', e);
+    }
+}
+
+function renderAttachments(attachments) {
+    const container = document.getElementById('attachments-list');
+    const countEl = document.getElementById('attachment-count');
+    countEl.textContent = attachments.length;
+
+    if (attachments.length === 0) {
+        container.innerHTML = '<span class="text-muted">No attachments</span>';
+        return;
+    }
+
+    let html = '<table class="data-table"><thead><tr>';
+    html += '<th>FILENAME</th><th style="width:100px;">SIZE</th><th style="width:120px;">TYPE</th><th style="width:180px;">UPLOADED</th><th style="width:60px;"></th>';
+    html += '</tr></thead><tbody>';
+
+    for (const att of attachments) {
+        const sizeKb = (att.size_bytes / 1024).toFixed(1);
+        html += `<tr>`;
+        html += `<td><a href="/api/attachments/${att.id}/download" class="mono">${escapeHtml(att.original_filename)}</a></td>`;
+        html += `<td class="mono" style="text-align:right;">${sizeKb} KB</td>`;
+        html += `<td class="mono">${escapeHtml(att.mime_type)}</td>`;
+        html += `<td class="timestamp">${att.created_at.replace('T', ' ').substring(0, 19)}Z</td>`;
+        html += `<td><button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteAttachment(${att.id})">X</button></td>`;
+        html += `</tr>`;
+    }
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function uploadAttachment() {
+    const fileInput = document.getElementById('attachment-file');
+    if (!fileInput.files.length) {
+        alert('Please select a file');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('procedure_instance_id', instanceId);
+
+    try {
+        const headers = {};
+        const userId = localStorage.getItem('opal_user_id');
+        if (userId) headers['X-User-Id'] = userId;
+
+        const response = await fetch('/api/attachments/upload', {
+            method: 'POST',
+            headers: headers,
+            body: formData,
+        });
+
+        if (response.ok) {
+            fileInput.value = '';
+            loadAttachments();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to upload file'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function deleteAttachment(attachmentId) {
+    if (!confirm('Delete this attachment?')) return;
+
+    try {
+        const response = await fetch(`/api/attachments/${attachmentId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+
+        if (response.ok) {
+            loadAttachments();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to delete attachment'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// Load attachments on page load
+document.addEventListener('DOMContentLoaded', loadAttachments);
 
 // Auto-leave on page unload if participating
 window.addEventListener('beforeunload', function() {

@@ -1,25 +1,21 @@
 {% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
 
 {% block breadcrumbs %}
-<span class="breadcrumb-item">HOME</span>
-<span class="breadcrumb-item"><a href="/datasets">DATASETS</a></span>
-<span class="breadcrumb-item">NEW</span>
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("DATASETS", "/datasets") }}
+{{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 700px;">
-    <div class="panel-header">NEW DATASET</div>
+    <div class="panel-header">
+        <span>NEW DATASET</span>
+    </div>
     <div class="panel-body">
         <form id="new-dataset-form" onsubmit="createDataset(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-textarea" rows="2"></textarea>
-            </div>
+            {{ ok.field("name", "NAME", required=true) }}
+            {{ ok.field("description", "DESCRIPTION", type="textarea", rows=2) }}
 
             <div class="form-group">
                 <label class="form-label" for="procedure">LINKED PROCEDURE (optional)</label>
@@ -43,15 +39,15 @@
                             <option value="date">Date</option>
                         </select>
                         <input type="text" class="form-input field-unit" placeholder="Unit (optional)" style="flex: 1;">
-                        <button type="button" class="btn" onclick="removeField(this)" style="padding: 0 var(--space-sm);">X</button>
+                        {{ ok.btn("X", attrs='type="button" onclick="removeField(this)" style="padding: 0 var(--space-sm);"') }}
                     </div>
                 </div>
-                <button type="button" class="btn" onclick="addField()">+ ADD FIELD</button>
+                {{ ok.btn("+ ADD FIELD", attrs='type="button" onclick="addField()"') }}
             </div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                <a href="/datasets" class="btn">CANCEL</a>
-                <button type="submit" class="btn btn-primary">CREATE</button>
+                {{ ok.btn("CANCEL", href="/datasets") }}
+                {{ ok.btn("CREATE", variant="primary", type="submit") }}
             </div>
         </form>
 
@@ -139,7 +135,7 @@ async function createDataset(event) {
             window.location.href = '/datasets/' + dataset.id;
         } else {
             const error = await response.json();
-            errorDiv.textContent = error.detail || 'Failed to create dataset';
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to create dataset');
             errorDiv.style.display = 'block';
         }
     } catch (e) {
