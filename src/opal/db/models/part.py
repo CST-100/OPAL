@@ -1,10 +1,11 @@
 """Part model."""
 
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from opal.db.base import Base, IdMixin, SoftDeleteMixin, TimestampMixin
@@ -51,6 +52,22 @@ class Part(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
     tier: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, index=True,
         comment="Inventory tier level (1=Flight, 2=Ground, 3=Loose)"
+    )
+
+    # Low stock threshold
+    reorder_point: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=15, scale=4), nullable=True,
+        comment="Quantity threshold below which part is considered low stock"
+    )
+
+    # Tooling & calibration
+    is_tooling: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, index=True,
+        comment="Whether this part is a tool requiring calibration tracking"
+    )
+    calibration_interval_days: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="Days between required calibrations (e.g., 365 for annual)"
     )
 
     # Assembly hierarchy - parts can contain other parts
