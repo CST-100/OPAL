@@ -1,10 +1,11 @@
 """Web UI routes."""
 
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Form, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_
 
@@ -33,6 +34,68 @@ def status_value(status) -> str:
 # Register custom filter
 templates.env.filters["status_value"] = status_value
 
+# Audit log display helpers
+_TABLE_URL_MAP: dict[str, str] = {
+    "part": "/parts",
+    "inventory_record": "/inventory/opal",
+    "master_procedure": "/procedures",
+    "procedure_instance": "/executions",
+    "issue": "/issues",
+    "risk": "/risks",
+    "purchase": "/purchases",
+    "supplier": "/suppliers",
+    "dataset": "/datasets",
+    "workcenter": "/workcenters",
+    "user": "/users",
+}
+
+TABLE_DISPLAY_NAMES: dict[str, str] = {
+    "part": "Part",
+    "inventory_record": "Inventory",
+    "master_procedure": "Procedure",
+    "procedure_step": "Step",
+    "procedure_version": "Version",
+    "procedure_instance": "Execution",
+    "step_execution": "Step Exec",
+    "issue": "Issue",
+    "risk": "Risk",
+    "purchase": "Purchase",
+    "purchase_line": "PO Line",
+    "supplier": "Supplier",
+    "dataset": "Dataset",
+    "data_point": "Data Point",
+    "workcenter": "Workcenter",
+    "user": "User",
+    "kit": "Kit",
+    "step_kit": "Step Kit",
+    "inventory_consumption": "Consumption",
+    "inventory_production": "Production",
+    "attachment": "Attachment",
+    "stock_transfer": "Transfer",
+    "stock_test_result": "Test Result",
+    "test_template": "Test Template",
+}
+
+templates.env.globals["TABLE_DISPLAY_NAMES"] = TABLE_DISPLAY_NAMES
+
+
+def _build_change_summary(entry) -> str:
+    """Build short text summary of audit log changes."""
+    action_val = entry.action.value if hasattr(entry.action, "value") else entry.action
+    if action_val == "create":
+        if entry.new_values and "name" in entry.new_values:
+            return f"Created: {entry.new_values['name']}"
+        return "Created"
+    elif action_val == "update" and entry.new_values:
+        fields = list(entry.new_values.keys())[:3]
+        suffix = f" +{len(entry.new_values) - 3}" if len(entry.new_values) > 3 else ""
+        return f"Changed: {', '.join(fields)}{suffix}"
+    elif action_val == "delete":
+        if entry.old_values and "name" in entry.old_values:
+            return f"Deleted: {entry.old_values['name']}"
+        return "Deleted"
+    return ""
+
 router = APIRouter()
 
 
@@ -51,6 +114,69 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
         "opal_version": __version__,
         "app_version": f"v{__version__}",
     }
+
+
+# ============ LOGIN / LOGOUT ============
+
+
+@router.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request, db: DbSession) -> HTMLResponse:
+    """User selection page."""
+    # If already logged in, redirect to home
+    if request.cookies.get("opal_user_id"):
+        return RedirectResponse(url="/", status_code=302)
+
+    users = db.query(User).filter(User.is_active == True).order_by(User.name).all()  # noqa: E712
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "users": users,
+    })
+
+
+@router.post("/login")
+async def login_submit(request: Request, db: DbSession, user_id: int = Form(...)) -> RedirectResponse:
+    """Set user identity cookies."""
+    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()  # noqa: E712
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    response = RedirectResponse(url="/", status_code=302)
+    max_age = 365 * 24 * 3600  # 1 year
+    response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
+    response.set_cookie("opal_user_name", user.name, max_age=max_age)
+    response.set_cookie("opal_user_email", user.email or "", max_age=max_age)
+    return response
+
+
+@router.post("/login/new-user")
+async def login_new_user(
+    request: Request,
+    db: DbSession,
+    name: str = Form(...),
+    email: str = Form(""),
+) -> RedirectResponse:
+    """Create a new user and log in."""
+    user = User(name=name, email=email or None, is_active=True)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    response = RedirectResponse(url="/", status_code=302)
+    max_age = 365 * 24 * 3600
+    response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
+    response.set_cookie("opal_user_name", user.name, max_age=max_age)
+    response.set_cookie("opal_user_email", user.email or "", max_age=max_age)
+    return response
+
+
+@router.get("/logout")
+async def logout(request: Request) -> RedirectResponse:
+    """Clear user identity cookies."""
+    response = RedirectResponse(url="/login", status_code=302)
+    response.delete_cookie("opal_user_id")
+    response.delete_cookie("opal_user_name")
+    response.delete_cookie("opal_user_email")
+    return response
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -78,6 +204,41 @@ async def index(request: Request, db: DbSession) -> HTMLResponse:
         r for r in db.query(Risk).filter(Risk.deleted_at.is_(None), Risk.status != "closed").all()
         if r.severity == "high"
     ])
+
+    # Low stock count
+    low_stock_parts = db.query(Part).filter(
+        Part.deleted_at.is_(None),
+        Part.reorder_point.isnot(None),
+    ).all()
+    low_stock_count = 0
+    for p in low_stock_parts:
+        total_qty = (
+            db.query(func.coalesce(func.sum(InventoryRecord.quantity), 0))
+            .filter(InventoryRecord.part_id == p.id)
+            .scalar()
+        ) or 0
+        if total_qty < p.reorder_point:
+            low_stock_count += 1
+    context["low_stock_count"] = low_stock_count
+
+    # Expiring soon count (within 30 days)
+    today = date.today()
+    threshold = today + timedelta(days=30)
+    expiring_soon_count = db.query(InventoryRecord).join(Part).filter(
+        Part.deleted_at.is_(None),
+        InventoryRecord.expiration_date.isnot(None),
+        InventoryRecord.expiration_date <= threshold,
+    ).count()
+    context["expiring_soon_count"] = expiring_soon_count
+
+    # Calibration overdue count
+    cal_overdue_count = db.query(InventoryRecord).join(Part).filter(
+        Part.deleted_at.is_(None),
+        Part.is_tooling == True,  # noqa: E712
+        InventoryRecord.calibration_due_at.isnot(None),
+        InventoryRecord.calibration_due_at <= datetime.now(timezone.utc),
+    ).count()
+    context["cal_overdue_count"] = cal_overdue_count
 
     # Get recent audit activity
     recent_activity = (
@@ -127,6 +288,7 @@ async def parts_table(
     category: str | None = Query(None),
     tier: int | None = Query(None),
     top_level: str | None = Query(None),
+    low_stock: str | None = Query(None),
     sort_by: str | None = Query("id"),
     sort_order: str | None = Query("desc"),
 ) -> HTMLResponse:
@@ -155,6 +317,9 @@ async def parts_table(
         elif top_level == "false":
             query = query.filter(Part.parent_id.isnot(None))
 
+    if low_stock == "true":
+        query = query.filter(Part.reorder_point.isnot(None))
+
     # Apply sorting
     sort_columns = {
         "id": Part.id,
@@ -181,6 +346,8 @@ async def parts_table(
             .scalar()
         )
         # Create a dict with all part attributes plus total_quantity
+        tq = total_qty or 0
+        is_low = bool(part.reorder_point is not None and tq < part.reorder_point)
         part_data = {
             "id": part.id,
             "internal_pn": part.internal_pn,
@@ -189,9 +356,15 @@ async def parts_table(
             "category": part.category,
             "tier": part.tier,
             "unit_of_measure": part.unit_of_measure,
-            "total_quantity": total_qty or 0,
+            "total_quantity": tq,
+            "reorder_point": part.reorder_point,
+            "is_low_stock": is_low,
         }
         parts_with_qty.append(type("PartWithQty", (), part_data)())
+
+    # Filter low stock parts in Python (stock is computed per-row)
+    if low_stock == "true":
+        parts_with_qty = [p for p in parts_with_qty if p.is_low_stock]
 
     return templates.TemplateResponse(
         "parts/table_rows.html",
@@ -235,6 +408,13 @@ async def parts_search_dropdown(
         "components/part_search_results.html",
         {"request": request, "parts": parts, "query": q},
     )
+
+
+@router.get("/parts/import", response_class=HTMLResponse)
+async def parts_import(request: Request, db: DbSession) -> HTMLResponse:
+    """CSV import page for parts."""
+    context = get_base_context(request, db, "Import Parts - OPAL")
+    return templates.TemplateResponse("parts/import.html", context)
 
 
 @router.get("/parts/new", response_class=HTMLResponse)
@@ -305,6 +485,36 @@ async def parts_detail(request: Request, db: DbSession, part_id: int) -> HTMLRes
     # Calculate total quantity for display
     total_quantity = sum(r.quantity for r in inventory_records)
     part.total_quantity = total_quantity  # Attach to part for template access
+
+    # Where Used: procedure kit usage
+    from opal.db.models.procedure import StepKit
+    kit_usages = (
+        db.query(Kit)
+        .join(MasterProcedure)
+        .filter(Kit.part_id == part.id, MasterProcedure.deleted_at.is_(None))
+        .all()
+    )
+    context["kit_usages"] = kit_usages
+
+    # Where Used: step-level kit usage
+    step_kit_usages = (
+        db.query(StepKit)
+        .filter(StepKit.part_id == part.id)
+        .all()
+    )
+    context["step_kit_usages"] = step_kit_usages
+
+    # Where Used: consumption history
+    from opal.db.models.inventory import InventoryConsumption
+    consumption_history = (
+        db.query(InventoryConsumption)
+        .join(InventoryRecord)
+        .filter(InventoryRecord.part_id == part.id)
+        .order_by(InventoryConsumption.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    context["consumption_history"] = consumption_history
 
     return templates.TemplateResponse("parts/detail.html", context)
 
@@ -379,6 +589,8 @@ async def inventory_table(
     part_id: int | None = Query(None),
     opal_search: str | None = Query(None),
     source_type: str | None = Query(None),
+    expiration: str | None = Query(None),
+    calibration: str | None = Query(None),
 ) -> HTMLResponse:
     """Inventory table rows (HTMX partial)."""
     query = db.query(InventoryRecord).join(Part).filter(Part.deleted_at.is_(None))
@@ -391,13 +603,32 @@ async def inventory_table(
         query = query.filter(InventoryRecord.opal_number.ilike(f"%{opal_search}%"))
     if source_type:
         query = query.filter(InventoryRecord.source_type == source_type)
+    if expiration == "expired":
+        query = query.filter(
+            InventoryRecord.expiration_date.isnot(None),
+            InventoryRecord.expiration_date < date.today(),
+        )
+    elif expiration == "expiring":
+        today = date.today()
+        threshold = today + timedelta(days=30)
+        query = query.filter(
+            InventoryRecord.expiration_date.isnot(None),
+            InventoryRecord.expiration_date <= threshold,
+        )
+    if calibration == "overdue":
+        now = datetime.now(timezone.utc)
+        query = query.filter(
+            Part.is_tooling == True,  # noqa: E712
+            InventoryRecord.calibration_due_at.isnot(None),
+            InventoryRecord.calibration_due_at <= now,
+        )
 
     # Order by OPAL number (most recent first)
     records = query.order_by(InventoryRecord.opal_number.desc()).limit(100).all()
 
     return templates.TemplateResponse(
         "inventory/table_rows.html",
-        {"request": request, "records": records},
+        {"request": request, "records": records, "today": date.today(), "now": datetime.now(timezone.utc)},
     )
 
 
@@ -428,6 +659,8 @@ async def inventory_opal_detail(
     context = get_base_context(request, db, f"{opal_number} - OPAL")
     context["record"] = record
     context["opal_number"] = opal_number
+    context["today"] = date.today()
+    context["now"] = datetime.now(timezone.utc)
 
     # Build history timeline
     history = []
@@ -475,6 +708,31 @@ async def inventory_opal_detail(
     context["history"] = history
 
     return templates.TemplateResponse("inventory/opal_detail.html", context)
+
+
+@router.get("/inventory/{inventory_id}/adjust", response_class=HTMLResponse)
+async def inventory_adjust(
+    request: Request,
+    db: DbSession,
+    inventory_id: int,
+) -> HTMLResponse:
+    """Inventory adjustment form page."""
+    record = (
+        db.query(InventoryRecord)
+        .join(Part)
+        .filter(InventoryRecord.id == inventory_id, Part.deleted_at.is_(None))
+        .first()
+    )
+    if not record:
+        return templates.TemplateResponse(
+            "errors/404.html",
+            {"request": request, "message": f"Inventory record {inventory_id} not found"},
+            status_code=404,
+        )
+
+    context = get_base_context(request, db, f"Adjust {record.opal_number or inventory_id} - OPAL")
+    context["record"] = record
+    return templates.TemplateResponse("inventory/adjust.html", context)
 
 
 # ============ PURCHASES ============
@@ -802,6 +1060,96 @@ async def procedures_step_edit(
     return templates.TemplateResponse("procedures/step_edit.html", context)
 
 
+@router.get("/procedures/{proc_id}/versions/{v1_id}/diff/{v2_id}", response_class=HTMLResponse)
+async def procedures_version_diff(
+    request: Request, db: DbSession, proc_id: int, v1_id: int, v2_id: int
+) -> HTMLResponse:
+    """Side-by-side diff of two procedure versions."""
+    from opal.core.diff import diff_procedure_versions
+
+    procedure = db.query(MasterProcedure).filter(MasterProcedure.id == proc_id).first()
+    if not procedure:
+        return HTMLResponse("Procedure not found", status_code=404)
+
+    version_a = db.query(ProcedureVersion).filter(ProcedureVersion.id == v1_id).first()
+    version_b = db.query(ProcedureVersion).filter(ProcedureVersion.id == v2_id).first()
+    if not version_a or not version_b:
+        return HTMLResponse("Version not found", status_code=404)
+
+    proc_changes, step_diffs = diff_procedure_versions(version_a.content, version_b.content)
+
+    context = get_base_context(request, db, f"Diff v{version_a.version_number} → v{version_b.version_number} - OPAL")
+    context["procedure"] = procedure
+    context["version_a"] = version_a
+    context["version_b"] = version_b
+    context["proc_changes"] = proc_changes
+    context["step_diffs"] = step_diffs
+    context["added_count"] = sum(1 for d in step_diffs if d.status == "added")
+    context["removed_count"] = sum(1 for d in step_diffs if d.status == "removed")
+    context["modified_count"] = sum(1 for d in step_diffs if d.status == "modified")
+    context["unchanged_count"] = sum(1 for d in step_diffs if d.status == "unchanged")
+
+    return templates.TemplateResponse("procedures/version_diff.html", context)
+
+
+@router.get("/procedures/{proc_id}/versions/{ver_id}/print", response_class=HTMLResponse)
+async def procedures_version_print(
+    request: Request, db: DbSession, proc_id: int, ver_id: int
+) -> HTMLResponse:
+    """Print-friendly procedure traveler."""
+    import base64
+    import io
+
+    import segno
+
+    version = db.query(ProcedureVersion).filter(
+        ProcedureVersion.id == ver_id,
+        ProcedureVersion.procedure_id == proc_id,
+    ).first()
+    if not version:
+        return HTMLResponse("Version not found", status_code=404)
+
+    procedure = db.query(MasterProcedure).filter(MasterProcedure.id == proc_id).first()
+
+    # Generate QR code as data URI
+    url = f"{request.base_url}procedures/{proc_id}/versions/{ver_id}"
+    qr = segno.make(url)
+    buf = io.BytesIO()
+    qr.save(buf, kind="svg", scale=3, border=1)
+    qr_data_uri = "data:image/svg+xml;base64," + base64.b64encode(buf.getvalue()).decode()
+
+    # Get kit items for this procedure
+    kit_items_raw = (
+        db.query(Kit)
+        .join(Part)
+        .filter(Kit.procedure_id == proc_id)
+        .order_by(Part.name)
+        .all()
+    )
+    kit_items = [
+        {
+            "part_name": k.part.name,
+            "part_pn": k.part.internal_pn,
+            "quantity": float(k.quantity_required),
+        }
+        for k in kit_items_raw
+    ]
+
+    # Extract steps from version content
+    steps = version.content.get("steps", [])
+
+    return templates.TemplateResponse("procedures/print_traveler.html", {
+        "request": request,
+        "procedure_name": version.content.get("procedure_name", procedure.name),
+        "version_number": version.version_number,
+        "description": version.content.get("procedure_description"),
+        "published_at": version.created_at.strftime("%Y-%m-%dT%H:%M:%SZ") if version.created_at else "",
+        "qr_data_uri": qr_data_uri,
+        "kit_items": kit_items,
+        "steps": steps,
+    })
+
+
 @router.get("/procedures/versions/{version_id}", response_class=HTMLResponse)
 async def procedures_version_detail(request: Request, db: DbSession, version_id: int) -> HTMLResponse:
     """View a specific procedure version."""
@@ -819,9 +1167,18 @@ async def procedures_version_detail(request: Request, db: DbSession, version_id:
         .first()
     )
 
+    # Get all versions for this procedure (for compare links)
+    versions = (
+        db.query(ProcedureVersion)
+        .filter(ProcedureVersion.procedure_id == procedure.id)
+        .order_by(ProcedureVersion.version_number.desc())
+        .all()
+    )
+
     context = get_base_context(request, db, f"v{version.version_number} - {procedure.name} - OPAL")
     context["version"] = version
     context["procedure"] = procedure
+    context["versions"] = versions
     return templates.TemplateResponse("procedures/version_detail.html", context)
 
 
@@ -1593,6 +1950,46 @@ async def users_edit(request: Request, db: DbSession, user_id: int) -> HTMLRespo
     return templates.TemplateResponse("users/edit.html", context)
 
 
+# ============ LABEL PRINT ============
+
+
+@router.get("/label", response_class=HTMLResponse)
+async def label_print(
+    request: Request,
+    db: DbSession,
+    type: str = Query(...),
+    id: int = Query(...),
+) -> HTMLResponse:
+    """Print label with QR code for a part or inventory record."""
+    if type == "inventory":
+        record = db.query(InventoryRecord).join(Part).filter(
+            InventoryRecord.id == id, Part.deleted_at.is_(None)
+        ).first()
+        if not record:
+            return HTMLResponse("Not found", status_code=404)
+        return templates.TemplateResponse("label_print.html", {
+            "request": request,
+            "entity_type": "inventory",
+            "entity_id": record.id,
+            "identifier": record.opal_number or f"INV-{record.id}",
+            "name": record.part.name,
+            "location": record.location,
+        })
+    elif type == "part":
+        part = db.query(Part).filter(Part.id == id, Part.deleted_at.is_(None)).first()
+        if not part:
+            return HTMLResponse("Not found", status_code=404)
+        return templates.TemplateResponse("label_print.html", {
+            "request": request,
+            "entity_type": "parts",
+            "entity_id": part.id,
+            "identifier": part.internal_pn or f"PART-{part.id}",
+            "name": part.name,
+            "location": None,
+        })
+    return HTMLResponse("Invalid type", status_code=400)
+
+
 # ============ DOCUMENTATION ============
 
 
@@ -1639,3 +2036,85 @@ async def project_edit(request: Request, db: DbSession) -> HTMLResponse:
     context["requirements"] = project.requirements
 
     return templates.TemplateResponse("project/wizard.html", context)
+
+
+# ============ AUDIT LOG ============
+
+
+@router.get("/audit", response_class=HTMLResponse)
+async def audit_list(request: Request, db: DbSession) -> HTMLResponse:
+    """Audit log list page."""
+    from opal.db.models.audit import AuditLog
+
+    context = get_base_context(request, db, "Audit Log - OPAL")
+
+    # Get distinct table names for filter
+    table_names = [
+        row[0] for row in db.query(AuditLog.table_name).distinct().order_by(AuditLog.table_name).all()
+    ]
+    context["table_names"] = table_names
+
+    return templates.TemplateResponse("audit/list.html", context)
+
+
+@router.get("/audit/table", response_class=HTMLResponse)
+async def audit_table(
+    request: Request,
+    db: DbSession,
+    table_name: str | None = Query(None),
+    action: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+) -> HTMLResponse:
+    """Audit log table rows (HTMX partial)."""
+    from opal.db.models.audit import AuditLog
+
+    query = db.query(AuditLog)
+
+    if table_name:
+        query = query.filter(AuditLog.table_name == table_name)
+    if action:
+        query = query.filter(AuditLog.action == action)
+    if date_from:
+        try:
+            dt_from = datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            query = query.filter(AuditLog.timestamp >= dt_from)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt_to = datetime.strptime(date_to, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.filter(AuditLog.timestamp < dt_to)
+        except ValueError:
+            pass
+
+    entries = query.order_by(AuditLog.timestamp.desc()).limit(200).all()
+
+    # Build user cache to avoid N+1
+    user_ids = {e.user_id for e in entries if e.user_id}
+    user_cache: dict[int, str] = {}
+    if user_ids:
+        users = db.query(User).filter(User.id.in_(user_ids)).all()
+        user_cache = {u.id: u.name for u in users}
+
+    # Annotate entries with helper data
+    for entry in entries:
+        entry._user_name = user_cache.get(entry.user_id) if entry.user_id else None
+        entry._summary = _build_change_summary(entry)
+        url_base = _TABLE_URL_MAP.get(entry.table_name)
+        entry._url = f"{url_base}/{entry.record_id}" if url_base else None
+
+    return templates.TemplateResponse(
+        "audit/table_rows.html",
+        {"request": request, "entries": entries},
+    )
+
+
+# ============ STYLEGUIDE ============
+
+
+@router.get("/styleguide", response_class=HTMLResponse)
+async def styleguide(request: Request, db: DbSession) -> HTMLResponse:
+    """OPALkit component styleguide page."""
+    context = get_base_context(request, db, "Styleguide - OPAL")
+    return templates.TemplateResponse("opalkit/styleguide/index.html", context)

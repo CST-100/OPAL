@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
+    <script>
+        // Apply theme before render to prevent FOUC
+        (function() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        })();
+    </script>
     <link rel="stylesheet" href="/static/css/main.css">
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/marked.min.js"></script>
@@ -60,23 +67,29 @@
                 <span class="cmd-icon">&#8984;</span>K
             </button>
 
+            <!-- Theme toggle -->
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme (Alt+T)">DARK</button>
+
+            <!-- Audit link -->
+            <a href="/audit" class="header-link{% if request.url.path.startswith('/audit') %} active{% endif %}" title="Audit Log (Alt+A)">AUDIT</a>
+
             <!-- Project link -->
             <a href="/project/edit" class="header-link{% if request.url.path.startswith('/project') %} active{% endif %}" title="Project Settings">PROJECT</a>
 
             <div class="user-dropdown">
             <button class="user-dropdown-btn" id="user-btn" onclick="toggleUserDropdown()">
-                <span id="user-display">Lavie Ohana</span>
+                <span id="user-display">NO USER</span>
                 <span>▼</span>
             </button>
             <div class="user-dropdown-content" id="user-dropdown-content">
                 <div class="user-dropdown-header">
                     <div class="user-profile-section">
                         <div class="user-avatar" id="user-avatar">
-                            <span id="user-initials">LO</span>
+                            <span id="user-initials">?</span>
                         </div>
                         <div class="user-name-display">
-                            <div class="user-fullname" id="user-fullname">Lavie Ohana</div>
-                            <div class="user-username" id="user-username">lohana</div>
+                            <div class="user-fullname" id="user-fullname">No User</div>
+                            <div class="user-username" id="user-username">Select a user</div>
                         </div>
                     </div>
                     <div class="user-header-actions">
@@ -155,6 +168,7 @@
             { type: 'nav', label: 'Go to Risks', action: '/risks', keywords: 'risks hazards mitigation' },
             { type: 'nav', label: 'Go to Datasets', action: '/datasets', keywords: 'datasets charts graphs data' },
             { type: 'nav', label: 'Go to Home', action: '/', keywords: 'home dashboard' },
+            { type: 'nav', label: 'Go to Audit Log', action: '/audit', keywords: 'audit log history changes' },
             // Actions
             { type: 'action', label: 'New Part', action: '/parts/new', keywords: 'create add part' },
             { type: 'action', label: 'New Purchase Order', action: '/purchases/new', keywords: 'create add purchase po' },
@@ -169,6 +183,15 @@
 
         let selectedIndex = 0;
         let filteredCommands = [...commands];
+        let searchResults = [];
+        let allItems = []; // combined commands + search results for keyboard nav
+        let searchDebounce = null;
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
 
         function openCommandPalette() {
             document.getElementById('command-palette').style.display = 'flex';
@@ -176,49 +199,119 @@
             input.value = '';
             input.focus();
             filteredCommands = [...commands];
+            searchResults = [];
             selectedIndex = 0;
             renderCommands();
         }
 
         function closeCommandPalette() {
             document.getElementById('command-palette').style.display = 'none';
+            if (searchDebounce) clearTimeout(searchDebounce);
         }
 
         function filterCommands(query) {
             query = query.toLowerCase().trim();
             if (!query) {
                 filteredCommands = [...commands];
-            } else {
-                filteredCommands = commands.filter(cmd => {
-                    const searchText = (cmd.label + ' ' + cmd.keywords).toLowerCase();
-                    return query.split(' ').every(term => searchText.includes(term));
-                });
+                searchResults = [];
+                selectedIndex = 0;
+                renderCommands();
+                return;
             }
+
+            filteredCommands = commands.filter(cmd => {
+                const searchText = (cmd.label + ' ' + cmd.keywords).toLowerCase();
+                return query.split(' ').every(term => searchText.includes(term));
+            });
             selectedIndex = 0;
             renderCommands();
+
+            // Debounced API search
+            if (searchDebounce) clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => fetchSearch(query), 200);
+        }
+
+        async function fetchSearch(query) {
+            try {
+                const resp = await fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=5');
+                if (resp.ok) {
+                    searchResults = await resp.json();
+                    renderCommands();
+                }
+            } catch (e) {
+                // Silently fail - static commands still work
+            }
         }
 
         function renderCommands() {
             const container = document.getElementById('cmd-results');
-            if (filteredCommands.length === 0) {
-                container.innerHTML = '<div class="cmd-empty">No matches found</div>';
-                return;
+            allItems = [];
+            let html = '';
+
+            // Static commands
+            if (filteredCommands.length > 0) {
+                html += '<div class="cmd-group-header">COMMANDS</div>';
+                filteredCommands.forEach((cmd, i) => {
+                    const idx = allItems.length;
+                    allItems.push({ type: 'command', index: i });
+                    html += `<div class="cmd-item ${idx === selectedIndex ? 'selected' : ''}"
+                                  onclick="executeItem(${idx})"
+                                  onmouseenter="selectedIndex = ${idx}; renderCommands();">
+                        <span class="cmd-type cmd-type-${cmd.type}">${cmd.type === 'nav' ? 'GO' : 'NEW'}</span>
+                        <span class="cmd-label">${escapeHtml(cmd.label)}</span>
+                    </div>`;
+                });
             }
 
-            container.innerHTML = filteredCommands.map((cmd, i) => `
-                <div class="cmd-item ${i === selectedIndex ? 'selected' : ''}"
-                     onclick="executeCommand(${i})"
-                     onmouseenter="selectedIndex = ${i}; renderCommands();">
-                    <span class="cmd-type cmd-type-${cmd.type}">${cmd.type === 'nav' ? 'GO' : 'NEW'}</span>
-                    <span class="cmd-label">${cmd.label}</span>
-                </div>
-            `).join('');
+            // Search results grouped by entity type
+            if (searchResults.length > 0) {
+                const grouped = {};
+                searchResults.forEach(r => {
+                    if (!grouped[r.entity_type]) grouped[r.entity_type] = [];
+                    grouped[r.entity_type].push(r);
+                });
+
+                const typeLabels = {
+                    part: 'PARTS', issue: 'ISSUES', procedure: 'PROCEDURES',
+                    execution: 'EXECUTIONS', risk: 'RISKS', supplier: 'SUPPLIERS',
+                    purchase: 'PURCHASES', dataset: 'DATASETS', workcenter: 'WORKCENTERS'
+                };
+
+                for (const [type, items] of Object.entries(grouped)) {
+                    html += `<div class="cmd-group-header">${typeLabels[type] || type.toUpperCase()}</div>`;
+                    items.forEach((r, i) => {
+                        const idx = allItems.length;
+                        allItems.push({ type: 'search', result: r });
+                        html += `<div class="cmd-item ${idx === selectedIndex ? 'selected' : ''}"
+                                      onclick="executeItem(${idx})"
+                                      onmouseenter="selectedIndex = ${idx}; renderCommands();">
+                            <span class="cmd-type cmd-type-search">${escapeHtml(type).toUpperCase().slice(0, 4)}</span>
+                            <span class="cmd-label">${escapeHtml(r.label)}</span>
+                            ${r.sublabel ? `<span class="cmd-sublabel">${escapeHtml(r.sublabel)}</span>` : ''}
+                            ${r.status ? `<span class="cmd-status">${escapeHtml(r.status)}</span>` : ''}
+                        </div>`;
+                    });
+                }
+            }
+
+            if (allItems.length === 0) {
+                html = '<div class="cmd-empty">No matches found</div>';
+            }
+
+            container.innerHTML = html;
+
+            // Scroll selected into view
+            const sel = container.querySelector('.cmd-item.selected');
+            if (sel) sel.scrollIntoView({ block: 'nearest' });
         }
 
-        function executeCommand(index) {
-            const cmd = filteredCommands[index];
-            if (cmd) {
-                window.location.href = cmd.action;
+        function executeItem(index) {
+            const item = allItems[index];
+            if (!item) return;
+            if (item.type === 'command') {
+                window.location.href = filteredCommands[item.index].action;
+            } else if (item.type === 'search') {
+                window.location.href = item.result.url;
             }
         }
 
@@ -226,7 +319,7 @@
         document.getElementById('cmd-input').addEventListener('keydown', function(e) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                selectedIndex = Math.min(selectedIndex + 1, filteredCommands.length - 1);
+                selectedIndex = Math.min(selectedIndex + 1, allItems.length - 1);
                 renderCommands();
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -234,7 +327,7 @@
                 renderCommands();
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                executeCommand(selectedIndex);
+                executeItem(selectedIndex);
             } else if (e.key === 'Escape') {
                 closeCommandPalette();
             }
@@ -268,13 +361,7 @@
             localStorage.removeItem('opal_user_id');
             localStorage.removeItem('opal_user_name');
             localStorage.removeItem('opal_user_email');
-            document.getElementById('user-display').textContent = 'NO USER';
-            document.getElementById('user-fullname').textContent = 'No User Selected';
-            document.getElementById('user-username').textContent = 'Select a user below';
-            document.getElementById('user-initials').textContent = '?';
-
-            // Close the dropdown after signing out
-            document.getElementById('user-dropdown-content').style.display = 'none';
+            window.location.href = '/logout';
         }
 
         function updateUserDisplay(userName, userEmail) {
@@ -303,13 +390,44 @@
             window.location.href = '/settings';
         }
 
-        // Restore user selection
+        // Theme toggle
+        function toggleTheme() {
+            var current = localStorage.getItem('opal_theme') || 'dark';
+            var next = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('opal_theme', next);
+            if (next === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            updateThemeButton();
+        }
+
+        function updateThemeButton() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            var btn = document.getElementById('theme-toggle');
+            if (btn) btn.textContent = theme === 'dark' ? 'DARK' : 'LIGHT';
+        }
+
+        // Cookie helper
+        function getCookie(name) {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            return match ? decodeURIComponent(match[2]) : null;
+        }
+
+        // Sync cookies → localStorage and restore user display
         document.addEventListener('DOMContentLoaded', function() {
-            const userId = localStorage.getItem('opal_user_id');
-            const userName = localStorage.getItem('opal_user_name');
-            const userEmail = localStorage.getItem('opal_user_email');
-            if (userId && userName) {
-                updateUserDisplay(userName, userEmail);
+            updateThemeButton();
+
+            // Sync cookie values to localStorage (cookies are source of truth)
+            const cookieUserId = getCookie('opal_user_id');
+            const cookieUserName = getCookie('opal_user_name');
+            const cookieUserEmail = getCookie('opal_user_email');
+            if (cookieUserId) {
+                localStorage.setItem('opal_user_id', cookieUserId);
+                localStorage.setItem('opal_user_name', cookieUserName || '');
+                localStorage.setItem('opal_user_email', cookieUserEmail || '');
+                updateUserDisplay(cookieUserName || 'Unknown', cookieUserEmail);
             }
         });
 
@@ -339,6 +457,16 @@
                 return;
             }
 
+            // Undo: Ctrl+Z or Cmd+Z
+            if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+                // Don't intercept if user is typing in an input/textarea
+                var tag = document.activeElement && document.activeElement.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                event.preventDefault();
+                triggerUndo();
+                return;
+            }
+
             // Escape closes command palette
             if (event.key === 'Escape') {
                 closeCommandPalette();
@@ -347,6 +475,11 @@
 
             // Alt+key shortcuts still work
             if (!event.altKey) return;
+            if (event.key === 't') {
+                event.preventDefault();
+                toggleTheme();
+                return;
+            }
             const shortcuts = {
                 'h': '/',
                 'p': '/parts',
@@ -359,12 +492,20 @@
                 'u': '/purchases',
                 's': '/suppliers',
                 'w': '/workcenters',
+                'a': '/audit',
             };
             if (shortcuts[event.key]) {
                 event.preventDefault();
                 window.location.href = shortcuts[event.key];
             }
         });
+
+        // Format API error detail (handles both string and validation error arrays)
+        function formatApiError(detail, fallback) {
+            if (typeof detail === 'string') return detail;
+            if (Array.isArray(detail)) return detail.map(e => e.msg).join('; ');
+            return fallback || 'Unknown error';
+        }
 
         // Markdown rendering helper
         function renderMarkdown() {
@@ -381,6 +522,48 @@
 
         // Re-render after HTMX swaps
         document.body.addEventListener('htmx:afterSwap', renderMarkdown);
+
+        // Undo last action
+        async function triggerUndo() {
+            var userId = localStorage.getItem('opal_user_id') || '1';
+            try {
+                var resp = await fetch('/api/undo/last', {
+                    headers: { 'X-User-Id': userId }
+                });
+                if (resp.status === 404) {
+                    alert('No recent actions to undo');
+                    return;
+                }
+                if (!resp.ok) {
+                    alert('Error checking undo');
+                    return;
+                }
+                var preview = await resp.json();
+                if (!preview.can_undo) {
+                    alert('Cannot undo: ' + (preview.reason || 'unknown reason'));
+                    return;
+                }
+                if (!confirm('Undo: ' + preview.summary + '?')) return;
+
+                var undoResp = await fetch('/api/undo/last', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-Id': userId
+                    }
+                });
+                if (undoResp.ok) {
+                    var result = await undoResp.json();
+                    alert(result.summary);
+                    window.location.reload();
+                } else {
+                    var err = await undoResp.json();
+                    alert('Undo failed: ' + (err.detail || 'unknown error'));
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        }
     </script>
 </body>
 </html>
