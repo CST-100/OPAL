@@ -811,6 +811,26 @@ async def inventory_opal_detail(
     history.sort(key=lambda h: h["timestamp"], reverse=True)
     context["history"] = history
 
+    # Source production info (if this item was produced)
+    source_wo = None
+    if record.source_production_id:
+        production = db.query(InventoryProduction).filter(
+            InventoryProduction.id == record.source_production_id
+        ).first()
+        if production and production.procedure_instance:
+            source_wo = {
+                "instance_id": production.procedure_instance_id,
+                "work_order_number": production.procedure_instance.work_order_number,
+                "serial_number": production.serial_number,
+            }
+    context["source_wo"] = source_wo
+
+    # Genealogy data
+    from opal.core.genealogy import get_full_genealogy
+    genealogy = get_full_genealogy(db, opal_number)
+    context["genealogy_components"] = genealogy["components"]
+    context["genealogy_assemblies"] = genealogy["assemblies_containing"]
+
     return templates.TemplateResponse("inventory/opal_detail.html", context)
 
 

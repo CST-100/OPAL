@@ -186,6 +186,89 @@
     </div>
 </div>
 
+{% if source_wo %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>SOURCE PRODUCTION</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <tr>
+                <th style="width: 140px;">WORK ORDER</th>
+                <td>
+                    {% if source_wo.work_order_number %}
+                    <a href="/executions/{{ source_wo.instance_id }}" class="mono">{{ source_wo.work_order_number }}</a>
+                    {% else %}
+                    <a href="/executions/{{ source_wo.instance_id }}">Execution #{{ source_wo.instance_id }}</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if source_wo.serial_number %}
+            <tr>
+                <th>SERIAL NUMBER</th>
+                <td class="mono">{{ source_wo.serial_number }}</td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if genealogy_components or genealogy_assemblies %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>GENEALOGY</span>
+    </div>
+    <div class="panel-body">
+        {% if genealogy_components %}
+        <h4 style="margin-bottom: var(--space-sm);">COMPONENTS IN THIS ASSEMBLY</h4>
+        <table class="data-table" style="margin-bottom: var(--space-lg);">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">OPAL #</th>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">QTY USED</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for comp in genealogy_components %}
+                <tr>
+                    <td class="mono"><a href="/inventory/opal/{{ comp.component_opal_number }}">{{ comp.component_opal_number }}</a></td>
+                    <td>{% if comp.part_id %}<a href="/parts/{{ comp.part_id }}">{{ comp.part_name or 'Unknown' }}</a>{% else %}Unknown{% endif %}</td>
+                    <td class="mono" style="text-align: right;">{{ comp.quantity_used }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if genealogy_assemblies %}
+        <h4 style="margin-bottom: var(--space-sm);">ASSEMBLIES CONTAINING THIS COMPONENT</h4>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 140px;">ASSEMBLY OPAL #</th>
+                    <th>PART</th>
+                    <th style="width: 140px;">WORK ORDER</th>
+                    <th style="width: 100px; text-align: right;">QTY USED</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asm in genealogy_assemblies %}
+                <tr>
+                    <td class="mono"><a href="/inventory/opal/{{ asm.assembly_opal_number }}">{{ asm.assembly_opal_number }}</a></td>
+                    <td>{% if asm.part_id %}<a href="/parts/{{ asm.part_id }}">{{ asm.part_name or 'Unknown' }}</a>{% else %}Unknown{% endif %}</td>
+                    <td class="mono">{{ asm.work_order_number or '-' }}</td>
+                    <td class="mono" style="text-align: right;">{{ asm.quantity_used }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 <style>
 .detail-label {
     display: block;
