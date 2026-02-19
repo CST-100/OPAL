@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from opal.api.deps import CurrentUserId, DbSession
 from opal.core.audit import log_create, log_update, get_model_dict
-from opal.core.designators import generate_work_order_number
+from opal.core.designators import generate_opal_number, generate_serial_number, generate_work_order_number
 from opal.core.events import (
     emit_instance_completed,
     emit_instance_started,
@@ -17,16 +17,24 @@ from opal.core.events import (
     emit_user_joined,
     emit_user_left,
 )
-from opal.db.models import InventoryRecord, Kit, ProcedureOutput
+from opal.core.genealogy import record_assembly_genealogy
+from opal.db.models import InventoryRecord, Kit, Part, ProcedureOutput
 from opal.db.models.execution import (
     InstanceStatus,
     ProcedureInstance,
     StepExecution,
     StepStatus,
 )
-from opal.db.models.inventory import ConsumptionType, InventoryConsumption, InventoryProduction
+from opal.db.models.inventory import (
+    ConsumptionType,
+    InventoryConsumption,
+    InventoryProduction,
+    ProductionStatus,
+    SourceType,
+    UsageType,
+)
 from opal.db.models.issue import Issue, IssuePriority, IssueStatus, IssueType
-from opal.db.models.procedure import MasterProcedure, ProcedureVersion
+from opal.db.models.procedure import MasterProcedure, ProcedureType, ProcedureVersion
 
 router = APIRouter(prefix="/procedure-instances", tags=["execution"])
 
@@ -278,6 +286,50 @@ async def create_instance(
         )
         db.add(step_exec)
 
+    # Auto-allocate output assemblies for BUILD procedures
+    proc_type = procedure.procedure_type
+    if hasattr(proc_type, 'value'):
+        proc_type = proc_type.value
+    if proc_type == ProcedureType.BUILD.value:
+        outputs = db.query(ProcedureOutput).filter(
+            ProcedureOutput.procedure_id == data.procedure_id
+        ).all()
+        for output in outputs:
+            output_part = db.query(Part).filter(Part.id == output.part_id).first()
+            if not output_part:
+                continue
+
+            serial = generate_serial_number(db, output_part)
+            opal_num = generate_opal_number(db)
+
+            # Create inventory record (qty=0 until finalized)
+            inv_record = InventoryRecord(
+                part_id=output.part_id,
+                quantity=0,
+                location="",
+                lot_number=work_order_number,
+                opal_number=opal_num,
+                source_type=SourceType.PRODUCTION,
+            )
+            db.add(inv_record)
+            db.flush()
+
+            # Create production record in PLANNED status
+            production = InventoryProduction(
+                inventory_record_id=inv_record.id,
+                quantity=output.quantity_produced,
+                procedure_instance_id=instance.id,
+                serial_number=serial,
+                produced_opal_number=opal_num,
+                status=ProductionStatus.PLANNED,
+                produced_by_id=user_id,
+            )
+            db.add(production)
+            db.flush()
+
+            # Link inventory record to its production
+            inv_record.source_production_id = production.id
+
     log_create(db, instance, user_id)
     db.commit()
     db.refresh(instance)
@@ -473,6 +525,12 @@ async def start_step(
     if status_val == InstanceStatus.PENDING.value:
         instance.status = InstanceStatus.IN_PROGRESS
         instance.started_at = datetime.now(timezone.utc)
+
+        # Transition planned production records to WIP
+        db.query(InventoryProduction).filter(
+            InventoryProduction.procedure_instance_id == instance_id,
+            InventoryProduction.status == ProductionStatus.PLANNED,
+        ).update({InventoryProduction.status: ProductionStatus.WIP})
 
     step_exec = (
         db.query(StepExecution)
@@ -1090,7 +1148,6 @@ async def consume_step_parts(
             )
 
         # Validate usage type
-        from opal.db.models.inventory import UsageType
         try:
             usage = UsageType(item.usage_type)
         except ValueError:
@@ -1278,28 +1335,23 @@ async def produce_output(
     productions = []
 
     for item in data.items:
-        # Find or create inventory record
-        inv_record = (
-            db.query(InventoryRecord)
-            .filter(
-                InventoryRecord.part_id == item.part_id,
-                InventoryRecord.location == item.location,
-                InventoryRecord.lot_number == item.lot_number,
-            )
-            .first()
-        )
+        part = db.query(Part).filter(Part.id == item.part_id).first()
+        if not part:
+            raise HTTPException(status_code=404, detail=f"Part {item.part_id} not found")
 
-        if inv_record:
-            inv_record.quantity = float(inv_record.quantity) + item.quantity
-        else:
-            inv_record = InventoryRecord(
-                part_id=item.part_id,
-                quantity=item.quantity,
-                location=item.location,
-                lot_number=item.lot_number,
-            )
-            db.add(inv_record)
-            db.flush()
+        opal_num = generate_opal_number(db)
+
+        # Always create a new inventory record for produced items (unique OPAL number)
+        inv_record = InventoryRecord(
+            part_id=item.part_id,
+            quantity=item.quantity,
+            location=item.location,
+            lot_number=item.lot_number,
+            opal_number=opal_num,
+            source_type=SourceType.PRODUCTION,
+        )
+        db.add(inv_record)
+        db.flush()
 
         # Create production record
         production = InventoryProduction(
@@ -1307,21 +1359,24 @@ async def produce_output(
             quantity=item.quantity,
             procedure_instance_id=instance_id,
             serial_number=item.serial_number,
+            produced_opal_number=opal_num,
+            status=ProductionStatus.COMPLETED,
             notes=data.notes,
             produced_by_id=user_id,
         )
         db.add(production)
         db.flush()
 
-        # Get part name for response
-        from opal.db.models import Part
-        part = db.query(Part).filter(Part.id == item.part_id).first()
+        # Link inventory record to its production
+        inv_record.source_production_id = production.id
+
+        log_create(db, production, user_id)
 
         productions.append(
             ProductionResponse(
                 id=production.id,
                 part_id=item.part_id,
-                part_name=part.name if part else "Unknown",
+                part_name=part.name,
                 quantity=item.quantity,
                 location=item.location,
                 lot_number=item.lot_number,
@@ -1362,6 +1417,215 @@ async def get_productions(
         )
         for p in productions
     ]
+
+
+# ============ BOM Reconciliation & Finalization ============
+
+
+class BOMKitItem(BaseModel):
+    """Kit vs actual consumption comparison."""
+
+    part_id: int
+    part_name: str
+    qty_required: float
+    qty_consumed: float
+    variance: float
+
+
+class BOMUnplannedItem(BaseModel):
+    """Consumption not in the original kit."""
+
+    part_id: int
+    part_name: str
+    qty_consumed: float
+
+
+class BOMOutputItem(BaseModel):
+    """Planned output status."""
+
+    part_id: int
+    part_name: str
+    serial_number: str | None
+    opal_number: str | None
+    quantity: float
+    status: str
+
+
+class BOMReconciliationResponse(BaseModel):
+    """BOM reconciliation comparison."""
+
+    kit_items: list[BOMKitItem]
+    unplanned_consumptions: list[BOMUnplannedItem]
+    outputs: list[BOMOutputItem]
+
+
+class FinalizeRequest(BaseModel):
+    """Request to finalize production after execution."""
+
+    location: str = Field(..., min_length=1, description="Where the produced assembly is stored")
+    notes: str | None = None
+
+
+@router.get("/{instance_id}/bom-reconciliation", response_model=BOMReconciliationResponse)
+async def get_bom_reconciliation(
+    instance_id: int,
+    db: DbSession,
+) -> BOMReconciliationResponse:
+    """Get BOM reconciliation: kit (expected) vs actual consumptions."""
+    instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(status_code=404, detail="Instance not found")
+
+    return _build_bom_reconciliation(db, instance)
+
+
+def _build_bom_reconciliation(db, instance) -> BOMReconciliationResponse:
+    """Build BOM reconciliation data for an instance."""
+    # Get kit (expected) parts
+    kit_items = db.query(Kit).filter(Kit.procedure_id == instance.procedure_id).all()
+    kit_by_part: dict[int, float] = {k.part_id: float(k.quantity_required) for k in kit_items}
+    kit_part_names: dict[int, str] = {k.part_id: k.part.name for k in kit_items}
+
+    # Get actual consumptions (only CONSUME type, not tooling)
+    consumptions = (
+        db.query(InventoryConsumption)
+        .filter(
+            InventoryConsumption.procedure_instance_id == instance.id,
+            InventoryConsumption.usage_type == UsageType.CONSUME,
+        )
+        .all()
+    )
+
+    # Aggregate consumed quantities by part
+    consumed_by_part: dict[int, float] = {}
+    consumed_part_names: dict[int, str] = {}
+    for c in consumptions:
+        pid = c.inventory_record.part_id
+        consumed_by_part[pid] = consumed_by_part.get(pid, 0) + float(c.quantity)
+        consumed_part_names[pid] = c.inventory_record.part.name
+
+    # Build kit comparison
+    bom_kit_items = []
+    for part_id, qty_required in kit_by_part.items():
+        qty_consumed = consumed_by_part.pop(part_id, 0)
+        bom_kit_items.append(BOMKitItem(
+            part_id=part_id,
+            part_name=kit_part_names[part_id],
+            qty_required=qty_required,
+            qty_consumed=qty_consumed,
+            variance=qty_consumed - qty_required,
+        ))
+
+    # Remaining consumed parts not in kit
+    unplanned = [
+        BOMUnplannedItem(
+            part_id=pid,
+            part_name=consumed_part_names.get(pid, "Unknown"),
+            qty_consumed=qty,
+        )
+        for pid, qty in consumed_by_part.items()
+    ]
+
+    # Get production outputs
+    productions = (
+        db.query(InventoryProduction)
+        .filter(InventoryProduction.procedure_instance_id == instance.id)
+        .all()
+    )
+    outputs = []
+    for p in productions:
+        prod_status = p.status.value if hasattr(p.status, 'value') else p.status
+        outputs.append(BOMOutputItem(
+            part_id=p.inventory_record.part_id,
+            part_name=p.inventory_record.part.name,
+            serial_number=p.serial_number,
+            opal_number=p.produced_opal_number,
+            quantity=float(p.quantity),
+            status=prod_status,
+        ))
+
+    return BOMReconciliationResponse(
+        kit_items=bom_kit_items,
+        unplanned_consumptions=unplanned,
+        outputs=outputs,
+    )
+
+
+@router.post("/{instance_id}/finalize", status_code=200)
+async def finalize_production(
+    instance_id: int,
+    data: FinalizeRequest,
+    db: DbSession,
+    user_id: CurrentUserId,
+) -> dict:
+    """Finalize production after execution is complete.
+
+    Sets production records to COMPLETED, assigns quantity and location
+    to inventory records, and records assembly genealogy.
+    """
+    instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(status_code=404, detail="Instance not found")
+
+    inst_status = instance.status.value if hasattr(instance.status, 'value') else instance.status
+    if inst_status != InstanceStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Instance must be COMPLETED before finalizing production")
+
+    # Get WIP production records for this instance
+    productions = (
+        db.query(InventoryProduction)
+        .filter(
+            InventoryProduction.procedure_instance_id == instance_id,
+            InventoryProduction.status == ProductionStatus.WIP,
+        )
+        .all()
+    )
+
+    if not productions:
+        raise HTTPException(status_code=400, detail="No WIP production records to finalize")
+
+    # Get all CONSUME-type consumption records for genealogy
+    consumption_ids = [
+        c.id for c in
+        db.query(InventoryConsumption).filter(
+            InventoryConsumption.procedure_instance_id == instance_id,
+            InventoryConsumption.usage_type == UsageType.CONSUME,
+        ).all()
+    ]
+
+    finalized = []
+    for production in productions:
+        old_values = get_model_dict(production)
+
+        production.status = ProductionStatus.COMPLETED
+
+        # Update inventory record with actual quantity and location
+        inv_record = production.inventory_record
+        inv_record.quantity = production.quantity
+        inv_record.location = data.location
+
+        log_update(db, production, old_values, user_id)
+
+        # Record assembly genealogy
+        if consumption_ids:
+            record_assembly_genealogy(db, production.id, consumption_ids)
+
+        finalized.append({
+            "production_id": production.id,
+            "opal_number": production.produced_opal_number,
+            "serial_number": production.serial_number,
+            "part_name": inv_record.part.name,
+            "quantity": float(production.quantity),
+            "location": data.location,
+        })
+
+    db.commit()
+
+    return {
+        "status": "finalized",
+        "instance_id": instance_id,
+        "productions": finalized,
+    }
 
 
 # ============ Collaboration (Multi-user Execution) ============

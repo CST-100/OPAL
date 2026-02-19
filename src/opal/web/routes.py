@@ -1470,7 +1470,7 @@ async def executions_detail(request: Request, db: DbSession, instance_id: int) -
     context["kit_items"] = kit_items
 
     # Get existing consumptions
-    from opal.db.models.inventory import InventoryConsumption, InventoryProduction
+    from opal.db.models.inventory import InventoryConsumption, InventoryProduction, ProductionStatus, UsageType
     from opal.db.models.procedure import ProcedureOutput
     consumptions = (
         db.query(InventoryConsumption)
@@ -1490,6 +1490,49 @@ async def executions_detail(request: Request, db: DbSession, instance_id: int) -
         .all()
     )
     context["productions"] = productions
+
+    # BOM reconciliation data
+    kit_items = context["kit_items"]
+    kit_by_part = {k.part_id: float(k.quantity_required) for k in kit_items}
+    consume_consumptions = [
+        c for c in consumptions
+        if (c.usage_type.value if hasattr(c.usage_type, 'value') else c.usage_type) == 'consume'
+    ]
+    consumed_by_part: dict[int, float] = {}
+    for c in consume_consumptions:
+        pid = c.inventory_record.part_id
+        consumed_by_part[pid] = consumed_by_part.get(pid, 0) + float(c.quantity)
+
+    bom_items = []
+    for k in kit_items:
+        qty_consumed = consumed_by_part.pop(k.part_id, 0)
+        qty_required = float(k.quantity_required)
+        bom_items.append({
+            "part_id": k.part_id,
+            "part_name": k.part.name,
+            "qty_required": qty_required,
+            "qty_consumed": qty_consumed,
+            "variance": qty_consumed - qty_required,
+        })
+    # Unplanned consumptions (consumed but not in kit)
+    unplanned = []
+    for pid, qty in consumed_by_part.items():
+        inv_c = next((c for c in consume_consumptions if c.inventory_record.part_id == pid), None)
+        unplanned.append({
+            "part_id": pid,
+            "part_name": inv_c.inventory_record.part.name if inv_c else "Unknown",
+            "qty_consumed": qty,
+        })
+    context["bom_items"] = bom_items
+    context["unplanned_consumptions"] = unplanned
+
+    # Can finalize: instance completed + has WIP productions
+    inst_status = instance.status.value if hasattr(instance.status, 'value') else instance.status
+    has_wip = any(
+        (p.status.value if hasattr(p.status, 'value') else p.status) == 'wip'
+        for p in productions
+    )
+    context["can_finalize"] = inst_status == 'completed' and has_wip
 
     return templates.TemplateResponse("executions/detail.html", context)
 

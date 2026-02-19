@@ -5,6 +5,7 @@ Provides atomic generation of sequential designators for various entity types:
 - WO-XXXXX: Work orders (procedure instances)
 - IT-XXXXX: Issues
 - RISK-XXXXX: Risks
+- SN-{PN}-XXXX: Serial numbers per part number
 """
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,10 @@ OPAL = "OPAL"
 WORK_ORDER = "WO"
 ISSUE = "IT"
 RISK = "RISK"
+SERIAL = "SN"
+
+# Known simple prefixes (serial numbers use compound prefix SN-{PN})
+_SIMPLE_PREFIXES = (OPAL, WORK_ORDER, ISSUE, RISK)
 
 
 def generate_designator(db: Session, designator_type: str, digits: int = 5) -> str:
@@ -27,7 +32,7 @@ def generate_designator(db: Session, designator_type: str, digits: int = 5) -> s
 
     Args:
         db: Database session
-        designator_type: Type of designator (OPAL, WO, IT, RISK)
+        designator_type: Type of designator (OPAL, WO, IT, RISK, or SN-{PN})
         digits: Number of digits for zero-padding (default 5)
 
     Returns:
@@ -113,42 +118,76 @@ def generate_risk_number(db: Session) -> str:
     return generate_designator(db, RISK)
 
 
+def generate_serial_number(db: Session, part) -> str:
+    """Generate the next serial number for a specific part.
+
+    Uses the part's internal_pn (or ID as fallback) to create a per-part
+    sequence. Each part gets its own independent counter.
+
+    Format: SN-{PN}-XXXX (4 digits, zero-padded)
+    Example: SN-PO/1-001-0001, SN-42-0001
+
+    Args:
+        db: Database session
+        part: Part model instance
+
+    Returns:
+        The next serial number for this part.
+    """
+    part_key = part.internal_pn or str(part.id)
+    seq_key = f"SN-{part_key}"
+    return generate_designator(db, seq_key, digits=4)
+
+
 def get_designator_type(designator: str) -> str | None:
     """Extract the type from a designator string.
 
     Args:
-        designator: A designator string like "OPAL-00042" or "WO-00015"
+        designator: A designator string like "OPAL-00042" or "SN-PO/1-001-0003"
 
     Returns:
-        The type prefix (OPAL, WO, IT, RISK) or None if invalid format.
+        The type prefix (OPAL, WO, IT, RISK, SN) or None if invalid format.
     """
     if not designator or "-" not in designator:
         return None
 
     prefix = designator.split("-")[0].upper()
-    if prefix in (OPAL, WORK_ORDER, ISSUE, RISK):
+    if prefix in _SIMPLE_PREFIXES:
         return prefix
+    if prefix == SERIAL:
+        return SERIAL
     return None
 
 
 def parse_designator(designator: str) -> tuple[str, int] | None:
     """Parse a designator into its type and sequence number.
 
+    For simple designators (OPAL, WO, IT, RISK): returns (type, number).
+    For serial numbers (SN-{PN}-XXXX): returns ("SN", number) where number
+    is the trailing sequence.
+
     Args:
-        designator: A designator string like "OPAL-00042"
+        designator: A designator string like "OPAL-00042" or "SN-PO/1-001-0003"
 
     Returns:
         Tuple of (type, number) or None if invalid format.
-        Example: ("OPAL", 42)
+        Example: ("OPAL", 42) or ("SN", 3)
     """
     if not designator or "-" not in designator:
         return None
 
     try:
-        prefix, num_str = designator.split("-", 1)
-        prefix = prefix.upper()
-        if prefix not in (OPAL, WORK_ORDER, ISSUE, RISK):
-            return None
-        return (prefix, int(num_str))
+        prefix = designator.split("-")[0].upper()
+
+        if prefix in _SIMPLE_PREFIXES:
+            _, num_str = designator.split("-", 1)
+            return (prefix, int(num_str))
+
+        if prefix == SERIAL:
+            # Serial numbers have format SN-{PN}-XXXX; sequence is the last segment
+            last_segment = designator.rsplit("-", 1)[-1]
+            return (SERIAL, int(last_segment))
+
+        return None
     except (ValueError, AttributeError):
         return None

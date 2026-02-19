@@ -19,6 +19,14 @@ class SourceType(str, Enum):
     TRANSFER = "transfer"  # Transferred from another location
 
 
+class ProductionStatus(str, Enum):
+    """Lifecycle status of a production record."""
+
+    PLANNED = "planned"  # eWO created, assembly allocated
+    WIP = "wip"  # Execution in progress
+    COMPLETED = "completed"  # BOM reconciled, production finalized
+
+
 class InventoryRecord(Base, IdMixin, TimestampMixin):
     """Inventory record tracking quantity at a location.
 
@@ -184,6 +192,10 @@ class InventoryProduction(Base, IdMixin, TimestampMixin):
         String(20), nullable=True, index=True,
         comment="OPAL number assigned to produced item"
     )
+    status: Mapped[ProductionStatus] = mapped_column(
+        String(20), nullable=False, default=ProductionStatus.PLANNED,
+        comment="planned = allocated, wip = execution started, completed = finalized"
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     produced_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("user.id", ondelete="SET NULL"), nullable=True
@@ -204,7 +216,7 @@ class InventoryProduction(Base, IdMixin, TimestampMixin):
     )
 
     def __repr__(self) -> str:
-        return f"<InventoryProduction(id={self.id}, inv_id={self.inventory_record_id}, qty={self.quantity})>"
+        return f"<InventoryProduction(id={self.id}, inv_id={self.inventory_record_id}, qty={self.quantity}, status={self.status})>"
 
 
 class TestResult(str, Enum):
