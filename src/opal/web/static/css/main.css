@@ -120,6 +120,7 @@ select option {
     display: flex;
     align-items: baseline;
     gap: var(--space-sm);
+    flex: 1;
 }
 
 .brand-link {
@@ -145,6 +146,8 @@ select option {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
+    flex: 1;
+    justify-content: flex-end;
 }
 
 .header-link {
@@ -1339,22 +1342,52 @@ select option {
     color: #fff;
 }
 
-/* Theme toggle button */
-.theme-toggle {
+/* User menu links (dropdown items for audit, project, theme) */
+a.user-menu-link,
+button.user-menu-link {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+a.user-menu-link:hover,
+button.user-menu-link:hover,
+a.user-menu-link.active {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Theme row inside user dropdown */
+.user-menu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.user-menu-row-label {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.user-menu-select {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    color: var(--text-secondary);
-    background: transparent;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     border: 1px solid var(--border-color);
     padding: var(--space-xs) var(--space-sm);
     cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.theme-toggle:hover {
-    color: var(--text-primary);
-    border-color: var(--border-light);
 }
 
 /* Diff view styles */
