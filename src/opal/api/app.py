@@ -31,7 +31,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    import logging
+
     settings = get_settings()
+    logging.getLogger(__name__).info("OPAL auth_mode=%s", settings.auth_mode)
 
     app = FastAPI(
         title="OPAL",

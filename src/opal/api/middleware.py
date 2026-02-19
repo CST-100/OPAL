@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse
 
-from opal.config import get_active_settings, get_settings
+from opal.config import get_active_settings
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
     """
 
     LOCAL_EXEMPT = ("/login", "/logout", "/api/", "/static/", "/docs", "/favicon.ico")
-    EXE_EXEMPT = ("/api/", "/static/", "/docs", "/favicon.ico")
+    EXE_EXEMPT = ("/__exe.dev/", "/login", "/logout", "/api/", "/static/", "/docs", "/favicon.ico")
 
     async def dispatch(self, request: Request, call_next: any) -> Response:
         settings = get_active_settings()
@@ -148,7 +148,8 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
 
 def setup_middleware(app: FastAPI) -> None:
     """Configure all middleware for the application."""
-    settings = get_settings()
+    settings = get_active_settings()
+    logger.info("Auth mode: %s", settings.auth_mode)
 
     # CORS middleware
     app.add_middleware(
