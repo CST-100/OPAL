@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Up Profile - OPAL</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .setup-container {
+            width: 400px;
+            max-width: 90vw;
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: var(--space-lg);
+        }
+        .setup-brand {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+            letter-spacing: 0.15em;
+        }
+        .setup-subtitle {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: var(--space-xs);
+        }
+        .setup-email {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: var(--space-sm);
+        }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="setup-brand">OPAL</div>
+            <div class="setup-subtitle">Set up your profile</div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">YOUR NAME</div>
+            <div class="panel-body">
+                <div class="setup-email">Signed in as {{ user.email }}</div>
+                <form method="POST" action="/setup-profile">
+                    <div class="form-group">
+                        <label class="form-label" for="name">Display Name *</label>
+                        <input type="text" name="name" id="name" class="form-input" required
+                               placeholder="Your full name"
+                               value="{{ user.name }}"
+                               autofocus>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">CONTINUE</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

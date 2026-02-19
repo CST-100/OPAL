@@ -16,8 +16,10 @@ class User(Base, IdMixin, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    exe_user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
+    needs_profile_setup: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Presence tracking
     last_seen_at: Mapped[datetime | None] = mapped_column(

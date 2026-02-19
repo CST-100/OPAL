@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     rate_limit_requests: int = Field(default=100, description="Max requests per window")
     rate_limit_window: int = Field(default=60, description="Rate limit window in seconds")
 
+    # Authentication
+    auth_mode: str = Field(default="local", description="Auth mode: 'local' or 'exe'")
+
     # File uploads
     upload_dir: Path = Field(
         default=Path("./data/attachments"),
@@ -129,6 +132,7 @@ def configure_for_project(
         upload_dir=upload_dir,
         max_upload_size=base.max_upload_size,
         allowed_mime_types=base.allowed_mime_types,
+        auth_mode=base.auth_mode,
     )
     _active_project = project
 

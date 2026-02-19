@@ -65,6 +65,16 @@
             <div class="login-subtitle">Operations, Procedures, Assets, Logistics</div>
         </div>
 
+        {% if auth_mode is defined and auth_mode == "exe" %}
+        <div class="panel">
+            <div class="panel-header">EXTERNAL AUTH</div>
+            <div class="panel-body">
+                <p class="mono" style="margin-bottom: var(--space-md);">Redirecting to exe.dev login...</p>
+                <a href="/__exe.dev/login?redirect=/" class="btn btn-primary" style="width: 100%;">GO TO LOGIN</a>
+            </div>
+        </div>
+        {% else %}
+
         <div class="panel">
             <div class="panel-header">SELECT USER</div>
             <div class="panel-body">
@@ -106,6 +116,8 @@
                 </form>
             </div>
         </div>
+
+        {% endif %}
     </div>
 </body>
 </html>
