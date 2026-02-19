@@ -25,6 +25,14 @@
                 <textarea id="description" name="description" class="form-textarea" rows="4">{{ procedure.description or '' }}</textarea>
             </div>
 
+            <div class="form-group">
+                <label class="form-label" for="procedure_type">TYPE</label>
+                <select id="procedure_type" name="procedure_type" class="form-select">
+                    <option value="op" {% if procedure.procedure_type.value == "op" %}selected{% endif %}>OP - Work Order (no output)</option>
+                    <option value="build" {% if procedure.procedure_type.value == "build" %}selected{% endif %}>BUILD - Produces assembly</option>
+                </select>
+            </div>
+
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
                 {{ ok.btn("CANCEL", href="/procedures/" ~ procedure.id) }}
                 {{ ok.btn("SAVE", variant="primary", type="submit") }}
@@ -46,6 +54,7 @@ async function updateProcedure(event) {
     const data = {
         name: form.name.value,
         description: form.description.value || null,
+        procedure_type: form.procedure_type.value,
     };
 
     const headers = {

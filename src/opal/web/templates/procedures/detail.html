@@ -23,6 +23,10 @@
                     <td class="id-cell">{{ procedure.id }}</td>
                 </tr>
                 <tr>
+                    <th>TYPE</th>
+                    <td>{{ ok.status(procedure.procedure_type.value | upper, "info" if procedure.procedure_type.value == "build" else "default") }}</td>
+                </tr>
+                <tr>
                     <th>STATUS</th>
                     <td>
                         <select id="status-select" class="form-select" style="width: auto;" onchange="updateStatus(this.value)">
@@ -261,6 +265,89 @@
         {% else %}
         {{ ok.empty("No parts in kit") }}
         {% endif %}
+    </div>
+</div>
+
+{% if procedure.procedure_type.value == "build" %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>OUTPUTS (ASSEMBLY PRODUCTS)</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD OUTPUT", variant="primary", attrs='onclick="showAddOutput()"') }}
+        </div>
+    </div>
+    <div class="panel-body">
+        {% if output_items %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">PART</th>
+                    <th>NAME</th>
+                    <th style="width: 120px;">PN</th>
+                    <th style="width: 100px; text-align: right;">QTY</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in output_items %}
+                <tr>
+                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
+                    <td class="mono">{{ item.part_external_pn or '-' }}</td>
+                    <td class="mono" style="text-align: right;">{{ item.quantity_produced }}</td>
+                    <td>{{ ok.btn("X", variant="danger", attrs='onclick="removeOutputItem(' ~ item.part_id ~ ')"') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        {{ ok.empty("No outputs defined — add the part(s) this procedure produces") }}
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Output Modal -->
+<div id="add-output-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD OUTPUT PART</div>
+            <div class="panel-body">
+                <form id="add-output-form" onsubmit="addOutputItem(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="output-part-search">PART *</label>
+                        <div class="part-search-container">
+                            <input type="text"
+                                   id="output-part-search"
+                                   class="form-input part-search-input"
+                                   placeholder="Search parts..."
+                                   autocomplete="off"
+                                   hx-get="/parts/search"
+                                   hx-trigger="keyup changed delay:200ms"
+                                   hx-target="#output-part-results"
+                                   hx-vals='{"limit": 5}'
+                                   name="q">
+                            <input type="hidden" id="output-part" name="part_id" required>
+                            <div id="output-part-results" class="part-search-dropdown"></div>
+                            <div id="output-part-selected" class="part-search-selected" style="display: none;">
+                                <span class="part-id"></span>
+                                <span class="part-name"></span>
+                                <span class="part-search-clear" onclick="clearPartSelection('output')">&times;</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="output-qty">QUANTITY PRODUCED *</label>
+                        <input type="number" id="output-qty" name="quantity_produced" class="form-input" step="0.0001" min="0.0001" value="1" required>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddOutput()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="output-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -671,11 +758,76 @@ async function removeKitItem(partId) {
     }
 }
 
+// Output functions
+function showAddOutput() {
+    document.getElementById('add-output-modal').style.display = 'block';
+}
+
+function hideAddOutput() {
+    document.getElementById('add-output-modal').style.display = 'none';
+    document.getElementById('add-output-form').reset();
+    document.getElementById('output-part').value = '';
+    document.getElementById('output-part-search').value = '';
+    document.getElementById('output-part-search').style.display = 'block';
+    document.getElementById('output-part-selected').style.display = 'none';
+    document.getElementById('output-part-results').innerHTML = '';
+}
+
+async function addOutputItem(event) {
+    event.preventDefault();
+    const form = document.getElementById('add-output-form');
+    const errorDiv = document.getElementById('output-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        part_id: parseInt(form.part_id.value),
+        quantity_produced: parseFloat(form.quantity_produced.value),
+    };
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/outputs`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add output');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function removeOutputItem(partId) {
+    if (!confirm('Remove this output part?')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/${procedureId}/outputs/${partId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to remove output'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         hideAddOp();
         hideAddStep();
         hideAddKit();
+        hideAddOutput();
     }
 });
 </script>

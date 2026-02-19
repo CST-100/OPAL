@@ -80,6 +80,7 @@ async function createProcedure(event) {
     const data = {
         name: form.name.value,
         description: form.description.value || null,
+        procedure_type: form.procedure_type.value,
     };
 
     const headers = {

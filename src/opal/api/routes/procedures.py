@@ -15,6 +15,7 @@ from opal.db.models.procedure import (
     MasterProcedure,
     ProcedureStatus,
     ProcedureStep,
+    ProcedureType,
     ProcedureVersion,
     StepKit,
     UsageType,
@@ -74,6 +75,7 @@ class ProcedureCreate(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
+    procedure_type: str = "op"
 
 
 class ProcedureUpdate(BaseModel):
@@ -82,6 +84,7 @@ class ProcedureUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
     status: str | None = None
+    procedure_type: str | None = None
 
 
 class StepCreate(BaseModel):
@@ -246,6 +249,7 @@ async def create_procedure(
     procedure = MasterProcedure(
         name=data.name,
         description=data.description,
+        procedure_type=ProcedureType(data.procedure_type),
         status=ProcedureStatus.DRAFT,
     )
     db.add(procedure)
@@ -314,6 +318,11 @@ async def update_procedure(
             procedure.status = ProcedureStatus(data.status)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {data.status}")
+    if data.procedure_type is not None:
+        try:
+            procedure.procedure_type = ProcedureType(data.procedure_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid procedure type: {data.procedure_type}")
 
     log_update(db, procedure, old_values, user_id)
     db.commit()
@@ -912,7 +921,7 @@ async def add_output(
     output = ProcedureOutput(
         procedure_id=procedure_id,
         part_id=data.part_id,
-        quantity_produced=data.quantity_produced,
+        quantity_produced=Decimal(str(data.quantity_produced)),
     )
     db.add(output)
     log_create(db, output, user_id)
@@ -946,7 +955,7 @@ async def update_output(
         raise HTTPException(status_code=404, detail="Output item not found")
 
     old_values = get_model_dict(output)
-    output.quantity_produced = data.quantity_produced
+    output.quantity_produced = Decimal(str(data.quantity_produced))
 
     log_update(db, output, old_values, user_id)
     db.commit()

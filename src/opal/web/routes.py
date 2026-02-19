@@ -967,6 +967,7 @@ async def procedures_table(
         procs_with_info.append({
             "id": p.id,
             "name": p.name,
+            "procedure_type": p.procedure_type.value if hasattr(p.procedure_type, 'value') else p.procedure_type,
             "status": status_val,
             "current_version_id": p.current_version_id,
             "version_number": version_number,
@@ -1046,6 +1047,26 @@ async def procedures_detail(request: Request, db: DbSession, procedure_id: int) 
             "quantity_required": float(k.quantity_required),
         }
         for k in kit_items
+    ]
+
+    # Get output items (what this procedure produces)
+    from opal.db.models.procedure import ProcedureOutput
+    output_items = (
+        db.query(ProcedureOutput)
+        .join(Part)
+        .filter(ProcedureOutput.procedure_id == procedure_id)
+        .order_by(Part.name)
+        .all()
+    )
+    context["output_items"] = [
+        {
+            "id": o.id,
+            "part_id": o.part_id,
+            "part_name": o.part.name,
+            "part_external_pn": o.part.external_pn,
+            "quantity_produced": float(o.quantity_produced),
+        }
+        for o in output_items
     ]
 
     # Get parts for kit modal

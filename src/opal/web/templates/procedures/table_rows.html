@@ -4,6 +4,7 @@
 <tr>
     <td>{{ ok.id_cell(p.id, "/procedures/" ~ p.id) }}</td>
     <td><a href="/procedures/{{ p.id }}">{{ p.name }}</a></td>
+    <td>{{ ok.status(p.procedure_type | upper, "info" if p.procedure_type == "build" else "default") }}</td>
     <td>{{ ok.status(p.status | upper) }}</td>
     <td class="mono">{% if p.current_version_id %}v{{ p.version_number }}{% else %}-{% endif %}</td>
     <td class="mono" style="text-align: center;">{{ p.step_count }}</td>
@@ -13,7 +14,7 @@
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="7">
+    <td colspan="8">
         {{ ok.empty("No procedures found") }}
     </td>
 </tr>
