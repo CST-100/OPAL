@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from opal.api.deps import RequiredAdmin
 from opal.config import get_active_project
 from opal.project import (
     PartNumberingConfig,
@@ -125,7 +126,7 @@ async def get_project_config() -> ProjectConfigResponse:
 
 
 @router.post("/config")
-async def create_project(data: ProjectConfigCreate) -> ProjectConfigResponse:
+async def create_project(data: ProjectConfigCreate, admin: RequiredAdmin) -> ProjectConfigResponse:
     """Create a new project configuration."""
     directory = Path(data.directory).resolve()
 
@@ -177,7 +178,7 @@ async def create_project(data: ProjectConfigCreate) -> ProjectConfigResponse:
 
 
 @router.put("/config")
-async def update_project_config(data: ProjectConfigUpdate) -> ProjectConfigResponse:
+async def update_project_config(data: ProjectConfigUpdate, admin: RequiredAdmin) -> ProjectConfigResponse:
     """Update existing project configuration."""
     project = get_active_project()
     if not project:

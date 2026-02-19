@@ -45,13 +45,14 @@
                     <th style="width: 60px;">ID</th>
                     <th>NAME</th>
                     <th style="width: 250px;">EMAIL</th>
+                    <th style="width: 80px;">ROLE</th>
                     <th style="width: 180px;">CREATED</th>
                     <th style="width: 80px;">STATUS</th>
                 </tr>
             </thead>
             <tbody id="users-table-body" hx-get="/users/table?is_active=true" hx-trigger="load">
                 <tr>
-                    <td colspan="5" class="text-muted">Loading...</td>
+                    <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
         </table>

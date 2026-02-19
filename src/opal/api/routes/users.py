@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
-from opal.api.deps import CurrentUserId, DbSession, PaginationParams
+from opal.api.deps import CurrentUserId, DbSession, PaginationParams, RequiredAdmin, RequiredUser
 from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.core.events import emit_user_activity
 from opal.db.models import User
@@ -21,6 +21,7 @@ class UserCreate(BaseModel):
 
     name: str
     email: EmailStr | None = None
+    is_admin: bool = False
 
 
 class UserUpdate(BaseModel):
@@ -29,6 +30,7 @@ class UserUpdate(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
     is_active: bool | None = None
+    is_admin: bool | None = None
 
 
 class UserResponse(BaseModel):
@@ -38,6 +40,7 @@ class UserResponse(BaseModel):
     name: str
     email: str | None
     is_active: bool
+    is_admin: bool
     created_at: str
     updated_at: str
 
@@ -55,8 +58,9 @@ class UserListResponse(BaseModel):
 async def list_users(
     db: DbSession,
     pagination: PaginationParams,
+    admin: RequiredAdmin,
 ) -> UserListResponse:
-    """List all users."""
+    """List all users. Requires admin."""
     query = db.query(User).filter(User.is_active == True)  # noqa: E712
     total = query.count()
     users = query.offset(pagination.skip).limit(pagination.limit).all()
@@ -68,6 +72,7 @@ async def list_users(
                 name=u.name,
                 email=u.email,
                 is_active=u.is_active,
+                is_admin=u.is_admin,
                 created_at=u.created_at.isoformat(),
                 updated_at=u.updated_at.isoformat(),
             )
@@ -81,14 +86,14 @@ async def list_users(
 async def create_user(
     db: DbSession,
     user_in: UserCreate,
-    acting_user_id: CurrentUserId,
+    admin: RequiredAdmin,
 ) -> UserResponse:
-    """Create a new user."""
-    user = User(name=user_in.name, email=user_in.email)
+    """Create a new user. Requires admin."""
+    user = User(name=user_in.name, email=user_in.email, is_admin=user_in.is_admin)
     db.add(user)
     db.flush()
 
-    log_create(db, user, acting_user_id)
+    log_create(db, user, admin.id)
     db.commit()
     db.refresh(user)
 
@@ -97,6 +102,7 @@ async def create_user(
         name=user.name,
         email=user.email,
         is_active=user.is_active,
+        is_admin=user.is_admin,
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat(),
     )
@@ -120,6 +126,7 @@ async def get_user(
         name=user.name,
         email=user.email,
         is_active=user.is_active,
+        is_admin=user.is_admin,
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat(),
     )
@@ -130,9 +137,14 @@ async def update_user(
     db: DbSession,
     user_id: int,
     user_in: UserUpdate,
-    acting_user_id: CurrentUserId,
+    acting_user: RequiredUser,
 ) -> UserResponse:
-    """Update a user."""
+    """Update a user.
+
+    Non-admins can only edit their own name/email.
+    Admins can edit any user, including is_admin and is_active.
+    Cannot remove admin from the last admin user.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -140,14 +152,43 @@ async def update_user(
             detail=f"User {user_id} not found",
         )
 
+    update_data = user_in.model_dump(exclude_unset=True)
+
+    # Non-admin restrictions
+    if not acting_user.is_admin:
+        # Can only edit self
+        if user_id != acting_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot edit other users",
+            )
+        # Can only change name and email
+        allowed_fields = {"name", "email"}
+        disallowed = set(update_data.keys()) - allowed_fields
+        if disallowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Cannot change fields: {', '.join(disallowed)}",
+            )
+
+    # Prevent removing last admin
+    if "is_admin" in update_data and not update_data["is_admin"] and user.is_admin:
+        admin_count = db.query(User).filter(
+            User.is_admin == True, User.is_active == True  # noqa: E712
+        ).count()
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot remove the last admin",
+            )
+
     old_data = get_model_dict(user)
 
-    update_data = user_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(user, field, value)
 
     db.flush()
-    log_update(db, user, old_data, acting_user_id)
+    log_update(db, user, old_data, acting_user.id)
     db.commit()
     db.refresh(user)
 
@@ -156,6 +197,7 @@ async def update_user(
         name=user.name,
         email=user.email,
         is_active=user.is_active,
+        is_admin=user.is_admin,
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat(),
     )
@@ -165,9 +207,13 @@ async def update_user(
 async def delete_user(
     db: DbSession,
     user_id: int,
-    acting_user_id: CurrentUserId,
+    acting_user: RequiredUser,
 ) -> None:
-    """Deactivate a user account."""
+    """Deactivate a user account.
+
+    Non-admins can only deactivate themselves.
+    Cannot deactivate the last admin.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -175,10 +221,28 @@ async def delete_user(
             detail=f"User {user_id} not found",
         )
 
+    # Non-admins can only deactivate self
+    if not acting_user.is_admin and user_id != acting_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot deactivate other users",
+        )
+
+    # Prevent deactivating last admin
+    if user.is_admin:
+        admin_count = db.query(User).filter(
+            User.is_admin == True, User.is_active == True  # noqa: E712
+        ).count()
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot deactivate the last admin",
+            )
+
     old_data = get_model_dict(user)
     user.is_active = False
     db.flush()
-    log_update(db, user, old_data, acting_user_id)
+    log_update(db, user, old_data, acting_user.id)
     db.commit()
 
 

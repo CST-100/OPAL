@@ -99,6 +99,25 @@ def _build_change_summary(entry) -> str:
 router = APIRouter()
 
 
+def _get_current_user(request: Request, db) -> User | None:
+    """Get current user from cookie."""
+    cookie_user_id = request.cookies.get("opal_user_id")
+    if not cookie_user_id:
+        return None
+    try:
+        return db.query(User).filter(User.id == int(cookie_user_id), User.is_active == True).first()  # noqa: E712
+    except (ValueError, TypeError):
+        return None
+
+
+def _require_admin_web(request: Request, db) -> RedirectResponse | None:
+    """Return redirect if current user is not admin, else None."""
+    user = _get_current_user(request, db)
+    if not user or not user.is_admin:
+        return RedirectResponse(url="/", status_code=302)
+    return None
+
+
 def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, Any]:
     """Get base context for all pages."""
     from opal import __version__
@@ -106,6 +125,19 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
 
     users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
     project = get_active_project()
+
+    # Resolve current user from cookie
+    current_user = None
+    is_admin = False
+    cookie_user_id = request.cookies.get("opal_user_id")
+    if cookie_user_id:
+        try:
+            current_user = db.query(User).filter(User.id == int(cookie_user_id), User.is_active == True).first()  # noqa: E712
+        except (ValueError, TypeError):
+            pass
+    if current_user:
+        is_admin = current_user.is_admin
+
     return {
         "request": request,
         "users": users,
@@ -113,6 +145,8 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
         "project_name": project.name if project else None,
         "opal_version": __version__,
         "app_version": f"v{__version__}",
+        "current_user": current_user,
+        "is_admin": is_admin,
     }
 
 
@@ -145,6 +179,7 @@ async def login_submit(request: Request, db: DbSession, user_id: int = Form(...)
     response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
     response.set_cookie("opal_user_name", user.name, max_age=max_age)
     response.set_cookie("opal_user_email", user.email or "", max_age=max_age)
+    response.set_cookie("opal_user_is_admin", "1" if user.is_admin else "0", max_age=max_age)
     return response
 
 
@@ -155,8 +190,10 @@ async def login_new_user(
     name: str = Form(...),
     email: str = Form(""),
 ) -> RedirectResponse:
-    """Create a new user and log in."""
-    user = User(name=name, email=email or None, is_active=True)
+    """Create a new user and log in. First user auto-becomes admin."""
+    # First user ever created is auto-admin
+    is_first_user = db.query(User).count() == 0
+    user = User(name=name, email=email or None, is_active=True, is_admin=is_first_user)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -166,6 +203,7 @@ async def login_new_user(
     response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
     response.set_cookie("opal_user_name", user.name, max_age=max_age)
     response.set_cookie("opal_user_email", user.email or "", max_age=max_age)
+    response.set_cookie("opal_user_is_admin", "1" if user.is_admin else "0", max_age=max_age)
     return response
 
 
@@ -176,6 +214,7 @@ async def logout(request: Request) -> RedirectResponse:
     response.delete_cookie("opal_user_id")
     response.delete_cookie("opal_user_name")
     response.delete_cookie("opal_user_email")
+    response.delete_cookie("opal_user_is_admin")
     return response
 
 
@@ -1872,7 +1911,10 @@ async def workcenters_edit(request: Request, db: DbSession, workcenter_id: int) 
 
 @router.get("/users", response_class=HTMLResponse)
 async def users_list(request: Request, db: DbSession) -> HTMLResponse:
-    """Users list page."""
+    """Users list page. Admin only."""
+    redirect = _require_admin_web(request, db)
+    if redirect:
+        return redirect
     context = get_base_context(request, db, "Users - OPAL")
     return templates.TemplateResponse("users/list.html", context)
 
@@ -1911,14 +1953,24 @@ async def users_table(
 
 @router.get("/users/new", response_class=HTMLResponse)
 async def users_new(request: Request, db: DbSession) -> HTMLResponse:
-    """New user form page."""
+    """New user form page. Admin only."""
+    redirect = _require_admin_web(request, db)
+    if redirect:
+        return redirect
     context = get_base_context(request, db, "New User - OPAL")
     return templates.TemplateResponse("users/new.html", context)
 
 
 @router.get("/users/{user_id}", response_class=HTMLResponse)
 async def users_detail(request: Request, db: DbSession, user_id: int) -> HTMLResponse:
-    """User detail page."""
+    """User detail page. Self-view for all, admin can view anyone."""
+    current_user = _get_current_user(request, db)
+    is_own_profile = current_user and current_user.id == user_id
+
+    # Non-admins can only view their own profile
+    if not is_own_profile and (not current_user or not current_user.is_admin):
+        return RedirectResponse(url="/", status_code=302)
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return templates.TemplateResponse(
@@ -1929,13 +1981,21 @@ async def users_detail(request: Request, db: DbSession, user_id: int) -> HTMLRes
 
     context = get_base_context(request, db, f"{user.name} - OPAL")
     context["user"] = user
+    context["is_own_profile"] = is_own_profile
 
     return templates.TemplateResponse("users/detail.html", context)
 
 
 @router.get("/users/{user_id}/edit", response_class=HTMLResponse)
 async def users_edit(request: Request, db: DbSession, user_id: int) -> HTMLResponse:
-    """User edit page."""
+    """User edit page. Self-edit for all, admin can edit anyone."""
+    current_user = _get_current_user(request, db)
+    is_own_profile = current_user and current_user.id == user_id
+
+    # Non-admins can only edit their own profile
+    if not is_own_profile and (not current_user or not current_user.is_admin):
+        return RedirectResponse(url="/", status_code=302)
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         return templates.TemplateResponse(
@@ -2005,8 +2065,12 @@ async def docs(request: Request, db: DbSession) -> HTMLResponse:
 
 @router.get("/project/new", response_class=HTMLResponse)
 async def project_new(request: Request, db: DbSession) -> HTMLResponse:
-    """New project wizard page."""
+    """New project wizard page. Admin only."""
     import os
+
+    redirect = _require_admin_web(request, db)
+    if redirect:
+        return redirect
 
     context = get_base_context(request, db, "New Project - OPAL")
     context["existing_config"] = None
@@ -2020,13 +2084,16 @@ async def project_new(request: Request, db: DbSession) -> HTMLResponse:
 
 @router.get("/project/edit", response_class=HTMLResponse)
 async def project_edit(request: Request, db: DbSession) -> HTMLResponse:
-    """Edit existing project configuration."""
+    """Edit existing project configuration. Admin only."""
     from opal.config import get_active_project
+
+    redirect = _require_admin_web(request, db)
+    if redirect:
+        return redirect
 
     project = get_active_project()
     if not project:
         # No existing project, redirect to new
-        from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/project/new", status_code=302)
 
     context = get_base_context(request, db, "Edit Project - OPAL")

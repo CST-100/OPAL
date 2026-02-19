@@ -5,6 +5,13 @@
     <td class="id-cell"><a href="/users/{{ u.id }}">{{ u.id }}</a></td>
     <td><a href="/users/{{ u.id }}">{{ u.name }}</a></td>
     <td class="mono">{{ u.email or '-' }}</td>
+    <td>
+        {% if u.is_admin %}
+        {{ ok.status("ADMIN", "warn") }}
+        {% else %}
+        {{ ok.status("USER", "info") }}
+        {% endif %}
+    </td>
     <td>{{ ok.timestamp(u.created_at) }}</td>
     <td>
         {% if u.is_active %}
@@ -17,6 +24,6 @@
 {% endfor %}
 {% else %}
 <tr>
-    <td colspan="5">{{ ok.empty("No users found") }}</td>
+    <td colspan="6">{{ ok.empty("No users found") }}</td>
 </tr>
 {% endif %}

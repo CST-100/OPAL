@@ -132,7 +132,7 @@ def cmd_seed(args: argparse.Namespace) -> None:
 
         # Create demo users
         users = [
-            User(name="Alice", email="alice@example.com"),
+            User(name="Alice", email="alice@example.com", is_admin=True),
             User(name="Bob", email="bob@example.com"),
             User(name="Charlie", email="charlie@example.com"),
         ]

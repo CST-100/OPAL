@@ -74,6 +74,25 @@ def require_user(
 RequiredUser = Annotated[User, Depends(require_user)]
 
 
+def require_admin(
+    user: RequiredUser,
+) -> User:
+    """Require an admin user for the request.
+
+    Raises 403 if user is not an admin.
+    """
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
+# Type alias for required admin dependency
+RequiredAdmin = Annotated[User, Depends(require_admin)]
+
+
 class Pagination:
     """Pagination parameters."""
 

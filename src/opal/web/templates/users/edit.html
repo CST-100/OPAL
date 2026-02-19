@@ -3,7 +3,9 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
+{% if is_admin %}
 {{ ok.crumb("USERS", "/users") }}
+{% endif %}
 {{ ok.crumb(user.name, "/users/" ~ user.id) }}
 {{ ok.crumb("EDIT") }}
 {% endblock %}
@@ -24,6 +26,7 @@
                 <small class="text-muted">Optional - for contact purposes</small>
             </div>
 
+            {% if is_admin %}
             <div class="form-group">
                 <label class="form-checkbox">
                     <input type="checkbox" id="is_active" name="is_active" {{ 'checked' if user.is_active else '' }}>
@@ -31,6 +34,15 @@
                 </label>
                 <small class="text-muted">Inactive users cannot be selected for tracking</small>
             </div>
+
+            <div class="form-group">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="is_admin_field" name="is_admin" {{ 'checked' if user.is_admin else '' }}>
+                    Admin
+                </label>
+                <small class="text-muted">Admins can manage users and project settings</small>
+            </div>
+            {% endif %}
 
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
@@ -53,8 +65,12 @@ async function updateUser(event) {
     const data = {
         name: form.name.value,
         email: form.email.value || null,
-        is_active: form.is_active.checked,
     };
+
+    {% if is_admin %}
+    data.is_active = form.is_active.checked;
+    data.is_admin = document.getElementById('is_admin_field').checked;
+    {% endif %}
 
     const headers = {
         'Content-Type': 'application/json',

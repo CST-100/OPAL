@@ -23,6 +23,14 @@
                 <small class="text-muted">Optional - for contact purposes</small>
             </div>
 
+            <div class="form-group">
+                <label class="form-checkbox">
+                    <input type="checkbox" id="is_admin_field" name="is_admin">
+                    Admin
+                </label>
+                <small class="text-muted">Admins can manage users and project settings</small>
+            </div>
+
             <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
 
             <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
@@ -44,6 +52,7 @@ async function createUser(event) {
     const data = {
         name: form.name.value,
         email: form.email.value || null,
+        is_admin: document.getElementById('is_admin_field').checked,
     };
 
     const headers = {
