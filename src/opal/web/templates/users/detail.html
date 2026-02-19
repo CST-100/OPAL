@@ -71,4 +71,51 @@
         </table>
     </div>
 </div>
+
+<!-- Delete account panel, only visible when viewing own profile -->
+<div id="delete-account-panel" class="panel" style="max-width: 800px; margin-top: var(--space-md); display: none;">
+    <div class="panel-header">
+        <span>DANGER ZONE</span>
+    </div>
+    <div class="panel-body" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <div style="font-weight: 600;">DELETE ACCOUNT</div>
+            <div class="text-muted" style="font-size: 0.75rem; font-family: var(--font-mono);">Deactivate this account. You will be signed out.</div>
+        </div>
+        {{ ok.btn("DELETE ACCOUNT", variant="danger", attrs='onclick="deleteAccount()"') }}
+    </div>
+</div>
+
+<script>
+// Show delete panel only if viewing own profile
+(function() {
+    var cookieUserId = (function(name) {
+        var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? decodeURIComponent(match[2]) : null;
+    })('opal_user_id');
+    if (cookieUserId === '{{ user.id }}') {
+        document.getElementById('delete-account-panel').style.display = '';
+    }
+})();
+
+async function deleteAccount() {
+    if (!confirm('Are you sure you want to delete your account? You will be signed out.')) return;
+
+    var userId = localStorage.getItem('opal_user_id');
+    try {
+        var resp = await fetch('/api/users/{{ user.id }}', {
+            method: 'DELETE',
+            headers: userId ? {'X-User-Id': userId} : {},
+        });
+        if (resp.ok || resp.status === 204) {
+            window.location.href = '/logout';
+        } else {
+            var err = await resp.json();
+            alert('Failed to delete account: ' + formatApiError(err.detail, 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
 {% endblock %}

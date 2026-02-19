@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
 from opal.api.deps import CurrentUserId, DbSession, PaginationParams
-from opal.core.audit import get_model_dict, log_create, log_update
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.core.events import emit_user_activity
 from opal.db.models import User
 
@@ -159,6 +159,27 @@ async def update_user(
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat(),
     )
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    db: DbSession,
+    user_id: int,
+    acting_user_id: CurrentUserId,
+) -> None:
+    """Deactivate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User {user_id} not found",
+        )
+
+    old_data = get_model_dict(user)
+    user.is_active = False
+    db.flush()
+    log_update(db, user, old_data, acting_user_id)
+    db.commit()
 
 
 # ============ Presence Tracking ============
