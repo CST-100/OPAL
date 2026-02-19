@@ -340,43 +340,129 @@
 </div>
 {% endif %}
 
-{% if output_items %}
+{% if productions %}
+<!-- Production panel: auto-allocated outputs with lifecycle tracking -->
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
-        <span>ASSEMBLY OUTPUT</span>
+        <span>PRODUCTION</span>
         <div class="panel-header-actions">
-            {% if productions %}
-            {{ ok.status("PRODUCED", "ok") }}
-            {% elif instance.status.value == 'completed' %}
-            {{ ok.status("PENDING", "warn") }}
-            {% endif %}
+            {% for p in productions %}
+                {% set pstatus = p.status.value if p.status.value is defined else p.status %}
+                {% if pstatus == 'completed' %}
+                    {{ ok.status("FINALIZED", "ok") }}
+                {% elif pstatus == 'wip' %}
+                    {{ ok.status("WIP", "info") }}
+                {% else %}
+                    {{ ok.status("PLANNED", "default") }}
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
     <div class="panel-body">
-        {% if productions %}
         <table class="data-table">
             <thead>
                 <tr>
                     <th>PART</th>
+                    <th style="width: 160px;">SERIAL</th>
+                    <th style="width: 140px;">OPAL #</th>
                     <th style="width: 100px; text-align: right;">QTY</th>
+                    <th style="width: 120px;">LOT (WO)</th>
                     <th style="width: 150px;">LOCATION</th>
-                    <th style="width: 100px;">LOT</th>
-                    <th style="width: 150px;">SERIAL</th>
+                    <th style="width: 100px;">STATUS</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in productions %}
+                {% set pstatus = p.status.value if p.status.value is defined else p.status %}
                 <tr>
                     <td><a href="/parts/{{ p.inventory_record.part_id }}">{{ p.inventory_record.part.name }}</a></td>
-                    <td class="mono" style="text-align: right;">{{ p.quantity }}</td>
-                    <td class="mono">{{ p.inventory_record.location }}</td>
-                    <td class="mono">{{ p.inventory_record.lot_number or '-' }}</td>
                     <td class="mono">{{ p.serial_number or '-' }}</td>
+                    <td class="mono">{% if p.produced_opal_number %}<a href="/inventory/opal/{{ p.produced_opal_number }}">{{ p.produced_opal_number }}</a>{% else %}-{% endif %}</td>
+                    <td class="mono" style="text-align: right;">{% if pstatus == 'completed' %}{{ p.quantity }}{% else %}({{ p.quantity }}){% endif %}</td>
+                    <td class="mono">{{ p.inventory_record.lot_number or '-' }}</td>
+                    <td class="mono">{{ p.inventory_record.location or '-' }}</td>
+                    <td>{{ ok.status(pstatus | upper, "ok" if pstatus == 'completed' else ("info" if pstatus == 'wip' else "default")) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
+
+        {% if can_finalize %}
+        <div style="margin-top: var(--space-md); border-top: 1px solid var(--border-color); padding-top: var(--space-md);">
+            <div style="display: flex; gap: var(--space-md); align-items: flex-end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label class="form-label" for="finalize-location">STORAGE LOCATION *</label>
+                    <input type="text" id="finalize-location" class="form-input" placeholder="e.g., SHELF-A1, CLEANROOM-2">
+                </div>
+                <button class="btn btn-primary" onclick="finalizeProduction()">FINALIZE PRODUCTION</button>
+            </div>
+            <div id="finalize-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if bom_items or unplanned_consumptions %}
+<!-- BOM Reconciliation -->
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header"><span>BOM RECONCILIATION</span></div>
+    <div class="panel-body">
+        {% if bom_items %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PART</th>
+                    <th style="width: 100px; text-align: right;">REQUIRED</th>
+                    <th style="width: 100px; text-align: right;">CONSUMED</th>
+                    <th style="width: 100px; text-align: right;">VARIANCE</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in bom_items %}
+                <tr>
+                    <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
+                    <td class="mono" style="text-align: right;">{{ item.qty_required }}</td>
+                    <td class="mono" style="text-align: right;">{{ item.qty_consumed }}</td>
+                    <td class="mono" style="text-align: right; {% if item.variance > 0 %}color: var(--accent-yellow);{% elif item.variance < 0 %}color: var(--accent-red);{% endif %}">
+                        {% if item.variance > 0 %}+{% endif %}{{ item.variance }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% if unplanned_consumptions %}
+        <div style="margin-top: var(--space-md);">
+            <strong class="text-yellow">UNPLANNED CONSUMPTIONS</strong>
+            <table class="data-table" style="margin-top: var(--space-sm);">
+                <thead>
+                    <tr>
+                        <th>PART</th>
+                        <th style="width: 100px; text-align: right;">QTY</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in unplanned_consumptions %}
+                    <tr>
+                        <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
+                        <td class="mono" style="text-align: right;">{{ item.qty_consumed }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% elif output_items %}
+<!-- Fallback: manual output recording for non-auto-allocated procedures -->
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>ASSEMBLY OUTPUT</span>
+    </div>
+    <div class="panel-body">
         <table class="data-table" id="output-table">
             <thead>
                 <tr>
@@ -418,7 +504,6 @@
         <div id="produce-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
         {% elif status_val in ['pending', 'in_progress'] %}
         <p class="text-muted" style="margin-top: var(--space-md);">Output can be recorded after the procedure is completed.</p>
-        {% endif %}
         {% endif %}
     </div>
 </div>
@@ -841,6 +926,50 @@ async function produceOutput() {
     } catch (e) {
         errorDiv.textContent = 'Network error: ' + e.message;
         errorDiv.style.display = 'block';
+    }
+}
+
+async function finalizeProduction() {
+    const locationInput = document.getElementById('finalize-location');
+    const errorDiv = document.getElementById('finalize-error');
+    if (errorDiv) errorDiv.style.display = 'none';
+
+    const location = locationInput ? locationInput.value.trim() : '';
+    if (!location) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Please enter a storage location';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
+
+    if (!confirm('Finalize production? This will set output quantities and record assembly genealogy.')) return;
+
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/finalize`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ location: location }),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            if (errorDiv) {
+                errorDiv.textContent = formatApiError(error.detail, 'Failed to finalize production');
+                errorDiv.style.display = 'block';
+            } else {
+                alert(formatApiError(error.detail, 'Failed to finalize production'));
+            }
+        }
+    } catch (e) {
+        const msg = 'Network error: ' + e.message;
+        if (errorDiv) {
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+        } else {
+            alert(msg);
+        }
     }
 }
 

@@ -19,7 +19,7 @@ class DesignatorSequence(Base, TimestampMixin):
     __tablename__ = "designator_sequence"
 
     designator_type: Mapped[str] = mapped_column(
-        String(10), primary_key=True, comment="OPAL, WO, IT, RISK"
+        String(50), primary_key=True, comment="OPAL, WO, IT, RISK, SN-*"
     )
     last_value: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, comment="Last assigned sequence number"
