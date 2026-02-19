@@ -245,6 +245,44 @@ async def logout(request: Request) -> HTMLResponse | RedirectResponse:
     return response
 
 
+@router.get("/setup-profile", response_class=HTMLResponse)
+async def setup_profile_page(request: Request, db: DbSession) -> HTMLResponse:
+    """Profile setup page for new exe-auth users to set their display name."""
+    user = _get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    if not user.needs_profile_setup:
+        return RedirectResponse(url="/", status_code=302)
+
+    return templates.TemplateResponse("setup_profile.html", {
+        "request": request,
+        "user": user,
+    })
+
+
+@router.post("/setup-profile")
+async def setup_profile_submit(
+    request: Request, db: DbSession, name: str = Form(...),
+) -> RedirectResponse:
+    """Save display name and clear the profile setup flag."""
+    user = _get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    user.name = name.strip()
+    user.needs_profile_setup = False
+    db.commit()
+
+    # Update cookies with the new name
+    response = RedirectResponse(url="/", status_code=302)
+    max_age = 365 * 24 * 3600
+    response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
+    response.set_cookie("opal_user_name", user.name, max_age=max_age)
+    response.set_cookie("opal_user_email", user.email or "", max_age=max_age)
+    response.set_cookie("opal_user_is_admin", "1" if user.is_admin else "0", max_age=max_age)
+    return response
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: DbSession) -> HTMLResponse:
     """Home page."""

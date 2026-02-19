@@ -53,7 +53,7 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
     """
 
     LOCAL_EXEMPT = ("/login", "/logout", "/api/", "/static/", "/docs", "/favicon.ico")
-    EXE_EXEMPT = ("/__exe.dev/", "/login", "/logout", "/api/", "/static/", "/docs", "/favicon.ico")
+    EXE_EXEMPT = ("/__exe.dev/", "/login", "/logout", "/setup-profile", "/api/", "/static/", "/docs", "/favicon.ico")
 
     async def dispatch(self, request: Request, call_next: any) -> Response:
         settings = get_active_settings()
@@ -95,6 +95,17 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
         if not user:
             return RedirectResponse(url="/__exe.dev/login", status_code=302)
 
+        # New users need to set their display name
+        if user["needs_profile_setup"]:
+            response = RedirectResponse(url="/setup-profile", status_code=302)
+            # Set cookies so the setup page knows who the user is
+            max_age = 365 * 24 * 3600
+            response.set_cookie("opal_user_id", str(user["id"]), max_age=max_age)
+            response.set_cookie("opal_user_name", user["name"], max_age=max_age)
+            response.set_cookie("opal_user_email", user["email"] or "", max_age=max_age)
+            response.set_cookie("opal_user_is_admin", "1" if user["is_admin"] else "0", max_age=max_age)
+            return response
+
         # Set cookies so the rest of the app works unchanged
         response = await call_next(request)
 
@@ -122,9 +133,12 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
                 if user.email != exe_email:
                     user.email = exe_email
                     db.flush()
-                return {"id": user.id, "name": user.name, "email": user.email, "is_admin": user.is_admin}
+                return {
+                    "id": user.id, "name": user.name, "email": user.email,
+                    "is_admin": user.is_admin, "needs_profile_setup": user.needs_profile_setup,
+                }
 
-            # Auto-create: derive name from email local part
+            # Auto-create: derive placeholder name from email local part
             local_part = exe_email.split("@")[0] if "@" in exe_email else exe_email
             name = local_part.replace(".", " ").replace("_", " ").replace("-", " ").title()
 
@@ -137,13 +151,17 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
                 exe_user_id=exe_user_id,
                 is_active=True,
                 is_admin=is_first_user,
+                needs_profile_setup=True,
             )
             db.add(new_user)
             db.flush()
             db.refresh(new_user)
-            logger.info("Auto-provisioned exe user: %s (exe_user_id=%s)", name, exe_user_id)
+            logger.info("Auto-provisioned exe user: %s (exe_user_id=%s, needs_profile_setup=True)", name, exe_user_id)
 
-            return {"id": new_user.id, "name": new_user.name, "email": new_user.email, "is_admin": new_user.is_admin}
+            return {
+                "id": new_user.id, "name": new_user.name, "email": new_user.email,
+                "is_admin": new_user.is_admin, "needs_profile_setup": True,
+            }
 
 
 def setup_middleware(app: FastAPI) -> None:
