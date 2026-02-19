@@ -121,10 +121,11 @@ def _require_admin_web(request: Request, db) -> RedirectResponse | None:
 def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, Any]:
     """Get base context for all pages."""
     from opal import __version__
-    from opal.config import get_active_project
+    from opal.config import get_active_project, get_active_settings
 
     users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
     project = get_active_project()
+    settings = get_active_settings()
 
     # Resolve current user from cookie
     current_user = None
@@ -147,6 +148,7 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
         "app_version": f"v{__version__}",
         "current_user": current_user,
         "is_admin": is_admin,
+        "auth_mode": settings.auth_mode,
     }
 
 
@@ -156,6 +158,14 @@ def get_base_context(request: Request, db: DbSession, title: str) -> dict[str, A
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: DbSession) -> HTMLResponse:
     """User selection page."""
+    from opal.config import get_active_settings
+
+    settings = get_active_settings()
+
+    # In exe mode, redirect to exe.dev login
+    if settings.auth_mode == "exe":
+        return RedirectResponse(url="/__exe.dev/login?redirect=/", status_code=302)
+
     # If already logged in, redirect to home
     if request.cookies.get("opal_user_id"):
         return RedirectResponse(url="/", status_code=302)
@@ -164,6 +174,7 @@ async def login_page(request: Request, db: DbSession) -> HTMLResponse:
     return templates.TemplateResponse("login.html", {
         "request": request,
         "users": users,
+        "auth_mode": settings.auth_mode,
     })
 
 
@@ -207,10 +218,26 @@ async def login_new_user(
     return response
 
 
-@router.get("/logout")
-async def logout(request: Request) -> RedirectResponse:
+@router.get("/logout", response_model=None)
+async def logout(request: Request) -> HTMLResponse | RedirectResponse:
     """Clear user identity cookies."""
-    response = RedirectResponse(url="/login", status_code=302)
+    from opal.config import get_active_settings
+
+    settings = get_active_settings()
+
+    if settings.auth_mode == "exe":
+        # Exe logout requires POST to /__exe.dev/logout — serve an auto-submit page
+        html = """<!DOCTYPE html>
+<html><head><title>Signing out...</title></head>
+<body>
+<p>Signing out...</p>
+<form id="exeLogout" method="POST" action="/__exe.dev/logout"></form>
+<script>document.getElementById('exeLogout').submit();</script>
+</body></html>"""
+        response = HTMLResponse(content=html)
+    else:
+        response = RedirectResponse(url="/login", status_code=302)
+
     response.delete_cookie("opal_user_id")
     response.delete_cookie("opal_user_name")
     response.delete_cookie("opal_user_email")
