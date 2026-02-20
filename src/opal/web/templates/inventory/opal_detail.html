@@ -18,6 +18,9 @@
             {% endif %}
             {{ ok.btn("PRINT LABEL", attrs='onclick="window.open(\'/label?type=inventory&id=' ~ record.id ~ '\', \'_blank\', \'width=500,height=300\')"') }}
             {{ ok.btn("ADJUST QTY", href="/inventory/" ~ record.id ~ "/adjust") }}
+            {% if record.quantity > 0 %}
+            {{ ok.btn("SCRAP", variant="danger", attrs='onclick="showScrapModal()"') }}
+            {% endif %}
         </div>
     </div>
     <div class="panel-body">
@@ -153,7 +156,11 @@
                     </span>
 
                     {% elif event.event == 'consumed' %}
+                    {% if event.details.usage_type == 'scrap' %}
+                    <strong style="color: var(--color-error);">SCRAPPED</strong>
+                    {% else %}
                     <strong style="color: var(--color-warning);">CONSUMED</strong>
+                    {% endif %}
                     <br>
                     <span class="text-muted">
                         Quantity: {{ event.details.quantity }}
@@ -162,6 +169,9 @@
                         {% endif %}
                         {% if event.details.usage_type == 'tooling' %}
                         (tooling - returned)
+                        {% endif %}
+                        {% if event.details.notes %}
+                        <br>{{ event.details.notes }}
                         {% endif %}
                     </span>
 
@@ -281,6 +291,109 @@
     font-size: 1em;
 }
 </style>
+
+<!-- Scrap Modal -->
+<div id="scrap-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="panel">
+            <div class="panel-header">
+                <span>SCRAP INVENTORY</span>
+                <button class="btn btn-sm" onclick="hideScrapModal()" style="margin-left: auto;">&times;</button>
+            </div>
+            <div class="panel-body">
+                <table class="data-table" style="margin-bottom: var(--space-md);">
+                    <tr>
+                        <th style="width: 100px;">OPAL #</th>
+                        <td class="mono">{{ opal_number }}</td>
+                    </tr>
+                    <tr>
+                        <th>PART</th>
+                        <td>{{ record.part.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>CURRENT QTY</th>
+                        <td class="mono">{{ '%g' % record.quantity }}</td>
+                    </tr>
+                </table>
+                <form id="scrap-form" onsubmit="event.preventDefault(); submitScrap();">
+                    <div class="form-group">
+                        <label class="form-label" for="scrap-qty">QUANTITY TO SCRAP <span class="text-red">*</span></label>
+                        <input type="number" id="scrap-qty" class="form-input" step="0.0001" min="0.0001" max="{{ record.quantity }}" value="{{ '%g' % record.quantity }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scrap-reason">REASON <span class="text-red">*</span></label>
+                        <select id="scrap-reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="Damaged">Damaged</option>
+                            <option value="Expired">Expired</option>
+                            <option value="Failed test/inspection">Failed test/inspection</option>
+                            <option value="Obsolete">Obsolete</option>
+                            <option value="Contaminated">Contaminated</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scrap-notes">NOTES</label>
+                        <textarea id="scrap-notes" class="form-input" rows="3" placeholder="Additional details about the scrap event..."></textarea>
+                    </div>
+                    <div style="display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-md);">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideScrapModal()"') }}
+                        {{ ok.btn("CONFIRM SCRAP", variant="danger", type="submit") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showScrapModal() {
+    document.getElementById('scrap-modal').style.display = 'flex';
+}
+function hideScrapModal() {
+    document.getElementById('scrap-modal').style.display = 'none';
+}
+document.getElementById('scrap-modal').addEventListener('click', function(e) {
+    if (e.target === this) hideScrapModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') hideScrapModal();
+});
+
+async function submitScrap() {
+    const qty = parseFloat(document.getElementById('scrap-qty').value);
+    const reason = document.getElementById('scrap-reason').value;
+    const notes = document.getElementById('scrap-notes').value.trim();
+
+    if (!reason) { alert('Please select a reason'); return; }
+    if (isNaN(qty) || qty <= 0) { alert('Please enter a valid quantity'); return; }
+
+    const body = {
+        adjustment: -qty,
+        reason: 'scrap',
+        notes: reason + (notes ? ': ' + notes : '')
+    };
+
+    try {
+        const response = await fetch('/api/inventory/{{ record.id }}/adjust', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': localStorage.getItem('opal_user_id') || '1'
+            },
+            body: JSON.stringify(body)
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to scrap inventory'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
 
 {% if record.part.is_tooling %}
 <script>

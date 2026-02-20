@@ -807,6 +807,7 @@ async def inventory_opal_detail(
                 "quantity": float(c.quantity),
                 "usage_type": c.usage_type.value if hasattr(c.usage_type, 'value') else c.usage_type,
                 "procedure_instance_id": c.procedure_instance_id,
+                "notes": c.notes,
             },
         })
 
