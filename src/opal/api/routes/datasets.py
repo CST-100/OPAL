@@ -1,9 +1,12 @@
 """Datasets API routes."""
 
+import csv
+import io
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from opal.api.deps import CurrentUserId, DbSession
@@ -442,4 +445,49 @@ async def get_chart_data(
                 "tension": 0.1,
             }
         ],
+    )
+
+
+# ============ CSV Export ============
+
+
+@router.get("/{dataset_id}/export")
+async def export_dataset_csv(
+    dataset_id: int,
+    db: DbSession,
+) -> StreamingResponse:
+    """Export dataset data points as CSV."""
+    dataset = (
+        db.query(Dataset)
+        .filter(Dataset.id == dataset_id, Dataset.deleted_at.is_(None))
+        .first()
+    )
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    points = (
+        db.query(DataPoint)
+        .filter(DataPoint.dataset_id == dataset_id)
+        .order_by(DataPoint.recorded_at.asc())
+        .all()
+    )
+
+    field_names = [f["name"] for f in dataset.data_schema.get("fields", [])]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["recorded_at"] + field_names)
+
+    for point in points:
+        row = [point.recorded_at.strftime("%Y-%m-%dT%H:%M:%S")]
+        for fname in field_names:
+            row.append(point.values.get(fname, ""))
+        writer.writerow(row)
+
+    output.seek(0)
+    filename = f"dataset_{dataset_id}_{dataset.name.replace(' ', '_')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
