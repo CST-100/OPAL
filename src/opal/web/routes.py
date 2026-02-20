@@ -390,7 +390,7 @@ async def parts_table(
     db: DbSession,
     search: str | None = Query(None),
     category: str | None = Query(None),
-    tier: int | None = Query(None),
+    tier: str | None = Query(None),
     top_level: str | None = Query(None),
     low_stock: str | None = Query(None),
     sort_by: str | None = Query("id"),
@@ -412,8 +412,11 @@ async def parts_table(
     if category:
         query = query.filter(Part.category == category)
 
-    if tier is not None:
-        query = query.filter(Part.tier == tier)
+    if tier:
+        try:
+            query = query.filter(Part.tier == int(tier))
+        except ValueError:
+            pass
 
     if top_level:
         if top_level == "true":
