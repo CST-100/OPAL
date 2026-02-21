@@ -133,3 +133,99 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def init_database(engine=None) -> None:
+    """Initialize or migrate the database.
+
+    For new databases: creates all tables and stamps the current alembic revision.
+    For existing databases: runs alembic upgrade to apply pending migrations.
+
+    Args:
+        engine: SQLAlchemy engine. If None, uses get_engine().
+    """
+    import logging
+
+    from sqlalchemy import inspect
+
+    logger = logging.getLogger("opal.db")
+
+    if engine is None:
+        engine = get_engine()
+
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+
+    # Import all models to ensure metadata is populated
+    import opal.db.models  # noqa: F401
+
+    if not existing_tables:
+        # New database: create all tables directly
+        logger.info("Creating new database schema...")
+        Base.metadata.create_all(engine)
+
+        # Stamp alembic version so future migrations know the starting point
+        _stamp_alembic_head(engine)
+        logger.info("Database initialized at current schema version.")
+    else:
+        # Existing database: run migrations to apply any pending changes
+        logger.info("Running database migrations...")
+        _run_alembic_upgrade(engine)
+        logger.info("Database migrations complete.")
+
+
+def _get_alembic_config(engine=None):
+    """Build an alembic Config object for programmatic use.
+
+    Looks for migrations in the installed package or the project root.
+    """
+    from pathlib import Path
+
+    from alembic.config import Config
+
+    cfg = Config()
+
+    # Find the migrations directory — try package resources first, then project root
+    project_root = Path(__file__).resolve().parent.parent.parent.parent
+    migrations_dir = project_root / "migrations"
+
+    if not migrations_dir.is_dir():
+        # Bundled binary: migrations might be alongside the package
+        import opal
+
+        pkg_dir = Path(opal.__file__).resolve().parent
+        for candidate in [
+            pkg_dir.parent.parent / "migrations",
+            pkg_dir.parent / "migrations",
+            pkg_dir / "migrations",
+        ]:
+            if candidate.is_dir():
+                migrations_dir = candidate
+                break
+
+    cfg.set_main_option("script_location", str(migrations_dir))
+
+    if engine is not None:
+        cfg.set_main_option("sqlalchemy.url", str(engine.url))
+
+    return cfg
+
+
+def _stamp_alembic_head(engine) -> None:
+    """Stamp the alembic version table to the current head revision."""
+    from alembic import command
+
+    cfg = _get_alembic_config(engine)
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.stamp(cfg, "head")
+
+
+def _run_alembic_upgrade(engine) -> None:
+    """Run alembic upgrade to head programmatically."""
+    from alembic import command
+
+    cfg = _get_alembic_config(engine)
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")

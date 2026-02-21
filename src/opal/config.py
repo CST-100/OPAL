@@ -1,5 +1,7 @@
 """OPAL configuration via environment variables."""
 
+import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -9,6 +11,47 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if TYPE_CHECKING:
     from opal.project import ProjectConfig
+
+
+def get_default_data_dir() -> Path:
+    """Get the platform-appropriate default data directory.
+
+    Resolution order:
+    1. OPAL_DATA_DIR environment variable (if set)
+    2. Platform-specific directory:
+       - macOS:   ~/Library/Application Support/OPAL/
+       - Linux:   $XDG_DATA_HOME/opal/ (default ~/.local/share/opal/)
+       - Windows: %LOCALAPPDATA%\\OPAL\\
+
+    Returns:
+        Path to the data directory.
+    """
+    env_dir = os.environ.get("OPAL_DATA_DIR")
+    if env_dir:
+        return Path(env_dir)
+
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "OPAL"
+    elif sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data) / "OPAL"
+        return Path.home() / "AppData" / "Local" / "OPAL"
+    else:
+        # Linux / other Unix
+        xdg_data = os.environ.get("XDG_DATA_HOME")
+        if xdg_data:
+            return Path(xdg_data) / "opal"
+        return Path.home() / ".local" / "share" / "opal"
+
+
+def _default_database_url() -> str:
+    data_dir = get_default_data_dir()
+    return f"sqlite:///{data_dir / 'opal.db'}"
+
+
+def _default_upload_dir() -> Path:
+    return get_default_data_dir() / "attachments"
 
 
 class Settings(BaseSettings):
@@ -28,7 +71,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./data/opal.db",
+        default_factory=_default_database_url,
         description="Database connection URL",
     )
 
@@ -46,7 +89,7 @@ class Settings(BaseSettings):
 
     # File uploads
     upload_dir: Path = Field(
-        default=Path("./data/attachments"),
+        default_factory=_default_upload_dir,
         description="Directory for file uploads",
     )
     max_upload_size: int = Field(
