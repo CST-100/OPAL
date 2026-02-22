@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from opal.api.deps import RequiredAdmin
-from opal.config import get_active_project
+from opal.config import configure_for_project, get_active_project
 from opal.project import (
     PartNumberingConfig,
     ProjectConfig,
@@ -173,6 +173,15 @@ async def create_project(data: ProjectConfigCreate, admin: RequiredAdmin) -> Pro
         requirements=requirements,
         categories=data.categories,
     )
+
+    # Activate the new project in memory so the UI reflects it immediately
+    configure_for_project(config)
+
+    # Reinitialize DB engine for the new project's database path and ensure tables exist
+    from opal.db.base import init_database, reinitialize_engine
+
+    reinitialize_engine()
+    init_database()
 
     return ProjectConfigResponse.from_config(config)
 

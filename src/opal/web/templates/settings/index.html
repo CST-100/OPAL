@@ -108,7 +108,11 @@
         <span>PROJECT CONFIGURATION</span>
     </div>
     <div class="panel-body">
+        {% if is_admin %}
         {{ ok.empty("No project configured", action_text="CREATE PROJECT", action_href="/project/new") }}
+        {% else %}
+        {{ ok.empty("No project configured") }}
+        {% endif %}
     </div>
 </div>
 {% endif %}

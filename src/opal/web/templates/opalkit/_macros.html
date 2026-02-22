@@ -12,9 +12,9 @@
 {%- if variant == "danger" %}{% set classes = classes + ["btn-danger"] %}{% endif -%}
 {%- if size == "sm" %}{% set classes = classes + ["btn-sm"] %}{% endif -%}
 {%- if href -%}
-<a href="{{ href }}" class="{{ classes | join(' ') }}" {{ attrs }}>{{ text }}</a>
+<a href="{{ href }}" class="{{ classes | join(' ') }}" {{ attrs|safe }}>{{ text }}</a>
 {%- else -%}
-<button type="{{ type }}" class="{{ classes | join(' ') }}" {{ attrs }}>{{ text }}</button>
+<button type="{{ type }}" class="{{ classes | join(' ') }}" {{ attrs|safe }}>{{ text }}</button>
 {%- endif -%}
 {% endmacro %}
 

@@ -102,6 +102,7 @@
 
                 <a href="/audit" class="user-menu-link{% if request.url.path.startswith('/audit') %} active{% endif %}" title="Alt+A">AUDIT LOG</a>
                 {% if is_admin %}
+                <a href="/users" class="user-menu-link{% if request.url.path.startswith('/users') %} active{% endif %}">MANAGE USERS</a>
                 <a href="/project/edit" class="user-menu-link{% if request.url.path.startswith('/project') %} active{% endif %}">PROJECT SETTINGS</a>
                 {% endif %}
                 <div class="user-menu-row" onclick="event.stopPropagation();">
@@ -175,6 +176,8 @@
             { type: 'nav', label: 'Go to Home', action: '/', keywords: 'home dashboard' },
             { type: 'nav', label: 'Go to Audit Log', action: '/audit', keywords: 'audit log history changes' },
             { type: 'nav', label: 'Go to Settings', action: '/settings', keywords: 'settings config system project' },
+            { type: 'nav', label: 'Go to Users', action: '/users', keywords: 'users people team manage admin' },
+            { type: 'nav', label: 'Go to Docs', action: '/docs', keywords: 'docs documentation help guide' },
             // Actions
             { type: 'action', label: 'New Part', action: '/parts/new', keywords: 'create add part' },
             { type: 'action', label: 'New Purchase Order', action: '/purchases/new', keywords: 'create add purchase po' },
@@ -185,6 +188,8 @@
             { type: 'action', label: 'New Issue', action: '/issues/new', keywords: 'create add issue bug nc' },
             { type: 'action', label: 'New Risk', action: '/risks/new', keywords: 'create add risk hazard' },
             { type: 'action', label: 'New Dataset', action: '/datasets/new', keywords: 'create add dataset chart' },
+            { type: 'action', label: 'New User', action: '/users/new', keywords: 'create add user person' },
+            { type: 'action', label: 'New Inventory Record', action: '/inventory/new', keywords: 'create add inventory stock record' },
         ];
 
         let selectedIndex = 0;
