@@ -545,6 +545,8 @@ async def parts_new(request: Request, db: DbSession) -> HTMLResponse:
     project = get_active_project()
     if project:
         context["tiers"] = project.tiers
+        if project.categories:
+            context["categories"] = sorted(set(context["categories"]) | set(project.categories))
     else:
         context["tiers"] = DEFAULT_TIERS
 
@@ -648,6 +650,13 @@ async def parts_edit(request: Request, db: DbSession, part_id: int) -> HTMLRespo
         .all()
     )
     context["categories"] = sorted([c[0] for c in categories if c[0]])
+
+    # Merge in project-configured categories
+    from opal.config import get_active_project
+
+    project = get_active_project()
+    if project and project.categories:
+        context["categories"] = sorted(set(context["categories"]) | set(project.categories))
 
     return templates.TemplateResponse("parts/edit.html", context)
 
