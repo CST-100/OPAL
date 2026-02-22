@@ -20,6 +20,7 @@ dependencies = [
     "aiofiles>=24.1.0",
     "httpx>=0.28.0",
     "segno>=1.6.0",
+    "packaging>=24.0",
 ]
 
 [project.optional-dependencies]
@@ -32,12 +33,17 @@ dev = [
 tui = [
     "textual>=0.89.0",
 ]
+app = [
+    "textual>=0.89.0",
+    "pyinstaller>=6.0",
+]
 e2e = [
     "playwright>=1.49.0",
 ]
 
 [project.scripts]
 opal = "opal.__main__:main"
+opal-app = "opal.launcher:main"
 
 [build-system]
 requires = ["hatchling"]

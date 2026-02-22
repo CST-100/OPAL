@@ -71,25 +71,39 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     Creates an Engine and associates a connection with the context.
+    Supports receiving a connection via config.attributes for programmatic use.
     """
-    configuration = config.get_section(config.config_ini_section) or {}
-    configuration["sqlalchemy.url"] = get_url()
+    # If a connection was passed programmatically (e.g. from init_database),
+    # use it directly instead of creating a new engine.
+    connectable = config.attributes.get("connection", None)
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
+    if connectable is not None:
         context.configure(
-            connection=connection,
+            connection=connectable,
             target_metadata=target_metadata,
-            render_as_batch=True,  # Required for SQLite ALTER TABLE
+            render_as_batch=True,
         )
-
         with context.begin_transaction():
             context.run_migrations()
+    else:
+        configuration = config.get_section(config.config_ini_section) or {}
+        configuration["sqlalchemy.url"] = get_url()
+
+        connectable = engine_from_config(
+            configuration,
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                render_as_batch=True,  # Required for SQLite ALTER TABLE
+            )
+
+            with context.begin_transaction():
+                context.run_migrations()
 
 
 if context.is_offline_mode():

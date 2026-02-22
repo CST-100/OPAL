@@ -16,8 +16,9 @@
 - **Database**: SQLite (single file at `./data/opal.db`)
 - **Backend**: Python 3.11+ with FastAPI
 - **Frontend Web**: HTMX + Jinja2 templates (no heavy JS framework)
-- **Frontend TUI**: Textual (Python) - deferred for now
+- **Desktop App**: Textual TUI launcher (`src/opal/launcher.py`) with auto-updater
 - **File Storage**: Local filesystem (`./data/attachments/`)
+- **Distribution**: PyInstaller standalone binary (`opal.spec`)
 
 ### Directory Structure
 ```
@@ -28,14 +29,27 @@
       /core         # business logic
       /db           # models, migrations
       /mcp          # Model Context Protocol server
-      /tui          # Textual app (future)
+      /tui          # Textual TUI components
       /web          # templates, static
+      launcher.py   # Desktop app TUI launcher (entry point for opal-app)
+      launcher.tcss # Launcher styles
+      updater.py    # Auto-updater (GitHub releases)
   /tests
   /data             # .gitignored, runtime data
   /migrations       # alembic
+  opal.spec         # PyInstaller build spec
   pyproject.toml
   CLAUDE.md
 ```
+
+### Data Directory (Standalone Binary)
+When running as a standalone binary, data is stored in platform-specific directories instead of `./data/`:
+- **macOS**: `~/Library/Application Support/OPAL/`
+- **Linux**: `$XDG_DATA_HOME/opal/` (default `~/.local/share/opal/`)
+- **Windows**: `%LOCALAPPDATA%\OPAL\`
+- **Override**: Set `OPAL_DATA_DIR` environment variable
+
+Resolution logic is in `src/opal/config.py:get_default_data_dir()`.
 
 ## Key Capabilities
 
@@ -163,7 +177,7 @@
 5. Issues (manual + NC auto-creation)
 6. Risks
 7. Datasets & Graphing
-8. TUI (full feature parity)
+8. Desktop App (TUI launcher, auto-updater, standalone binary)
 9. Polish (keyboard shortcuts, search, export)
 
 ## Non-Goals (For Now)
@@ -182,6 +196,7 @@ uv run opal init          # Initialize database
 
 # Development
 uv run opal serve         # Start server (http://localhost:8080)
+uv run opal-app           # Launch desktop app (TUI launcher)
 uv run pytest             # Run tests
 uv run opal seed          # Populate demo data
 
@@ -189,6 +204,9 @@ uv run opal seed          # Populate demo data
 uv run alembic revision --autogenerate -m "message"  # Generate migration
 uv run alembic upgrade head                           # Apply migrations
 uv run alembic downgrade -1                          # Rollback one migration
+
+# Build standalone binary
+pyinstaller opal.spec     # Output: dist/opal (or dist/opal.exe on Windows)
 ```
 
 ## Important Context for AI Assistants

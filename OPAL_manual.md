@@ -10,16 +10,17 @@
 
 1. [Introduction](#introduction)
 2. [Getting Started](#getting-started)
-3. [Core Concepts](#core-concepts)
-4. [Parts & Inventory Management](#parts--inventory-management)
-5. [Procedures & Execution](#procedures--execution)
-6. [Procurement](#procurement)
-7. [Quality Management](#quality-management)
-8. [Data Analysis](#data-analysis)
-9. [User Interface Guide](#user-interface-guide)
-10. [Advanced Features](#advanced-features)
-11. [Traceability & Compliance](#traceability--compliance)
-12. [Troubleshooting](#troubleshooting)
+3. [Desktop App](#desktop-app)
+4. [Core Concepts](#core-concepts)
+5. [Parts & Inventory Management](#parts--inventory-management)
+6. [Procedures & Execution](#procedures--execution)
+7. [Procurement](#procurement)
+8. [Quality Management](#quality-management)
+9. [Data Analysis](#data-analysis)
+10. [User Interface Guide](#user-interface-guide)
+11. [Advanced Features](#advanced-features)
+12. [Traceability & Compliance](#traceability--compliance)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -65,14 +66,55 @@ OPAL is ideal for:
 
 ### Installation
 
-#### Prerequisites
+There are two ways to install OPAL:
+
+1. **Standalone binary** (recommended for most users) — download a single file and run it
+2. **From source** (for development) — clone the repo and install with `uv`
+
+#### Option A: Standalone Binary
+
+Install with a single command:
+
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/CST-100/OPAL/master/install.ps1 | iex
+```
+
+Or download manually from the [GitHub Releases](https://github.com/CST-100/OPAL/releases/latest) page:
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `opal-macos-arm64` |
+| macOS (Intel) | `opal-macos-x86_64` |
+| Linux (x86_64) | `opal-linux-x86_64` |
+| Windows (x86_64) | `opal-windows-x86_64.exe` |
+
+On macOS/Linux, make it executable and run:
+
+```bash
+chmod +x opal-macos-arm64
+./opal-macos-arm64
+```
+
+On Windows, double-click `opal-windows-x86_64.exe`.
+
+The launcher handles everything: database initialization, migrations, and server management. See [Desktop App](#desktop-app) for full details.
+
+#### Option B: From Source (Development)
+
+##### Prerequisites
 
 - A computer running macOS, Linux, or Windows
 - Python 3.11 or higher (installed automatically by uv)
 - ~100 MB disk space for software
 - Additional space for data and attachments
 
-#### Step 1: Install uv
+##### Step 1: Install uv
 
 OPAL uses `uv` for Python dependency management. Install it:
 
@@ -84,14 +126,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-#### Step 2: Download OPAL
+##### Step 2: Download OPAL
 
 ```bash
 git clone https://github.com/CST-100/OPAL.git
 cd OPAL
 ```
 
-#### Step 3: Install Dependencies
+##### Step 3: Install Dependencies
 
 ```bash
 uv sync
@@ -99,7 +141,7 @@ uv sync
 
 This installs all required Python packages.
 
-#### Step 4: Initialize Database
+##### Step 4: Initialize Database
 
 ```bash
 uv run opal init
@@ -107,7 +149,7 @@ uv run opal init
 
 This creates the SQLite database at `./data/opal.db` and runs all migrations.
 
-#### Step 5: Start the Server
+##### Step 5: Start the Server
 
 ```bash
 uv run opal serve
@@ -115,7 +157,7 @@ uv run opal serve
 
 By default, OPAL runs on `http://localhost:8080`. The server will print the URL when it starts.
 
-#### Step 6: Access the Web Interface
+##### Step 6: Access the Web Interface
 
 Open your web browser and navigate to:
 
@@ -160,6 +202,91 @@ uv run opal seed
 ```
 
 This creates example parts, procedures, and other entities.
+
+---
+
+## Desktop App
+
+The OPAL desktop app is a standalone binary that bundles everything needed to run OPAL — no Python installation, no dependency management, no terminal commands. It provides a TUI (terminal user interface) launcher for managing the OPAL server.
+
+### First Launch
+
+On first launch the desktop app:
+
+1. Creates the platform data directory (see [Data Directory](#data-directory) below)
+2. Initializes the SQLite database and runs all migrations
+3. Presents the launcher interface
+
+No manual setup is required.
+
+### Launcher Interface
+
+The launcher displays:
+
+- **Server Panel** — current server status (STOPPED / STARTING / RUNNING), port, URL, and data directory path
+- **Controls** — Start, Stop, Restart, and Open in Browser buttons
+- **Log** — timestamped output from the server process and launcher events
+- **Footer** — version number, Check for Updates button, Quit button
+
+### Keyboard Shortcuts
+
+All launcher actions are accessible via keyboard:
+
+| Key | Action |
+|-----|--------|
+| `s` | Start server |
+| `x` | Stop server |
+| `r` | Restart server |
+| `o` | Open web UI in browser |
+| `u` | Check for updates (or install pending update) |
+| `q` | Quit (stops server first) |
+
+### Data Directory
+
+The standalone binary stores its database and attachments in a platform-specific data directory:
+
+| Platform | Default Path |
+|----------|-------------|
+| macOS | `~/Library/Application Support/OPAL/` |
+| Linux | `$XDG_DATA_HOME/opal/` (default `~/.local/share/opal/`) |
+| Windows | `%LOCALAPPDATA%\OPAL\` |
+
+To override the data directory, set the `OPAL_DATA_DIR` environment variable:
+
+```bash
+OPAL_DATA_DIR=/path/to/custom/data ./opal
+```
+
+The data directory contains:
+
+- `opal.db` — SQLite database
+- `attachments/` — uploaded files
+
+### Updating
+
+The launcher can check for updates from GitHub Releases:
+
+1. Press `u` (or click **Check for Updates**)
+2. If an update is available, the log shows the new version and release notes
+3. For binary installs, press `u` again to download and install the update
+4. Restart the app to apply the update
+
+The updater detects the correct binary for your platform automatically.
+
+### Running Headless (Server-Only)
+
+The desktop app is not required for server operation. For CI, server deployments, or users who prefer the terminal:
+
+```bash
+# From source
+uv run opal serve
+
+# Or with the binary's Python (development install)
+opal-app  # launches the TUI
+opal serve  # runs the server directly
+```
+
+The web UI is fully functional without the launcher.
 
 ---
 

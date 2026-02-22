@@ -148,8 +148,9 @@ def cmd_seed(args: argparse.Namespace) -> None:
 
 
 def cmd_init(args: argparse.Namespace) -> None:
-    """Initialize OPAL (create directories, run migrations)."""
+    """Initialize OPAL (create directories, initialize/migrate database)."""
     from opal.config import get_active_settings
+    from opal.db.base import get_engine, init_database
 
     # Configure project first
     _setup_project(args)
@@ -159,15 +160,14 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     print("Created data directories")
 
-    # Run migrations
-    migrate_args = argparse.Namespace(action="upgrade", revision="head", message=None)
     try:
-        cmd_migrate(migrate_args)
+        engine = get_engine()
+        init_database(engine)
         print("Database initialized")
     except Exception as e:
-        print(f"Migration failed: {e}")
-        print("You may need to generate the initial migration first:")
-        print("  opal migrate generate --message 'Initial migration'")
+        print(f"Database initialization failed: {e}")
+        print("If developing, you can use: opal migrate upgrade")
+        sys.exit(1)
 
 
 def cmd_tui(args: argparse.Namespace) -> None:

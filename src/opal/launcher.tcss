@@ -1,0 +1,114 @@
+/* OPAL Launcher Styles */
+
+Screen {
+    background: $surface;
+}
+
+#server-panel {
+    height: auto;
+    border: solid $primary;
+    padding: 1 2;
+    margin: 1 1 0 1;
+}
+
+#server-panel-title {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+.info-row {
+    height: auto;
+}
+
+.info-label {
+    width: 10;
+    text-style: bold;
+    color: $text-muted;
+}
+
+.info-value {
+    color: $text;
+}
+
+#status-value.running {
+    color: $success;
+    text-style: bold;
+}
+
+#status-value.stopped {
+    color: $error;
+    text-style: bold;
+}
+
+#status-value.starting {
+    color: $warning;
+    text-style: bold;
+}
+
+#controls {
+    height: auto;
+    padding: 1 2;
+    margin: 0 1;
+}
+
+#controls Button {
+    margin: 0 1 0 0;
+}
+
+#btn-start {
+    color: $text;
+    background: $success 30%;
+}
+
+#btn-stop {
+    color: $text;
+    background: $error 30%;
+}
+
+#btn-restart {
+    color: $text;
+}
+
+#btn-browser {
+    color: $text;
+}
+
+#log-panel {
+    border: solid $primary;
+    margin: 0 1;
+    height: 1fr;
+}
+
+#log-panel-title {
+    text-style: bold;
+    color: $primary;
+    padding: 0 1;
+}
+
+#log-view {
+    height: 1fr;
+    padding: 0 1;
+}
+
+#footer-bar {
+    height: auto;
+    padding: 1 2;
+    margin: 0 1 1 1;
+    border: solid $primary;
+}
+
+#version-label {
+    color: $text-muted;
+    width: 1fr;
+}
+
+#btn-update {
+    margin: 0 1;
+}
+
+#btn-quit {
+    margin: 0 0 0 1;
+    color: $text;
+    background: $error 30%;
+}
