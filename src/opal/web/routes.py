@@ -2258,6 +2258,59 @@ async def project_edit(request: Request, db: DbSession) -> HTMLResponse:
     return templates.TemplateResponse("project/wizard.html", context)
 
 
+# ============ SETTINGS ============
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, db: DbSession) -> HTMLResponse:
+    """System settings page."""
+    import platform
+
+    from opal.config import get_active_project, get_active_settings, get_default_data_dir
+
+    context = get_base_context(request, db, "Settings - OPAL")
+    project = get_active_project()
+    settings = get_active_settings()
+
+    # Compute database size
+    db_path = settings.database_url.replace("sqlite:///", "")
+    db_size = "-"
+    try:
+        size_bytes = Path(db_path).stat().st_size
+        if size_bytes < 1024:
+            db_size = f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            db_size = f"{size_bytes / 1024:.1f} KB"
+        else:
+            db_size = f"{size_bytes / (1024 * 1024):.1f} MB"
+    except OSError:
+        pass
+
+    # Max upload size human-readable
+    max_bytes = settings.max_upload_size
+    if max_bytes < 1024 * 1024:
+        max_upload = f"{max_bytes / 1024:.0f} KB"
+    else:
+        max_upload = f"{max_bytes / (1024 * 1024):.0f} MB"
+
+    context["project"] = project
+    context["sys_info"] = {
+        "opal_version": context["opal_version"],
+        "python_version": platform.python_version(),
+        "platform": f"{platform.system()} {platform.release()} ({platform.machine()})",
+        "server": f"{settings.host}:{settings.port}",
+        "debug": settings.debug,
+        "auth_mode": settings.auth_mode,
+        "data_dir": str(get_default_data_dir()),
+        "db_path": db_path,
+        "db_size": db_size,
+        "upload_dir": str(settings.upload_dir),
+        "max_upload_size": max_upload,
+    }
+
+    return templates.TemplateResponse("settings/index.html", context)
+
+
 # ============ AUDIT LOG ============
 
 

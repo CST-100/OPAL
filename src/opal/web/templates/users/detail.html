@@ -85,6 +85,43 @@
 </div>
 
 {% if is_own_profile %}
+<!-- Preferences panel, only visible when viewing own profile -->
+<div class="panel" style="max-width: 800px; margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>PREFERENCES</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <tr>
+                <th style="width: 150px;">THEME</th>
+                <td>
+                    <div style="display: flex; gap: var(--space-sm); align-items: center;">
+                        <button type="button" class="btn btn-sm" id="theme-btn-dark" onclick="setTheme('dark'); updateThemeButtons();">DARK</button>
+                        <button type="button" class="btn btn-sm" id="theme-btn-light" onclick="setTheme('light'); updateThemeButtons();">LIGHT</button>
+                    </div>
+                    <div class="text-muted" style="font-size: 0.75rem; font-family: var(--font-mono); margin-top: var(--space-xs);">Stored in browser localStorage. Not synced across devices.</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<script>
+function updateThemeButtons() {
+    var theme = localStorage.getItem('opal_theme') || 'dark';
+    var darkBtn = document.getElementById('theme-btn-dark');
+    var lightBtn = document.getElementById('theme-btn-light');
+    if (theme === 'dark') {
+        darkBtn.classList.add('btn-primary');
+        lightBtn.classList.remove('btn-primary');
+    } else {
+        lightBtn.classList.add('btn-primary');
+        darkBtn.classList.remove('btn-primary');
+    }
+}
+document.addEventListener('DOMContentLoaded', updateThemeButtons);
+</script>
+
 <!-- Delete account panel, only visible when viewing own profile -->
 <div class="panel" style="max-width: 800px; margin-top: var(--space-md);">
     <div class="panel-header">

@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("SETTINGS") }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px;">
+
+{# ── PROJECT CONFIGURATION ── #}
+{% if project %}
+<div class="panel">
+    <div class="panel-header">
+        <span>PROJECT CONFIGURATION</span>
+        {% if is_admin %}
+        <div class="panel-header-actions">
+            {{ ok.btn("EDIT", href="/project/edit") }}
+        </div>
+        {% endif %}
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            {{ ok.detail_row("NAME", project.name) }}
+            {{ ok.detail_row("DESCRIPTION", project.description or '-') }}
+        </table>
+
+        {# Tiers #}
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">INVENTORY TIERS</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        {{ ok.th("LEVEL", width="60px") }}
+                        {{ ok.th("NAME", width="150px") }}
+                        {{ ok.th("CODE", width="80px") }}
+                        {{ ok.th("DESCRIPTION") }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tier in project.tiers %}
+                    <tr>
+                        <td class="mono">{{ tier.level }}</td>
+                        <td>{{ tier.name }}</td>
+                        <td class="mono">{{ tier.code }}</td>
+                        <td>{{ tier.description or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Part numbering #}
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">PART NUMBERING</div>
+            <table class="data-table">
+                {{ ok.detail_row("PREFIX", project.part_numbering.prefix or '-', mono=true) }}
+                {{ ok.detail_row("SEPARATOR", project.part_numbering.separator if project.part_numbering.separator else '(none)', mono=true) }}
+                {{ ok.detail_row("SEQUENCE DIGITS", project.part_numbering.sequence_digits) }}
+                {{ ok.detail_row("FORMAT", project.part_numbering.format, mono=true) }}
+            </table>
+        </div>
+
+        {# Categories #}
+        {% if project.categories %}
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">CATEGORIES</div>
+            <div style="display: flex; flex-wrap: wrap; gap: var(--space-xs);">
+                {% for cat in project.categories %}
+                {{ ok.badge(cat) }}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Requirements #}
+        {% if project.requirements %}
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">REQUIREMENTS</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        {{ ok.th("ID", width="120px") }}
+                        {{ ok.th("TITLE", width="200px") }}
+                        {{ ok.th("DESCRIPTION") }}
+                        {{ ok.th("CATEGORY", width="120px") }}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in project.requirements %}
+                    <tr>
+                        <td class="mono">{{ req.id }}</td>
+                        <td>{{ req.title }}</td>
+                        <td>{{ req.description or '-' }}</td>
+                        <td>{{ req.category or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="panel">
+    <div class="panel-header">
+        <span>PROJECT CONFIGURATION</span>
+    </div>
+    <div class="panel-body">
+        {{ ok.empty("No project configured", action_text="CREATE PROJECT", action_href="/project/new") }}
+    </div>
+</div>
+{% endif %}
+
+{# ── SYSTEM INFORMATION ── #}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>SYSTEM INFORMATION</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            {{ ok.detail_row("OPAL VERSION", sys_info.opal_version, mono=true) }}
+            {{ ok.detail_row("PYTHON VERSION", sys_info.python_version, mono=true) }}
+            {{ ok.detail_row("PLATFORM", sys_info.platform, mono=true) }}
+            {{ ok.detail_row("SERVER", sys_info.server, mono=true) }}
+            {{ ok.detail_row("DEBUG MODE", ok.status("ON", "warn") if sys_info.debug else ok.status("OFF", "ok")) }}
+            {{ ok.detail_row("AUTH MODE", sys_info.auth_mode, mono=true) }}
+        </table>
+
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">STORAGE</div>
+            <table class="data-table">
+                {{ ok.detail_row("DATA DIRECTORY", sys_info.data_dir, mono=true) }}
+                {{ ok.detail_row("DATABASE", sys_info.db_path, mono=true) }}
+                {{ ok.detail_row("DATABASE SIZE", sys_info.db_size, mono=true) }}
+                {{ ok.detail_row("UPLOAD DIRECTORY", sys_info.upload_dir, mono=true) }}
+                {{ ok.detail_row("MAX UPLOAD SIZE", sys_info.max_upload_size, mono=true) }}
+            </table>
+        </div>
+    </div>
+</div>
+
+</div>
+{% endblock %}
