@@ -73,7 +73,19 @@ There are two ways to install OPAL:
 
 #### Option A: Standalone Binary
 
-Download the binary for your platform from the [GitHub Releases](https://github.com/CST-100/OPAL/releases/latest) page:
+Install with a single command:
+
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/CST-100/OPAL/master/install.ps1 | iex
+```
+
+Or download manually from the [GitHub Releases](https://github.com/CST-100/OPAL/releases/latest) page:
 
 | Platform | File |
 |----------|------|

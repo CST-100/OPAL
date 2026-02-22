@@ -6,7 +6,19 @@ An enterprise resource planning system optimized for small teams and hardware pr
 
 ## Download
 
-Download the standalone binary for your platform from [GitHub Releases](https://github.com/CST-100/OPAL/releases/latest):
+Install with a single command:
+
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/CST-100/OPAL/master/install.ps1 | iex
+```
+
+Or download manually from [GitHub Releases](https://github.com/CST-100/OPAL/releases/latest):
 
 | Platform | File |
 |----------|------|
