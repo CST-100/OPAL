@@ -117,6 +117,61 @@
 </div>
 {% endif %}
 
+{# ── USER MANAGEMENT (admin only) ── #}
+{% if is_admin %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>USER MANAGEMENT</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ NEW USER", href="/users/new", variant="primary") }}
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
+            <input type="text"
+                   id="search-input"
+                   class="form-input"
+                   placeholder="Search users..."
+                   style="max-width: 300px;"
+                   hx-get="/users/table"
+                   hx-trigger="keyup changed delay:300ms, search"
+                   hx-target="#users-table-body"
+                   hx-include="#status-filter"
+                   name="search">
+            <select id="status-filter"
+                    name="is_active"
+                    class="form-select"
+                    style="max-width: 150px;"
+                    hx-get="/users/table"
+                    hx-trigger="change"
+                    hx-target="#users-table-body"
+                    hx-include="#search-input">
+                <option value="">All status</option>
+                <option value="true" selected>Active</option>
+                <option value="false">Inactive</option>
+            </select>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">ID</th>
+                    <th>NAME</th>
+                    <th style="width: 250px;">EMAIL</th>
+                    <th style="width: 80px;">ROLE</th>
+                    <th style="width: 180px;">CREATED</th>
+                    <th style="width: 80px;">STATUS</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body" hx-get="/users/table?is_active=true" hx-trigger="load">
+                <tr>
+                    <td colspan="6" class="text-muted">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 {# ── SYSTEM INFORMATION ── #}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">

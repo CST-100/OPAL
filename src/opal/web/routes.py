@@ -2062,14 +2062,10 @@ async def workcenters_edit(request: Request, db: DbSession, workcenter_id: int) 
 # ============ USERS ============
 
 
-@router.get("/users", response_class=HTMLResponse)
-async def users_list(request: Request, db: DbSession) -> HTMLResponse:
-    """Users list page. Admin only."""
-    redirect = _require_admin_web(request, db)
-    if redirect:
-        return redirect
-    context = get_base_context(request, db, "Users - OPAL")
-    return templates.TemplateResponse("users/list.html", context)
+@router.get("/users")
+async def users_list(request: Request, db: DbSession):
+    """Redirect to settings page (user management is now on /settings)."""
+    return RedirectResponse(url="/settings", status_code=302)
 
 
 @router.get("/users/table", response_class=HTMLResponse)
