@@ -604,12 +604,51 @@ async def complete_step(
         raise HTTPException(status_code=404, detail="Step not found")
 
     step_status = step_exec.status.value if hasattr(step_exec.status, 'value') else step_exec.status
-    if step_status == StepStatus.COMPLETED.value:
+    if step_status in [StepStatus.COMPLETED.value, StepStatus.SIGNED_OFF.value]:
         raise HTTPException(status_code=400, detail="Step already completed")
+
+    # Accept PENDING, IN_PROGRESS, or AWAITING_SIGNOFF (parent OPs whose children are done)
+    if step_status not in [
+        StepStatus.PENDING.value,
+        StepStatus.IN_PROGRESS.value,
+        StepStatus.AWAITING_SIGNOFF.value,
+    ]:
+        raise HTTPException(status_code=400, detail=f"Cannot complete step in {step_status} status")
 
     # If step wasn't started, start it now
     if step_status == StepStatus.PENDING.value:
         step_exec.started_at = datetime.now(timezone.utc)
+
+    # Server-side data capture validation
+    version = db.query(ProcedureVersion).filter(ProcedureVersion.id == instance.version_id).first()
+    if data.data_captured and version:
+        step_data = next(
+            (s for s in version.content.get("steps", []) if s["order"] == step_number), {}
+        )
+        schema = step_data.get("required_data_schema") or {}
+        fields = schema.get("fields", [])
+        errors: list[str] = []
+        for field in fields:
+            name = field.get("name")
+            val = data.data_captured.get(name)
+            if field.get("required") and (val is None or val == ""):
+                errors.append(f"{field.get('label', name)} is required")
+            if field.get("type") == "number" and val is not None and val != "":
+                try:
+                    num_val = float(val)
+                except (TypeError, ValueError):
+                    errors.append(f"{field.get('label', name)}: invalid number")
+                    continue
+                if field.get("min") is not None and num_val < field["min"]:
+                    errors.append(
+                        f"{field.get('label', name)}: {num_val} below minimum {field['min']}"
+                    )
+                if field.get("max") is not None and num_val > field["max"]:
+                    errors.append(
+                        f"{field.get('label', name)}: {num_val} above maximum {field['max']}"
+                    )
+        if errors:
+            raise HTTPException(status_code=422, detail=errors)
 
     step_exec.status = StepStatus.COMPLETED
     step_exec.completed_at = datetime.now(timezone.utc)
@@ -618,13 +657,6 @@ async def complete_step(
         step_exec.data_captured = data.data_captured
     if data.notes is not None:
         step_exec.notes = data.notes
-
-    # Check if step requires sign-off (from version snapshot)
-    version = db.query(ProcedureVersion).filter(ProcedureVersion.id == instance.version_id).first()
-    if version:
-        step_data = next((s for s in version.content.get("steps", []) if s["order"] == step_number), {})
-        if step_data.get("requires_signoff"):
-            step_exec.status = StepStatus.AWAITING_SIGNOFF
 
     # Get user name for event
     from opal.db.models import User
@@ -855,9 +887,8 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
 
     Rules:
     - All non-contingency steps must be completed, signed_off, or skipped
-    - Parent steps (level=0 with children) must be SIGNED_OFF or SKIPPED
-    - Leaf steps (no children or level>0) can be COMPLETED or SKIPPED
-    - Parent steps automatically become AWAITING_SIGNOFF when all children complete
+    - Parent steps auto-complete to COMPLETED when all children are done
+    - All step types accept COMPLETED, SIGNED_OFF, or SKIPPED as done
     - Contingency steps are optional (only required if explicitly started)
     """
     version = db.query(ProcedureVersion).filter(ProcedureVersion.id == instance.version_id).first()
@@ -868,7 +899,7 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
     all_steps = db.query(StepExecution).filter(StepExecution.instance_id == instance.id).all()
     step_by_number = {s.step_number: s for s in all_steps}
 
-    # First pass: check if any parent steps should become AWAITING_SIGNOFF
+    # First pass: check if any parent steps should auto-complete when all children are done
     for step_exec in all_steps:
         if step_exec.level == 0:  # This is a parent OP
             # Find all children of this parent
@@ -885,7 +916,16 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
                         for c in children
                     )
                     if all_children_done:
-                        step_exec.status = StepStatus.AWAITING_SIGNOFF
+                        step_exec.status = StepStatus.COMPLETED
+                        step_exec.completed_at = datetime.now(timezone.utc)
+                        # Use the last child's completer
+                        last_child = max(
+                            (c for c in children if c.completed_at),
+                            key=lambda c: c.completed_at,
+                            default=None,
+                        )
+                        if last_child and last_child.completed_by_id:
+                            step_exec.completed_by_id = last_child.completed_by_id
 
     # Second pass: check instance completion
     for step_exec in all_steps:
@@ -893,20 +933,10 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
         is_contingency = step_data.get("is_contingency", False)
         step_status = step_exec.status.value if hasattr(step_exec.status, 'value') else step_exec.status
 
-        # Find if this step has children
-        children = [s for s in all_steps if s.parent_step_order == step_exec.step_number]
-        is_parent = len(children) > 0
-
-        # Completed/done statuses depend on step type
-        if is_parent:
-            # Parent steps must be SIGNED_OFF or SKIPPED
-            done_statuses = [StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value]
-        elif step_data.get("requires_signoff"):
-            # Leaf steps with requires_signoff must be SIGNED_OFF or SKIPPED
-            done_statuses = [StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value]
-        else:
-            # Leaf steps can be COMPLETED, SIGNED_OFF, or SKIPPED
-            done_statuses = [StepStatus.COMPLETED.value, StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value]
+        # All step types accept COMPLETED, SIGNED_OFF, or SKIPPED as done
+        done_statuses = [
+            StepStatus.COMPLETED.value, StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value
+        ]
 
         # Non-contingency steps must be done
         if not is_contingency and step_status not in done_statuses:

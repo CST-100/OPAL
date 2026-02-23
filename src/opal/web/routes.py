@@ -634,6 +634,16 @@ async def parts_detail(request: Request, db: DbSession, part_id: int) -> HTMLRes
     where_used = db.query(BOMLine).filter(BOMLine.component_id == part.id).all()
     context["where_used"] = where_used
 
+    # Test templates
+    from opal.db.models.inventory import TestTemplate
+    test_templates = (
+        db.query(TestTemplate)
+        .filter(TestTemplate.part_id == part.id)
+        .order_by(TestTemplate.sort_order)
+        .all()
+    )
+    context["test_templates"] = test_templates
+
     return templates.TemplateResponse("parts/detail.html", context)
 
 
@@ -852,6 +862,24 @@ async def inventory_opal_detail(
     genealogy = get_full_genealogy(db, opal_number)
     context["genealogy_components"] = genealogy["components"]
     context["genealogy_assemblies"] = genealogy["assemblies_containing"]
+
+    # Test results and templates
+    from opal.db.models.inventory import StockTestResult, TestTemplate
+    test_results = (
+        db.query(StockTestResult)
+        .filter(StockTestResult.inventory_record_id == record.id)
+        .order_by(StockTestResult.created_at.desc())
+        .all()
+    )
+    context["test_results"] = test_results
+
+    test_templates = (
+        db.query(TestTemplate)
+        .filter(TestTemplate.part_id == record.part_id)
+        .order_by(TestTemplate.sort_order)
+        .all()
+    )
+    context["test_templates"] = test_templates
 
     return templates.TemplateResponse("inventory/opal_detail.html", context)
 

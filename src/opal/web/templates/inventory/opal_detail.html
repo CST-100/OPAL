@@ -196,6 +196,59 @@
     </div>
 </div>
 
+<!-- Tests Panel -->
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>TESTS</span>
+        <span id="test-overall-badge" style="margin-left: var(--space-sm);"></span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ RUN TEST", variant="primary", attrs='onclick="showRunTest()"') }}
+        </div>
+    </div>
+    <div class="panel-body">
+        <div id="test-status-summary" class="mono" style="margin-bottom: var(--space-md); font-size: 0.875rem;"></div>
+        {% if test_results %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>TEST NAME</th>
+                    <th style="width: 70px;">RESULT</th>
+                    <th style="width: 120px;">VALUE</th>
+                    <th style="width: 120px;">TESTED BY</th>
+                    <th style="width: 160px;">TESTED AT</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tr in test_results %}
+                <tr>
+                    <td>{{ tr.test_name }}</td>
+                    <td>
+                        {% set r = tr.result.value if tr.result.value is defined else tr.result %}
+                        {% if r == 'pass' %}
+                        {{ ok.status("PASS", "ok") }}
+                        {% elif r == 'fail' %}
+                        {{ ok.status("FAIL", "error") }}
+                        {% else %}
+                        {{ ok.status("PENDING", "warn") }}
+                        {% endif %}
+                    </td>
+                    <td class="mono">{{ tr.value or '-' }}</td>
+                    <td>{% if tr.tested_by_user %}{{ tr.tested_by_user.display_name or tr.tested_by_user.email }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                    <td>{% if tr.tested_at %}{{ ok.timestamp(tr.tested_at) }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                    <td>
+                        {{ ok.btn("EDIT", size="sm", attrs='onclick="showEditTest(' ~ tr.id ~ ')"') }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        {{ ok.empty("No test results recorded") }}
+        {% endif %}
+    </div>
+</div>
+
 {% if source_wo %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
@@ -419,4 +472,361 @@ async function recordCalibration() {
 }
 </script>
 {% endif %}
+
+<!-- Run Test Modal -->
+<div id="run-test-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">RUN TEST</div>
+            <div class="panel-body">
+                <form id="run-test-form" onsubmit="submitRunTest(event)">
+                    {% if test_templates %}
+                    <div class="form-group">
+                        <label class="form-label" for="run-template">TEST TEMPLATE</label>
+                        <select id="run-template" class="form-select" onchange="onTemplateSelect()">
+                            <option value="">(Custom test)</option>
+                            {% for tt in test_templates %}
+                            <option value="{{ tt.id }}"
+                                data-name="{{ tt.name }}"
+                                data-type="{{ tt.test_type }}"
+                                data-min="{{ tt.min_value if tt.min_value is not none else '' }}"
+                                data-max="{{ tt.max_value if tt.max_value is not none else '' }}"
+                                data-unit="{{ tt.unit or '' }}">{{ tt.name }}{% if tt.required %} (REQUIRED){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="form-group" id="run-name-group">
+                        <label class="form-label" for="run-test-name">TEST NAME *</label>
+                        <input type="text" id="run-test-name" class="form-input" required>
+                    </div>
+                    <div class="form-group" id="run-type-group">
+                        <label class="form-label" for="run-test-type">TYPE</label>
+                        <select id="run-test-type" class="form-select" onchange="toggleRunFields()">
+                            <option value="boolean">BOOLEAN (Pass/Fail)</option>
+                            <option value="numeric">NUMERIC</option>
+                            <option value="text">TEXT</option>
+                        </select>
+                    </div>
+                    <div id="run-value-group" class="form-group" style="display: none;">
+                        <label class="form-label" for="run-value">VALUE</label>
+                        <input type="text" id="run-value" class="form-input">
+                        <div id="run-value-hint" class="text-muted" style="font-size: 0.8em; margin-top: 2px;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">RESULT *</label>
+                        <div style="display: flex; gap: var(--space-md);">
+                            <label><input type="radio" name="run-result" value="pass" required> PASS</label>
+                            <label><input type="radio" name="run-result" value="fail"> FAIL</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="run-notes">NOTES</label>
+                        <textarea id="run-notes" class="form-input" rows="2"></textarea>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideRunTest()"') }}
+                        {{ ok.btn("RECORD", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="run-test-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Test Modal -->
+<div id="edit-test-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">EDIT TEST RESULT</div>
+            <div class="panel-body">
+                <form id="edit-test-form" onsubmit="submitEditTest(event)">
+                    <input type="hidden" id="edit-test-id">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-test-name">TEST NAME *</label>
+                        <input type="text" id="edit-test-name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-value">VALUE</label>
+                        <input type="text" id="edit-value" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">RESULT *</label>
+                        <div style="display: flex; gap: var(--space-md);">
+                            <label><input type="radio" name="edit-result" value="pass" required> PASS</label>
+                            <label><input type="radio" name="edit-result" value="fail"> FAIL</label>
+                            <label><input type="radio" name="edit-result" value="pending"> PENDING</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-notes">NOTES</label>
+                        <textarea id="edit-notes" class="form-input" rows="2"></textarea>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideEditTest()"') }}
+                        {{ ok.btn("SAVE", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="edit-test-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const inventoryId = {{ record.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+// Load test status summary on page load
+const requiredTemplateCount = {{ test_templates | selectattr('required') | list | length }};
+
+async function loadTestStatus() {
+    try {
+        const response = await fetch(`/api/inventory/${inventoryId}/test-status`, {
+            headers: getHeaders(),
+        });
+        if (!response.ok) return;
+        const status = await response.json();
+
+        const summaryEl = document.getElementById('test-status-summary');
+        const badgeEl = document.getElementById('test-overall-badge');
+
+        if (status.total_tests === 0 && requiredTemplateCount === 0) {
+            summaryEl.textContent = 'No tests recorded';
+            summaryEl.style.color = 'var(--color-text-muted)';
+            return;
+        }
+
+        const parts = [];
+        if (status.passed > 0) parts.push(`${status.passed} PASS`);
+        if (status.failed > 0) parts.push(`${status.failed} FAIL`);
+        if (status.pending > 0) parts.push(`${status.pending} PENDING`);
+        if (status.total_tests === 0) parts.push('0 TESTED');
+
+        if (requiredTemplateCount > 0) {
+            const passedCount = requiredTemplateCount - status.missing_required_tests.length;
+            parts.push(`REQUIRED: ${passedCount}/${requiredTemplateCount}`);
+        }
+
+        summaryEl.textContent = parts.join('  |  ');
+
+        if (status.overall_status === 'pass') {
+            badgeEl.innerHTML = '<span class="status-badge status-ok">PASS</span>';
+        } else if (status.overall_status === 'fail') {
+            badgeEl.innerHTML = '<span class="status-badge status-error">FAIL</span>';
+        } else {
+            badgeEl.innerHTML = '<span class="status-badge status-warn">PENDING</span>';
+        }
+    } catch (e) {
+        // Silent failure — not critical
+    }
+}
+loadTestStatus();
+
+// Run Test
+function showRunTest() {
+    document.getElementById('run-test-modal').style.display = 'block';
+}
+
+function hideRunTest() {
+    document.getElementById('run-test-modal').style.display = 'none';
+    document.getElementById('run-test-form').reset();
+    document.getElementById('run-value-group').style.display = 'none';
+    document.getElementById('run-value-hint').textContent = '';
+    document.getElementById('run-test-error').style.display = 'none';
+    const nameGroup = document.getElementById('run-name-group');
+    nameGroup.style.display = 'block';
+    const typeGroup = document.getElementById('run-type-group');
+    typeGroup.style.display = 'block';
+}
+
+function onTemplateSelect() {
+    const sel = document.getElementById('run-template');
+    const opt = sel.options[sel.selectedIndex];
+    const nameInput = document.getElementById('run-test-name');
+    const typeSelect = document.getElementById('run-test-type');
+    const nameGroup = document.getElementById('run-name-group');
+    const typeGroup = document.getElementById('run-type-group');
+
+    if (opt.value) {
+        nameInput.value = opt.dataset.name;
+        nameGroup.style.display = 'none';
+        typeSelect.value = opt.dataset.type;
+        typeGroup.style.display = 'none';
+        toggleRunFields();
+
+        // Set value hints for numeric
+        const hint = document.getElementById('run-value-hint');
+        if (opt.dataset.type === 'numeric') {
+            const parts = [];
+            if (opt.dataset.min) parts.push('Min: ' + opt.dataset.min);
+            if (opt.dataset.max) parts.push('Max: ' + opt.dataset.max);
+            if (opt.dataset.unit) parts.push('Unit: ' + opt.dataset.unit);
+            hint.textContent = parts.join('  |  ');
+        } else {
+            hint.textContent = '';
+        }
+    } else {
+        nameInput.value = '';
+        nameGroup.style.display = 'block';
+        typeGroup.style.display = 'block';
+        toggleRunFields();
+        document.getElementById('run-value-hint').textContent = '';
+    }
+}
+
+function toggleRunFields() {
+    const type = document.getElementById('run-test-type').value;
+    const valueGroup = document.getElementById('run-value-group');
+    const valueInput = document.getElementById('run-value');
+    if (type === 'numeric') {
+        valueGroup.style.display = 'block';
+        valueInput.type = 'number';
+        valueInput.step = 'any';
+        valueInput.placeholder = 'Measured value';
+    } else if (type === 'text') {
+        valueGroup.style.display = 'block';
+        valueInput.type = 'text';
+        valueInput.step = '';
+        valueInput.placeholder = 'Test observation';
+    } else {
+        valueGroup.style.display = 'none';
+        valueInput.value = '';
+    }
+}
+
+async function submitRunTest(event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('run-test-error');
+    errorDiv.style.display = 'none';
+
+    const result = document.querySelector('input[name="run-result"]:checked');
+    if (!result) {
+        errorDiv.textContent = 'Please select PASS or FAIL';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const data = {
+        test_name: document.getElementById('run-test-name').value,
+        result: result.value,
+        value: document.getElementById('run-value').value || null,
+        notes: document.getElementById('run-notes').value || null,
+    };
+
+    const templateSel = document.getElementById('run-template');
+    if (templateSel && templateSel.value) {
+        data.template_id = parseInt(templateSel.value);
+    }
+
+    try {
+        const response = await fetch(`/api/inventory/${inventoryId}/tests`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to record test');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Edit Test
+const testResults = {
+    {% for tr in test_results %}
+    {{ tr.id }}: {
+        test_name: {{ tr.test_name | tojson }},
+        result: {{ (tr.result.value if tr.result.value is defined else tr.result) | tojson }},
+        value: {{ (tr.value or '') | tojson }},
+        notes: {{ (tr.notes or '') | tojson }},
+        template_id: {{ tr.template_id | tojson }},
+    },
+    {% endfor %}
+};
+
+function showEditTest(testId) {
+    const data = testResults[testId];
+    if (!data) return;
+
+    document.getElementById('edit-test-id').value = testId;
+    document.getElementById('edit-test-name').value = data.test_name;
+    document.getElementById('edit-value').value = data.value;
+    document.getElementById('edit-notes').value = data.notes;
+
+    const radios = document.querySelectorAll('input[name="edit-result"]');
+    radios.forEach(r => r.checked = r.value === data.result);
+
+    document.getElementById('edit-test-error').style.display = 'none';
+    document.getElementById('edit-test-modal').style.display = 'block';
+}
+
+function hideEditTest() {
+    document.getElementById('edit-test-modal').style.display = 'none';
+}
+
+async function submitEditTest(event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('edit-test-error');
+    errorDiv.style.display = 'none';
+
+    const testId = document.getElementById('edit-test-id').value;
+    const result = document.querySelector('input[name="edit-result"]:checked');
+    if (!result) {
+        errorDiv.textContent = 'Please select a result';
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    const originalData = testResults[testId];
+    const data = {
+        test_name: document.getElementById('edit-test-name').value,
+        result: result.value,
+        value: document.getElementById('edit-value').value || null,
+        notes: document.getElementById('edit-notes').value || null,
+    };
+    if (originalData && originalData.template_id) {
+        data.template_id = originalData.template_id;
+    }
+
+    try {
+        const response = await fetch(`/api/inventory/${inventoryId}/tests/${testId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to update test result');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Escape key — close test modals
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideRunTest();
+        hideEditTest();
+    }
+});
+</script>
 {% endblock %}

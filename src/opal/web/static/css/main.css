@@ -1404,6 +1404,12 @@ select option {
     border-color: var(--text-muted);
 }
 
+.ewo-sidebar-status--pending {
+    background: var(--text-muted);
+    border-color: var(--text-muted);
+    opacity: 0.4;
+}
+
 .ewo-sidebar-divider {
     border-top: 2px solid var(--border-light);
     margin: var(--space-xs) 0;

@@ -20,9 +20,6 @@
             </div>
         </div>
         <div class="panel-body">
-            <div style="float: right; margin-left: var(--space-md);">
-                <img src="/api/parts/{{ part.id }}/qrcode" alt="QR Code" style="width: 80px; height: 80px;">
-            </div>
             <table class="data-table">
                 <tr>
                     <th style="width: 180px;">ID</th>
@@ -54,7 +51,11 @@
                 </tr>
                 <tr>
                     <th>TRACKING TYPE</th>
-                    <td>{{ ok.status(part.tracking_type.value if part.tracking_type else 'BULK') }}</td>
+                    <td>{{ ok.status(part.tracking_type.value|upper if part.tracking_type else 'BULK', "info" if part.tracking_type and part.tracking_type.value == 'serialized' else "default") }}</td>
+                </tr>
+                <tr>
+                    <th>QR CODE</th>
+                    <td><img src="/api/parts/{{ part.id }}/qrcode" alt="QR Code" style="width: 80px; height: 80px; background: white; padding: 4px;"></td>
                 </tr>
                 {% if part.reorder_point is not none %}
                 <tr>
@@ -248,6 +249,50 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Test Templates -->
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                <span>TEST TEMPLATES ({{ test_templates | length }})</span>
+                <div class="panel-header-actions">
+                    {{ ok.btn("+ ADD TEST", variant="primary", attrs='onclick="showAddTest()"') }}
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if test_templates %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>NAME</th>
+                            <th style="width: 80px;">TYPE</th>
+                            <th style="width: 70px;">REQUIRED</th>
+                            <th style="width: 80px;">MIN</th>
+                            <th style="width: 80px;">MAX</th>
+                            <th style="width: 60px;">UNIT</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tt in test_templates %}
+                        <tr>
+                            <td>{{ tt.name }}</td>
+                            <td class="mono">{{ tt.test_type | upper }}</td>
+                            <td>{% if tt.required %}{{ ok.status("YES", "ok") }}{% else %}<span class="text-muted">NO</span>{% endif %}</td>
+                            <td class="mono">{{ '%g' % tt.min_value if tt.min_value is not none else '-' }}</td>
+                            <td class="mono">{{ '%g' % tt.max_value if tt.max_value is not none else '-' }}</td>
+                            <td class="mono">{{ tt.unit or '-' }}</td>
+                            <td>
+                                {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteTestTemplate(' ~ tt.id ~ ')"') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                {{ ok.empty("No test templates defined") }}
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 
@@ -347,6 +392,61 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Add Test Template Modal -->
+<div id="add-test-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD TEST TEMPLATE</div>
+            <div class="panel-body">
+                <form id="add-test-form" onsubmit="addTestTemplate(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="test-name">NAME *</label>
+                        <input type="text" id="test-name" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="test-type">TYPE *</label>
+                        <select id="test-type" class="form-select" onchange="toggleNumericFields()">
+                            <option value="boolean">BOOLEAN (Pass/Fail)</option>
+                            <option value="numeric">NUMERIC (Measured Value)</option>
+                            <option value="text">TEXT (Freeform)</option>
+                        </select>
+                    </div>
+                    <div id="numeric-fields" style="display: none;">
+                        <div style="display: flex; gap: var(--space-md);">
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label" for="test-min">MIN VALUE</label>
+                                <input type="number" id="test-min" class="form-input" step="any">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label" for="test-max">MAX VALUE</label>
+                                <input type="number" id="test-max" class="form-input" step="any">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="test-unit">UNIT</label>
+                            <input type="text" id="test-unit" class="form-input" placeholder="e.g., ohms, mm, V">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="test-required"> REQUIRED
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="test-sort">SORT ORDER</label>
+                        <input type="number" id="test-sort" class="form-input" value="0" min="0">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddTest()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="test-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Add Component Modal -->
 <div id="add-component-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
@@ -645,11 +745,93 @@ if (document.getElementById('bom-tree')) {
     loadBomTree();
 }
 
+// Test Templates
+function toggleNumericFields() {
+    const type = document.getElementById('test-type').value;
+    document.getElementById('numeric-fields').style.display = type === 'numeric' ? 'block' : 'none';
+    if (type !== 'numeric') {
+        document.getElementById('test-min').value = '';
+        document.getElementById('test-max').value = '';
+        document.getElementById('test-unit').value = '';
+    }
+}
+
+function showAddTest() {
+    document.getElementById('add-test-modal').style.display = 'block';
+}
+
+function hideAddTest() {
+    document.getElementById('add-test-modal').style.display = 'none';
+    document.getElementById('add-test-form').reset();
+    document.getElementById('numeric-fields').style.display = 'none';
+    document.getElementById('test-error').style.display = 'none';
+}
+
+async function addTestTemplate(event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('test-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        name: document.getElementById('test-name').value,
+        test_type: document.getElementById('test-type').value,
+        required: document.getElementById('test-required').checked,
+        sort_order: parseInt(document.getElementById('test-sort').value) || 0,
+    };
+
+    if (data.test_type === 'numeric') {
+        const min = document.getElementById('test-min').value;
+        const max = document.getElementById('test-max').value;
+        const unit = document.getElementById('test-unit').value;
+        if (min !== '') data.min_value = parseFloat(min);
+        if (max !== '') data.max_value = parseFloat(max);
+        if (unit) data.unit = unit;
+    }
+
+    try {
+        const response = await fetch(`/api/inventory/parts/${partId}/test-templates`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add test template');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+async function deleteTestTemplate(templateId) {
+    if (!confirm('Delete this test template?')) return;
+
+    try {
+        const response = await fetch(`/api/inventory/parts/${partId}/test-templates/${templateId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to delete test template'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
 // Escape key handler
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         hideAddComponent();
         hideEditBom();
+        hideAddTest();
     }
 });
 </script>
