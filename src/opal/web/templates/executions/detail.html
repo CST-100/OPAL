@@ -127,9 +127,13 @@
                 {% if op.is_contingency %}{{ ok.status("CONTINGENCY", "warn") }}{% endif %}
                 <span class="op-title">{{ op.title }}</span>
                 <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+                {% if op.status in ['completed', 'signed_off'] and op.execution and op.execution.completed_by_user %}
+                {{ ok.status("COMPLETED BY " ~ op.execution.completed_by_user.name|upper, "ok") }}
+                {% else %}
                 {{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
-                {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
-                <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
+                {% endif %}
+                {% if op.status in ['awaiting_signoff', 'in_progress'] and inst_status in ['pending', 'in_progress'] and op_data.sub_steps %}
+                <button class="btn btn-sm btn-primary" onclick="completeStep({{ op.order }})" style="margin-left: var(--space-sm);">COMPLETE</button>
                 {% endif %}
             </div>
 
@@ -139,12 +143,15 @@
             {% set vs = version_steps_map.get(step.order, {}) %}
             {% set schema = vs.get('required_data_schema') %}
             {% set has_schema = schema and schema.get('fields') %}
-            <details class="step-details" id="step-{{ step.order }}"{% if step.status == 'in_progress' %} open{% endif %}>
+            <details class="step-details" id="step-{{ step.order }}" open>
                 <summary class="step-summary">
                     <span class="step-number mono">{{ step.step_number }}</span>
                     <span class="step-title">{{ step.title }}</span>
+                    {% if step.status in ['completed', 'signed_off'] and step.execution and step.execution.completed_by_user %}
+                    {{ ok.status("COMPLETED BY " ~ step.execution.completed_by_user.name|upper, "ok") }}
+                    {% else %}
                     {{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status in ['completed', 'signed_off'] else ("info" if step.status == 'in_progress' else ("warn" if step.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
-                    {% if vs.get('requires_signoff') and step.status != 'signed_off' %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% endif %}
                     {% if step.execution and step.execution.started_at %}
                     <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
                         {{ step.execution.started_at.strftime('%H:%M:%S') }}{% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
@@ -214,23 +221,23 @@
                             <label class="form-label" style="font-size: 0.75rem;">{{ field.label }}{% if field.required %} <span class="text-red">*</span>{% endif %}{% if field.get('unit') %} ({{ field.unit }}){% endif %}</label>
                             {% if step.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
                                 {% if field.type == 'text' %}
-                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
+                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}"{% if field.required %} required{% endif %}{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
                                 {% elif field.type == 'number' %}
-                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %}{% if field.get('step') %} step="{{ field.step }}"{% else %} step="any"{% endif %}{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
+                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %}{% if field.get('step') %} step="{{ field.step }}"{% else %} step="any"{% endif %}{% if field.required %} required{% endif %}{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
                                 {% elif field.type == 'checkbox' %}
                                 <label style="display: flex; align-items: center; gap: var(--space-sm);">
                                     <input type="checkbox" data-capture-field="{{ field.name }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] %} checked{% endif %}>
                                     <span>{{ field.label }}</span>
                                 </label>
                                 {% elif field.type == 'select' %}
-                                <select class="form-select" data-capture-field="{{ field.name }}">
+                                <select class="form-select" data-capture-field="{{ field.name }}"{% if field.required %} required{% endif %}>
                                     <option value="">Select...</option>
                                     {% for opt in field.get('options', []) %}
                                     <option value="{{ opt }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] == opt %} selected{% endif %}>{{ opt }}</option>
                                     {% endfor %}
                                 </select>
                                 {% elif field.type == 'textarea' %}
-                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}">{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %}{{ step.execution.data_captured[field.name] }}{% endif %}</textarea>
+                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}"{% if field.required %} required{% endif %}>{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %}{{ step.execution.data_captured[field.name] }}{% endif %}</textarea>
                                 {% endif %}
                         </div>
                             {% else %}
@@ -274,7 +281,7 @@
                             <button class="btn btn-sm text-yellow" onclick="showNCModal({{ step.order }})">LOG NC</button>
                             <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
                             {% elif step.status == 'awaiting_signoff' %}
-                            <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ step.order }})">SIGN OFF</button>
+                            <button class="btn btn-sm btn-primary" onclick="completeStep({{ step.order }})">COMPLETE</button>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -286,10 +293,12 @@
             {% set vs = version_steps_map.get(op.order, {}) %}
             {% set schema = vs.get('required_data_schema') %}
             {% set has_schema = schema and schema.get('fields') %}
-            <details class="step-details" id="step-{{ op.order }}"{% if op.status == 'in_progress' %} open{% endif %}>
+            <details class="step-details" id="step-{{ op.order }}" open>
                 <summary class="step-summary" style="padding-left: var(--space-md);">
                     <span class="step-title">{{ op.title }}</span>
-                    {% if vs.get('requires_signoff') and op.status != 'signed_off' %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% if op.status in ['completed', 'signed_off'] and op.execution and op.execution.completed_by_user %}
+                    {{ ok.status("COMPLETED BY " ~ op.execution.completed_by_user.name|upper, "ok") }}
+                    {% endif %}
                     {% if op.execution and op.execution.started_at %}
                     <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
                         {{ op.execution.started_at.strftime('%H:%M:%S') }}{% if op.execution.completed_at %} - {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
@@ -358,15 +367,15 @@
                             <label class="form-label" style="font-size: 0.75rem;">{{ field.label }}{% if field.required %} <span class="text-red">*</span>{% endif %}{% if field.get('unit') %} ({{ field.unit }}){% endif %}</label>
                             {% if op.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
                                 {% if field.type == 'text' %}
-                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}">
+                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}"{% if field.required %} required{% endif %}>
                                 {% elif field.type == 'number' %}
-                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %} step="{{ field.get('step', 'any') }}">
+                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %} step="{{ field.get('step', 'any') }}"{% if field.required %} required{% endif %}>
                                 {% elif field.type == 'checkbox' %}
                                 <label style="display: flex; align-items: center; gap: var(--space-sm);"><input type="checkbox" data-capture-field="{{ field.name }}"> {{ field.label }}</label>
                                 {% elif field.type == 'select' %}
-                                <select class="form-select" data-capture-field="{{ field.name }}"><option value="">Select...</option>{% for opt in field.get('options', []) %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}</select>
+                                <select class="form-select" data-capture-field="{{ field.name }}"{% if field.required %} required{% endif %}><option value="">Select...</option>{% for opt in field.get('options', []) %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}</select>
                                 {% elif field.type == 'textarea' %}
-                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}"></textarea>
+                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}"{% if field.required %} required{% endif %}></textarea>
                                 {% endif %}
                             {% else %}
                                 {% if op.execution and op.execution.data_captured and op.execution.data_captured[field.name] is defined %}
@@ -404,7 +413,7 @@
                             <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
                             <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
                             {% elif op.status == 'awaiting_signoff' %}
-                            <button class="btn btn-signoff" onclick="signoffStep({{ op.order }})">SIGN OFF</button>
+                            <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
                             {% endif %}
                         {% endif %}
                     </div>
@@ -751,6 +760,33 @@ async function completeStep(stepNumber) {
                 else if (f.type === 'number') data.data_captured[name] = f.value ? parseFloat(f.value) : null;
                 else data.data_captured[name] = f.value || null;
             });
+
+            // Validate data capture fields against constraints
+            let errors = [];
+            fields.forEach(f => {
+                const name = f.dataset.captureField;
+                const val = data.data_captured[name];
+                // Required check
+                if (f.hasAttribute('required') && (val === null || val === '' || val === undefined)) {
+                    const label = f.closest('.form-group')?.querySelector('.form-label');
+                    const fieldName = label ? label.textContent.replace(/\s*\*\s*$/, '').replace(/\s*\(.*\)\s*$/, '').trim() : name;
+                    errors.push(fieldName + ' is required');
+                }
+                // Number range check
+                if (f.type === 'number' && val !== null && val !== undefined && val !== '') {
+                    const numVal = parseFloat(val);
+                    if (f.hasAttribute('min') && numVal < parseFloat(f.min)) {
+                        errors.push(name + ': value ' + numVal + ' below minimum ' + f.min);
+                    }
+                    if (f.hasAttribute('max') && numVal > parseFloat(f.max)) {
+                        errors.push(name + ': value ' + numVal + ' above maximum ' + f.max);
+                    }
+                }
+            });
+            if (errors.length > 0) {
+                alert('Cannot complete step:\n' + errors.join('\n'));
+                return;
+            }
         }
 
         // Collect notes

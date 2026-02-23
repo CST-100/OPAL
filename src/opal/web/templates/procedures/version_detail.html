@@ -58,29 +58,41 @@
             <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
             {% endif %}
             {% if op_data.sub_steps %}
-            <table class="data-table op-steps-table">
-                <thead>
-                    <tr>
-                        <th style="width: 70px;">#</th>
-                        <th>STEP</th>
-                        <th style="width: 80px;">DURATION</th>
-                        <th style="width: 140px;">FLAGS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for step in op_data.sub_steps %}
-                    <tr>
-                        <td class="mono">{{ step.step_number }}</td>
-                        <td>{{ step.title }}</td>
-                        <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
-                        <td>
-                            {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }} {% endif %}
-                            {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }} {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% for step in op_data.sub_steps %}
+            <details class="step-details" open>
+                <summary class="step-summary">
+                    <span class="step-number mono">{{ step.step_number }}</span>
+                    <span class="step-title">{{ step.title }}</span>
+                    {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }}{% endif %}
+                    {% if step.estimated_duration_minutes %}
+                    <span class="op-duration mono" style="margin-left: auto;">{{ step.estimated_duration_minutes }}m</span>
+                    {% endif %}
+                </summary>
+                <div class="step-detail-body">
+                    {% if step.instructions %}
+                    <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
+                    {% endif %}
+                    {% if step.required_data_schema and step.required_data_schema.fields %}
+                    <div style="margin: var(--space-sm) 0;">
+                        <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">DATA CAPTURE SCHEMA</div>
+                        <table class="data-table">
+                            <thead><tr><th>FIELD</th><th style="width:80px;">TYPE</th><th style="width:80px;">REQUIRED</th></tr></thead>
+                            <tbody>
+                                {% for field in step.required_data_schema.fields %}
+                                <tr>
+                                    <td>{{ field.label }}{% if field.get('unit') %} <span class="text-muted">({{ field.unit }})</span>{% endif %}</td>
+                                    <td class="mono">{{ field.type | upper }}</td>
+                                    <td>{% if field.required %}{{ ok.status("REQ", "info") }}{% else %}-{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+            {% endfor %}
             {% endif %}
         </div>
         {% endfor %}
@@ -107,29 +119,41 @@
             <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
             {% endif %}
             {% if op_data.sub_steps %}
-            <table class="data-table op-steps-table">
-                <thead>
-                    <tr>
-                        <th style="width: 70px;">#</th>
-                        <th>STEP</th>
-                        <th style="width: 80px;">DURATION</th>
-                        <th style="width: 140px;">FLAGS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for step in op_data.sub_steps %}
-                    <tr>
-                        <td class="mono">{{ step.step_number }}</td>
-                        <td>{{ step.title }}</td>
-                        <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
-                        <td>
-                            {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }} {% endif %}
-                            {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }} {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% for step in op_data.sub_steps %}
+            <details class="step-details" open>
+                <summary class="step-summary">
+                    <span class="step-number mono">{{ step.step_number }}</span>
+                    <span class="step-title">{{ step.title }}</span>
+                    {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }}{% endif %}
+                    {% if step.estimated_duration_minutes %}
+                    <span class="op-duration mono" style="margin-left: auto;">{{ step.estimated_duration_minutes }}m</span>
+                    {% endif %}
+                </summary>
+                <div class="step-detail-body">
+                    {% if step.instructions %}
+                    <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
+                    {% endif %}
+                    {% if step.required_data_schema and step.required_data_schema.fields %}
+                    <div style="margin: var(--space-sm) 0;">
+                        <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">DATA CAPTURE SCHEMA</div>
+                        <table class="data-table">
+                            <thead><tr><th>FIELD</th><th style="width:80px;">TYPE</th><th style="width:80px;">REQUIRED</th></tr></thead>
+                            <tbody>
+                                {% for field in step.required_data_schema.fields %}
+                                <tr>
+                                    <td>{{ field.label }}{% if field.get('unit') %} <span class="text-muted">({{ field.unit }})</span>{% endif %}</td>
+                                    <td class="mono">{{ field.type | upper }}</td>
+                                    <td>{% if field.required %}{{ ok.status("REQ", "info") }}{% else %}-{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                </div>
+            </details>
+            {% endfor %}
             {% endif %}
         </div>
         {% endfor %}
