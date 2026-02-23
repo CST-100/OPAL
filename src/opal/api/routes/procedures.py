@@ -639,10 +639,24 @@ async def publish_version(
             "workcenter_id": step.workcenter_id,
         }
 
+    # Snapshot kit and output items alongside steps
+    kit_items = db.query(Kit).filter(Kit.procedure_id == procedure_id).all()
+    output_items = (
+        db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == procedure_id).all()
+    )
+
     content = {
         "procedure_name": procedure.name,
         "procedure_description": procedure.description,
         "steps": [step_to_dict(s) for s in steps],
+        "kit_items": [
+            {"part_id": k.part_id, "quantity_required": float(k.quantity_required)}
+            for k in kit_items
+        ],
+        "output_items": [
+            {"part_id": o.part_id, "quantity_produced": float(o.quantity_produced)}
+            for o in output_items
+        ],
     }
 
     version = ProcedureVersion(
@@ -700,6 +714,111 @@ async def get_version(
         raise HTTPException(status_code=404, detail="Version not found")
 
     return VersionDetailResponse.model_validate(version)
+
+
+@router.post("/{procedure_id}/versions/{version_id}/restore", response_model=ProcedureResponse)
+async def restore_from_version(
+    procedure_id: int,
+    version_id: int,
+    db: DbSession,
+    user_id: CurrentUserId,
+) -> ProcedureResponse:
+    """Replace master steps, kit, and outputs with a published version's snapshot.
+
+    Deletes all current ProcedureStep, Kit, and ProcedureOutput rows for this
+    procedure and recreates them from the version's content snapshot.
+    Does NOT change current_version_id or procedure status.
+    """
+    procedure = (
+        db.query(MasterProcedure)
+        .filter(MasterProcedure.id == procedure_id, MasterProcedure.deleted_at.is_(None))
+        .first()
+    )
+    if not procedure:
+        raise HTTPException(status_code=404, detail="Procedure not found")
+
+    version = (
+        db.query(ProcedureVersion)
+        .filter(ProcedureVersion.id == version_id, ProcedureVersion.procedure_id == procedure_id)
+        .first()
+    )
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found for this procedure")
+
+    # Delete all current steps, kit items, and outputs
+    db.query(ProcedureStep).filter(ProcedureStep.procedure_id == procedure_id).delete()
+    db.query(Kit).filter(Kit.procedure_id == procedure_id).delete()
+    db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == procedure_id).delete()
+    db.flush()
+
+    # Recreate steps from version snapshot (two-pass for parent ID mapping)
+    version_steps = version.content.get("steps", [])
+    old_id_to_new_id: dict[int, int] = {}
+
+    # First pass: create parent ops (no parent_step_id)
+    for step_data in version_steps:
+        if step_data.get("parent_step_id") is None:
+            new_step = ProcedureStep(
+                procedure_id=procedure_id,
+                order=step_data["order"],
+                step_number=step_data["step_number"],
+                level=step_data["level"],
+                title=step_data["title"],
+                instructions=step_data.get("instructions"),
+                required_data_schema=step_data.get("required_data_schema"),
+                is_contingency=step_data.get("is_contingency", False),
+                requires_signoff=step_data.get("requires_signoff", False),
+                estimated_duration_minutes=step_data.get("estimated_duration_minutes"),
+                workcenter_id=step_data.get("workcenter_id"),
+            )
+            db.add(new_step)
+            db.flush()
+            old_id_to_new_id[step_data["id"]] = new_step.id
+
+    # Second pass: create child steps (with parent_step_id)
+    for step_data in version_steps:
+        if step_data.get("parent_step_id") is not None:
+            new_parent_id = old_id_to_new_id.get(step_data["parent_step_id"])
+            new_step = ProcedureStep(
+                procedure_id=procedure_id,
+                order=step_data["order"],
+                step_number=step_data["step_number"],
+                level=step_data["level"],
+                parent_step_id=new_parent_id,
+                title=step_data["title"],
+                instructions=step_data.get("instructions"),
+                required_data_schema=step_data.get("required_data_schema"),
+                is_contingency=step_data.get("is_contingency", False),
+                requires_signoff=step_data.get("requires_signoff", False),
+                estimated_duration_minutes=step_data.get("estimated_duration_minutes"),
+                workcenter_id=step_data.get("workcenter_id"),
+            )
+            db.add(new_step)
+            db.flush()
+            old_id_to_new_id[step_data["id"]] = new_step.id
+
+    # Recreate kit items (graceful for old versions without kit data)
+    for kit_data in version.content.get("kit_items", []):
+        new_kit = Kit(
+            procedure_id=procedure_id,
+            part_id=kit_data["part_id"],
+            quantity_required=Decimal(str(kit_data["quantity_required"])),
+        )
+        db.add(new_kit)
+
+    # Recreate output items (graceful for old versions without output data)
+    for output_data in version.content.get("output_items", []):
+        new_output = ProcedureOutput(
+            procedure_id=procedure_id,
+            part_id=output_data["part_id"],
+            quantity_produced=Decimal(str(output_data["quantity_produced"])),
+        )
+        db.add(new_output)
+
+    db.commit()
+    db.refresh(procedure)
+
+    return ProcedureResponse.model_validate(procedure)
 
 
 # ============ Kit ============

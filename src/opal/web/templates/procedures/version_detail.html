@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb("tWO", "/procedures") }}
 {{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
 {{ ok.crumb("v" ~ version.version_number) }}
 {% endblock %}
@@ -14,6 +14,7 @@
         <span>{{ version.content.procedure_name }} - VERSION {{ version.version_number }}</span>
         <div class="panel-header-actions">
             {{ ok.btn("PRINT TRAVELER", attrs='onclick="window.open(\'/procedures/' ~ procedure.id ~ '/versions/' ~ version.id ~ '/print\', \'_blank\')"') }}
+            {{ ok.btn("RESTORE TO DRAFT", attrs='onclick="restoreFromVersion()"') }}
             {% if procedure.current_version_id == version.id %}
             {{ ok.status("CURRENT", "ok") }}
             {% else %}
@@ -39,39 +40,150 @@
             {% endif %}
         </table>
 
-        <div class="form-label" style="margin-bottom: var(--space-sm);">STEPS ({{ version.content.steps | length }})</div>
+        <!-- Hierarchical step display -->
+        <div class="form-label" style="margin-bottom: var(--space-sm);">OPERATIONS ({{ ops | length }}{% if contingency_ops %} + {{ contingency_ops | length }} contingency{% endif %})</div>
+
+        {% for op_data in ops %}
+        {% set op = op_data.step %}
+        <div class="op-block" style="margin-bottom: var(--space-md);">
+            <div class="op-header">
+                <span class="op-number mono">OP {{ op.step_number }}</span>
+                <span class="op-title">{{ op.title }}</span>
+                {% if op.estimated_duration_minutes %}
+                <span class="op-duration mono">{{ op.estimated_duration_minutes }}m</span>
+                {% endif %}
+                <span class="op-progress">{{ op_data.sub_steps | length }} steps</span>
+            </div>
+            {% if op.instructions %}
+            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+            {% endif %}
+            {% if op_data.sub_steps %}
+            <table class="data-table op-steps-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">#</th>
+                        <th>STEP</th>
+                        <th style="width: 80px;">DURATION</th>
+                        <th style="width: 140px;">FLAGS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for step in op_data.sub_steps %}
+                    <tr>
+                        <td class="mono">{{ step.step_number }}</td>
+                        <td>{{ step.title }}</td>
+                        <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                        <td>
+                            {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }} {% endif %}
+                            {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }} {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if not ops %}
+        {{ ok.empty("No operations in this version") }}
+        {% endif %}
+
+        {% if contingency_ops %}
+        <div class="form-label" style="margin-top: var(--space-lg); margin-bottom: var(--space-sm);">CONTINGENCY OPERATIONS</div>
+        {% for op_data in contingency_ops %}
+        {% set op = op_data.step %}
+        <div class="op-block op-contingency" style="margin-bottom: var(--space-md);">
+            <div class="op-header">
+                <span class="op-number mono">OP {{ op.step_number }}</span>
+                {{ ok.status("CONTINGENCY", "warn") }}
+                <span class="op-title">{{ op.title }}</span>
+                {% if op.estimated_duration_minutes %}
+                <span class="op-duration mono">{{ op.estimated_duration_minutes }}m</span>
+                {% endif %}
+                <span class="op-progress">{{ op_data.sub_steps | length }} steps</span>
+            </div>
+            {% if op.instructions %}
+            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
+            {% endif %}
+            {% if op_data.sub_steps %}
+            <table class="data-table op-steps-table">
+                <thead>
+                    <tr>
+                        <th style="width: 70px;">#</th>
+                        <th>STEP</th>
+                        <th style="width: 80px;">DURATION</th>
+                        <th style="width: 140px;">FLAGS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for step in op_data.sub_steps %}
+                    <tr>
+                        <td class="mono">{{ step.step_number }}</td>
+                        <td>{{ step.title }}</td>
+                        <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                        <td>
+                            {% if step.requires_signoff %}{{ ok.status("SIGNOFF", "info") }} {% endif %}
+                            {% if step.required_data_schema and step.required_data_schema.fields %}{{ ok.status("DATA", "default") }} {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Kit Items (if captured in version snapshot) -->
+        {% if version.content.kit_items %}
+        <div class="form-label" style="margin-top: var(--space-lg); margin-bottom: var(--space-sm);">KIT ITEMS ({{ version.content.kit_items | length }})</div>
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 60px;">#</th>
-                    <th>TITLE</th>
-                    <th>INSTRUCTIONS</th>
-                    <th style="width: 100px;">TYPE</th>
-                    <th style="width: 80px;">DURATION</th>
+                    <th style="width: 60px;">PART</th>
+                    <th>NAME</th>
+                    <th style="width: 100px; text-align: right;">QTY REQ</th>
                 </tr>
             </thead>
             <tbody>
-                {% for step in version.content.steps %}
+                {% for item in version.content.kit_items %}
                 <tr>
-                    <td class="mono">{{ step.order }}</td>
-                    <td>{{ step.title }}</td>
-                    <td class="text-secondary">{{ step.instructions or '-' }}</td>
-                    <td>
-                        {% if step.is_contingency %}
-                        {{ ok.status("CONTINGENCY", "warn") }}
-                        {% else %}
-                        {{ ok.status("NORMAL", "info") }}
-                        {% endif %}
-                    </td>
-                    <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
+                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ kit_parts.get(item.part_id, {}).get('name', '-') if kit_parts else '-' }}</td>
+                    <td class="mono" style="text-align: right;">{{ '%g' % item.quantity_required }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% endif %}
+
+        <!-- Output Items (if captured in version snapshot) -->
+        {% if version.content.output_items %}
+        <div class="form-label" style="margin-top: var(--space-lg); margin-bottom: var(--space-sm);">OUTPUTS ({{ version.content.output_items | length }})</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">PART</th>
+                    <th>NAME</th>
+                    <th style="width: 100px; text-align: right;">QTY</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in version.content.output_items %}
+                <tr>
+                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ kit_parts.get(item.part_id, {}).get('name', '-') if kit_parts else '-' }}</td>
+                    <td class="mono" style="text-align: right;">{{ '%g' % item.quantity_produced }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
 
         {% if versions and versions | length > 1 %}
         <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-md); align-items: center;">
-            {{ ok.btn("BACK TO PROCEDURE", href="/procedures/" ~ procedure.id) }}
+            {{ ok.btn("BACK TO tWO", href="/procedures/" ~ procedure.id) }}
             <span class="text-muted mono" style="font-size: 0.75rem;">COMPARE WITH:</span>
             {% for v in versions %}
             {% if v.id != version.id %}
@@ -81,9 +193,37 @@
         </div>
         {% else %}
         <div style="margin-top: var(--space-lg);">
-            {{ ok.btn("BACK TO PROCEDURE", href="/procedures/" ~ procedure.id) }}
+            {{ ok.btn("BACK TO tWO", href="/procedures/" ~ procedure.id) }}
         </div>
         {% endif %}
     </div>
 </div>
+
+<script>
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function restoreFromVersion() {
+    if (!confirm('Replace ALL current draft steps, kit items, and outputs with this version\'s snapshot? This cannot be undone.')) return;
+
+    try {
+        const response = await fetch(`/api/procedures/{{ procedure.id }}/versions/{{ version.id }}/restore`, {
+            method: 'POST',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.href = '/procedures/{{ procedure.id }}';
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to restore from version'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+</script>
 {% endblock %}
