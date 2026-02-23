@@ -39,6 +39,7 @@ class StepSchema(BaseModel):
     instructions: str | None = None
     required_data_schema: dict[str, Any] | None = None
     is_contingency: bool = False
+    requires_signoff: bool = False
     estimated_duration_minutes: int | None = None
     workcenter_id: int | None = None
     sub_steps: list["StepSchema"] = []
@@ -94,6 +95,7 @@ class StepCreate(BaseModel):
     instructions: str | None = None
     required_data_schema: dict[str, Any] | None = None
     is_contingency: bool = False
+    requires_signoff: bool = False
     estimated_duration_minutes: int | None = Field(None, ge=1)
     parent_step_id: int | None = Field(None, description="Parent op ID for sub-steps")
 
@@ -105,6 +107,7 @@ class StepUpdate(BaseModel):
     instructions: str | None = None
     required_data_schema: dict[str, Any] | None = None
     is_contingency: bool | None = None
+    requires_signoff: bool | None = None
     estimated_duration_minutes: int | None = Field(None, ge=1)
 
 
@@ -187,6 +190,7 @@ def _build_step_hierarchy(steps: list[ProcedureStep]) -> list[StepSchema]:
             instructions=step.instructions,
             required_data_schema=step.required_data_schema,
             is_contingency=step.is_contingency,
+            requires_signoff=step.requires_signoff,
             estimated_duration_minutes=step.estimated_duration_minutes,
             workcenter_id=step.workcenter_id,
             sub_steps=[build_schema(s) for s in sorted(sub_steps, key=lambda x: x.order)],
@@ -458,6 +462,7 @@ async def add_step(
         instructions=data.instructions,
         required_data_schema=data.required_data_schema,
         is_contingency=is_contingency,
+        requires_signoff=data.requires_signoff,
         estimated_duration_minutes=data.estimated_duration_minutes,
     )
     db.add(step)
@@ -497,6 +502,8 @@ async def update_step(
         step.required_data_schema = data.required_data_schema
     if data.is_contingency is not None:
         step.is_contingency = data.is_contingency
+    if data.requires_signoff is not None:
+        step.requires_signoff = data.requires_signoff
     if data.estimated_duration_minutes is not None:
         step.estimated_duration_minutes = data.estimated_duration_minutes
 
@@ -627,6 +634,7 @@ async def publish_version(
             "instructions": step.instructions,
             "required_data_schema": step.required_data_schema,
             "is_contingency": step.is_contingency,
+            "requires_signoff": step.requires_signoff,
             "estimated_duration_minutes": step.estimated_duration_minutes,
             "workcenter_id": step.workcenter_id,
         }
@@ -1267,6 +1275,7 @@ async def clone_procedure(
             instructions=source_step.instructions,
             required_data_schema=source_step.required_data_schema,
             is_contingency=source_step.is_contingency,
+            requires_signoff=source_step.requires_signoff,
             estimated_duration_minutes=source_step.estimated_duration_minutes,
             workcenter_id=source_step.workcenter_id,
         )

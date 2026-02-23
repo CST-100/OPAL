@@ -1519,6 +1519,9 @@ async def executions_detail(request: Request, db: DbSession, instance_id: int) -
     context["ops"] = ops
     context["contingency_ops"] = contingency_ops
 
+    # Map step order -> version step data (for data capture schemas, requires_signoff)
+    context["version_steps_map"] = {s["order"]: s for s in version_steps}
+
     # Get kit information
     kit_items = db.query(Kit).filter(Kit.procedure_id == instance.procedure_id).all()
     context["kit_items"] = kit_items

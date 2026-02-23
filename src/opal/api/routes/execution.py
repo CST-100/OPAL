@@ -55,6 +55,7 @@ class StepExecutionResponse(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     completed_by_id: int | None = None
+    notes: str | None = None
     signed_off_at: datetime | None = None
     signed_off_by_id: int | None = None
     duration_seconds: int | None = None
@@ -125,6 +126,7 @@ class StepComplete(BaseModel):
     """Complete step request."""
 
     data_captured: dict[str, Any] | None = None
+    notes: str | None = None
 
 
 class NonConformanceCreate(BaseModel):
@@ -199,6 +201,7 @@ async def list_instances(
                         completed_at=se.completed_at,
                         completed_by_id=se.completed_by_id,
                         signed_off_at=se.signed_off_at,
+                        notes=se.notes,
                         signed_off_by_id=se.signed_off_by_id,
                         duration_seconds=se.duration_seconds,
                     )
@@ -573,6 +576,7 @@ async def start_step(
         completed_at=step_exec.completed_at,
         completed_by_id=step_exec.completed_by_id,
         signed_off_at=step_exec.signed_off_at,
+        notes=step_exec.notes,
         signed_off_by_id=step_exec.signed_off_by_id,
         duration_seconds=step_exec.duration_seconds,
     )
@@ -612,6 +616,15 @@ async def complete_step(
     step_exec.completed_by_id = user_id
     if data.data_captured:
         step_exec.data_captured = data.data_captured
+    if data.notes is not None:
+        step_exec.notes = data.notes
+
+    # Check if step requires sign-off (from version snapshot)
+    version = db.query(ProcedureVersion).filter(ProcedureVersion.id == instance.version_id).first()
+    if version:
+        step_data = next((s for s in version.content.get("steps", []) if s["order"] == step_number), {})
+        if step_data.get("requires_signoff"):
+            step_exec.status = StepStatus.AWAITING_SIGNOFF
 
     # Get user name for event
     from opal.db.models import User
@@ -648,6 +661,56 @@ async def complete_step(
         completed_at=step_exec.completed_at,
         completed_by_id=step_exec.completed_by_id,
         signed_off_at=step_exec.signed_off_at,
+        notes=step_exec.notes,
+        signed_off_by_id=step_exec.signed_off_by_id,
+        duration_seconds=step_exec.duration_seconds,
+    )
+
+
+class StepNotesUpdate(BaseModel):
+    """Update step notes."""
+
+    notes: str | None = None
+
+
+@router.patch("/{instance_id}/steps/{step_number}/notes", response_model=StepExecutionResponse)
+async def update_step_notes(
+    instance_id: int,
+    step_number: int,
+    data: StepNotesUpdate,
+    db: DbSession,
+    user_id: CurrentUserId,
+) -> StepExecutionResponse:
+    """Update notes on a step execution (while in progress or after completion)."""
+    instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(status_code=404, detail="Instance not found")
+
+    step_exec = (
+        db.query(StepExecution)
+        .filter(StepExecution.instance_id == instance_id, StepExecution.step_number == step_number)
+        .first()
+    )
+    if not step_exec:
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    step_exec.notes = data.notes
+    db.commit()
+    db.refresh(step_exec)
+
+    return StepExecutionResponse(
+        id=step_exec.id,
+        step_number=step_exec.step_number,
+        step_number_str=step_exec.step_number_str,
+        level=step_exec.level,
+        parent_step_order=step_exec.parent_step_order,
+        status=step_exec.status.value if hasattr(step_exec.status, 'value') else step_exec.status,
+        data_captured=step_exec.data_captured,
+        started_at=step_exec.started_at,
+        completed_at=step_exec.completed_at,
+        completed_by_id=step_exec.completed_by_id,
+        signed_off_at=step_exec.signed_off_at,
+        notes=step_exec.notes,
         signed_off_by_id=step_exec.signed_off_by_id,
         duration_seconds=step_exec.duration_seconds,
     )
@@ -708,6 +771,7 @@ async def skip_step(
         completed_at=step_exec.completed_at,
         completed_by_id=step_exec.completed_by_id,
         signed_off_at=step_exec.signed_off_at,
+        notes=step_exec.notes,
         signed_off_by_id=step_exec.signed_off_by_id,
         duration_seconds=step_exec.duration_seconds,
     )
@@ -720,10 +784,10 @@ async def signoff_step(
     db: DbSession,
     user_id: CurrentUserId,
 ) -> StepExecutionResponse:
-    """Sign off on a parent step (OP) after all sub-steps are complete.
+    """Sign off on a step in AWAITING_SIGNOFF status.
 
-    This is used to formally acknowledge that all work under a parent OP
-    has been completed and verified. Only steps in AWAITING_SIGNOFF status
+    This applies to parent OPs (after all sub-steps complete) and any step
+    with requires_signoff=True. Only steps in AWAITING_SIGNOFF status
     can be signed off.
     """
     instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
@@ -780,6 +844,7 @@ async def signoff_step(
         completed_at=step_exec.completed_at,
         completed_by_id=step_exec.completed_by_id,
         signed_off_at=step_exec.signed_off_at,
+        notes=step_exec.notes,
         signed_off_by_id=step_exec.signed_off_by_id,
         duration_seconds=step_exec.duration_seconds,
     )
@@ -835,6 +900,9 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
         # Completed/done statuses depend on step type
         if is_parent:
             # Parent steps must be SIGNED_OFF or SKIPPED
+            done_statuses = [StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value]
+        elif step_data.get("requires_signoff"):
+            # Leaf steps with requires_signoff must be SIGNED_OFF or SKIPPED
             done_statuses = [StepStatus.SIGNED_OFF.value, StepStatus.SKIPPED.value]
         else:
             # Leaf steps can be COMPLETED, SIGNED_OFF, or SKIPPED

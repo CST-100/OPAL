@@ -101,6 +101,9 @@ class ProcedureStep(Base, IdMixin, TimestampMixin):
     is_contingency: Mapped[bool] = mapped_column(
         default=False, nullable=False, comment="Only shown if NC logged"
     )
+    requires_signoff: Mapped[bool] = mapped_column(
+        default=False, nullable=False, comment="Step requires sign-off to complete"
+    )
     estimated_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     workcenter_id: Mapped[int | None] = mapped_column(
         ForeignKey("workcenter.id", ondelete="SET NULL"), nullable=True, index=True,

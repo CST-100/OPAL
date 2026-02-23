@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from opal.db.base import Base, IdMixin, TimestampMixin
@@ -142,7 +142,10 @@ class StepExecution(Base, IdMixin, TimestampMixin):
         Integer, nullable=True, comment="Order of parent step (for sub-steps)"
     )
 
-    # Sign-off fields (for parent OPs)
+    # Operator notes
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Free-text operator notes")
+
+    # Sign-off fields (for parent OPs or steps with requires_signoff)
     signed_off_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, comment="When OP was signed off"
     )
