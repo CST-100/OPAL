@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb("tWO", "/procedures") }}
 {{ ok.crumb(procedure.name) }}
 {% endblock %}
 
@@ -137,7 +137,7 @@
                         {% for step in op_data.sub_steps %}
                         <tr data-step-id="{{ step.id }}">
                             <td class="mono">{{ step.step_number }}</td>
-                            <td>{{ step.title }}</td>
+                            <td>{{ step.title }}{% if step.requires_signoff %} {{ ok.status("SIGNOFF", "info") }}{% endif %}</td>
                             <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
                             <td>
                                 {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ step.id ~ ')"') }}
@@ -201,7 +201,7 @@
                         {% for step in op_data.sub_steps %}
                         <tr data-step-id="{{ step.id }}">
                             <td class="mono">{{ step.step_number }}</td>
-                            <td>{{ step.title }}</td>
+                            <td>{{ step.title }}{% if step.requires_signoff %} {{ ok.status("SIGNOFF", "info") }}{% endif %}</td>
                             <td class="mono">{% if step.estimated_duration_minutes %}{{ step.estimated_duration_minutes }}m{% else %}-{% endif %}</td>
                             <td>
                                 {{ ok.btn("EDIT", size="sm", attrs='onclick="editStep(' ~ step.id ~ ')"') }}

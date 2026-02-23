@@ -11,6 +11,7 @@
             if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
         })();
     </script>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/css/main.css">
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/marked.min.js"></script>
@@ -42,8 +43,8 @@
                     MANUFACTURING
                 </button>
                 <div class="nav-dropdown-content">
-                    <a href="/procedures" class="{% if request.url.path.startswith('/procedures') %}active{% endif %}">Procedures</a>
-                    <a href="/executions" class="{% if request.url.path.startswith('/executions') %}active{% endif %}">Executions</a>
+                    <a href="/procedures" class="{% if request.url.path.startswith('/procedures') %}active{% endif %}">tWO Templates</a>
+                    <a href="/executions" class="{% if request.url.path.startswith('/executions') %}active{% endif %}">eWO Executions</a>
                     <a href="/workcenters" class="{% if request.url.path.startswith('/workcenters') %}active{% endif %}">Workcenters</a>
                 </div>
             </div>
@@ -155,8 +156,8 @@
             { type: 'nav', label: 'Go to Stock Levels', action: '/inventory', keywords: 'inventory stock quantities' },
             { type: 'nav', label: 'Go to Purchases', action: '/purchases', keywords: 'purchases orders po' },
             { type: 'nav', label: 'Go to Suppliers', action: '/suppliers', keywords: 'suppliers vendors' },
-            { type: 'nav', label: 'Go to Procedures', action: '/procedures', keywords: 'procedures ops manufacturing' },
-            { type: 'nav', label: 'Go to Executions', action: '/executions', keywords: 'executions runs instances' },
+            { type: 'nav', label: 'Go to tWO Templates', action: '/procedures', keywords: 'procedures ops manufacturing two templates' },
+            { type: 'nav', label: 'Go to eWO Executions', action: '/executions', keywords: 'executions runs instances ewo work orders' },
             { type: 'nav', label: 'Go to Workcenters', action: '/workcenters', keywords: 'workcenters stations' },
             { type: 'nav', label: 'Go to Issues', action: '/issues', keywords: 'issues bugs problems nc' },
             { type: 'nav', label: 'Go to Risks', action: '/risks', keywords: 'risks hazards mitigation' },
@@ -169,8 +170,8 @@
             { type: 'action', label: 'New Part', action: '/parts/new', keywords: 'create add part' },
             { type: 'action', label: 'New Purchase Order', action: '/purchases/new', keywords: 'create add purchase po' },
             { type: 'action', label: 'New Supplier', action: '/suppliers/new', keywords: 'create add supplier vendor' },
-            { type: 'action', label: 'New Procedure', action: '/procedures/new', keywords: 'create add procedure op' },
-            { type: 'action', label: 'New Execution', action: '/executions/new', keywords: 'start run execute procedure' },
+            { type: 'action', label: 'New tWO', action: '/procedures/new', keywords: 'create add procedure op two template' },
+            { type: 'action', label: 'New eWO', action: '/executions/new', keywords: 'start run execute procedure ewo work order' },
             { type: 'action', label: 'New Workcenter', action: '/workcenters/new', keywords: 'create add workcenter station' },
             { type: 'action', label: 'New Issue', action: '/issues/new', keywords: 'create add issue bug nc' },
             { type: 'action', label: 'New Risk', action: '/risks/new', keywords: 'create add risk hazard' },

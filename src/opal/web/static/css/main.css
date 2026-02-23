@@ -1318,6 +1318,312 @@ select option {
     color: var(--status-warn);
 }
 
+/* eWO Layout — Sidebar + Main */
+.ewo-layout {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.ewo-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.ewo-sidebar-header {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.ewo-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ewo-sidebar-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.ewo-sidebar-item.active {
+    background: var(--bg-tertiary);
+    color: var(--accent-orange);
+    border-left: 3px solid var(--accent-orange);
+}
+
+.ewo-sidebar-progress {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.ewo-sidebar-status {
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--text-muted);
+}
+
+.ewo-sidebar-status--completed,
+.ewo-sidebar-status--signed_off {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+}
+
+.ewo-sidebar-status--in_progress {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+}
+
+.ewo-sidebar-status--awaiting_signoff {
+    background: var(--accent-yellow);
+    border-color: var(--accent-yellow);
+}
+
+.ewo-sidebar-status--skipped {
+    background: var(--text-muted);
+    border-color: var(--text-muted);
+}
+
+.ewo-sidebar-divider {
+    border-top: 2px solid var(--border-light);
+    margin: var(--space-xs) 0;
+}
+
+.ewo-main {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+/* OP blocks */
+.op-block {
+    border-bottom: 2px solid var(--border-color);
+}
+
+.op-block:last-child {
+    border-bottom: none;
+}
+
+.op-contingency {
+    border-left: 3px solid var(--accent-yellow);
+}
+
+.op-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+}
+
+.op-number {
+    font-weight: 600;
+    color: var(--accent-orange);
+}
+
+.op-title {
+    font-weight: 600;
+}
+
+.op-progress {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Collapsible step details */
+.step-details {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.step-details:last-child {
+    border-bottom: none;
+}
+
+.step-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-lg);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    list-style: none;
+    user-select: none;
+}
+
+.step-summary::-webkit-details-marker {
+    display: none;
+}
+
+.step-summary::before {
+    content: '>';
+    display: inline-block;
+    width: 12px;
+    color: var(--text-muted);
+    transition: transform 0.1s;
+}
+
+.step-details[open] > .step-summary::before {
+    transform: rotate(90deg);
+}
+
+.step-summary:hover {
+    background: var(--bg-tertiary);
+}
+
+.step-number {
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 40px;
+}
+
+.step-title {
+    color: var(--text-primary);
+}
+
+.step-detail-body {
+    padding: var(--space-md) var(--space-md) var(--space-md) var(--space-xl);
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.step-instructions {
+    margin-bottom: var(--space-md);
+    line-height: 1.6;
+}
+
+.step-data-capture {
+    margin-bottom: var(--space-md);
+    padding: var(--space-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.step-notes {
+    margin-bottom: var(--space-md);
+}
+
+.step-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+/* Sign-off button */
+.btn-signoff {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.btn-signoff:hover {
+    background: var(--accent-green);
+    color: var(--bg-primary);
+}
+
+/* Collaboration styles */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.connection-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-red);
+    display: inline-block;
+}
+
+.connection-status.connected .connection-dot {
+    background: var(--accent-green);
+}
+
+.participants-header {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-xs);
+}
+
+.participants-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.participant {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+}
+
+.participant.self {
+    color: var(--accent-orange);
+}
+
+.participant-avatar {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+}
+
+.participant-name {
+    flex: 1;
+}
+
+.participant-step {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.btn-join {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.btn-leave {
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+}
+
 /* Light theme */
 :root[data-theme="light"] {
     --bg-primary: #f5f5f5;

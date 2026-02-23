@@ -3,18 +3,20 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
-{{ ok.crumb("EXECUTIONS", "/executions") }}
-{{ ok.crumb(instance.id) }}
+{{ ok.crumb("eWO", "/executions") }}
+{{ ok.crumb("#" ~ instance.id) }}
 {% endblock %}
 
 {% block content %}
+{% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+
+<!-- Header row: info + collaboration + progress -->
 <div class="grid grid-2">
     <div class="panel">
         <div class="panel-header">
-            <span>EXECUTION #{{ instance.id }}</span>
-            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
+            <span>eWO #{{ instance.id }}</span>
             <div class="panel-header-actions">
-                {{ ok.status(status_val | upper | replace('_', ' ')) }}
+                {{ ok.status(inst_status | upper | replace('_', ' ')) }}
             </div>
         </div>
         <div class="panel-body">
@@ -44,8 +46,7 @@
                     <td class="timestamp">{% if instance.completed_at %}{{ instance.completed_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}-{% endif %}</td>
                 </tr>
             </table>
-            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-            {% if status_val == 'in_progress' %}
+            {% if inst_status == 'in_progress' %}
             <div style="margin-top: var(--space-md);">
                 <button class="btn text-red" onclick="abortExecution()">ABORT EXECUTION</button>
             </div>
@@ -64,8 +65,7 @@
             </div>
         </div>
         <div class="panel-body">
-            {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-            {% if status_val in ['pending', 'in_progress'] %}
+            {% if inst_status in ['pending', 'in_progress'] %}
             <div style="margin-bottom: var(--space-md);">
                 <button id="join-btn" class="btn btn-join" onclick="joinExecution()" style="display: none;">JOIN EXECUTION</button>
                 <button id="leave-btn" class="btn btn-leave" onclick="leaveExecution()" style="display: none;">LEAVE EXECUTION</button>
@@ -75,146 +75,148 @@
             <div id="participants-list" class="participants-list">
                 <span class="text-muted">Loading...</span>
             </div>
+
+            <!-- Progress -->
+            {% set completed = steps | selectattr('status', 'in', ['completed', 'signed_off', 'skipped']) | list | length %}
+            {% set total = steps | length %}
+            <div style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-color);">
+                <div style="font-size: 1.25rem; font-weight: bold; color: var(--accent-blue);">
+                    {{ completed }} / {{ total }} STEPS
+                </div>
+                <div style="background: var(--bg-tertiary); height: 14px; border: 1px solid var(--border-color); margin-top: var(--space-xs);">
+                    <div style="background: var(--accent-green); height: 100%; width: {{ (completed / total * 100) if total > 0 else 0 }}%;"></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header"><span>PROGRESS</span></div>
-    <div class="panel-body">
-        {% set completed = steps | selectattr('status', 'in', ['completed', 'skipped']) | list | length %}
-        {% set total = steps | length %}
-        {% set ops_completed = ops | selectattr('step.status', 'in', ['completed', 'skipped']) | list | length %}
-        {% set ops_total = ops | length %}
-        <div style="font-size: 2rem; font-weight: bold; color: var(--accent-blue); margin-bottom: var(--space-md);">
-            {{ ops_completed }} / {{ ops_total }} OPS
-        </div>
-        <div style="font-size: 1rem; color: var(--text-muted); margin-bottom: var(--space-sm);">
-            {{ completed }} / {{ total }} total steps
-        </div>
-        <div style="background: var(--bg-tertiary); height: 20px; border: 1px solid var(--border-color);">
-            <div style="background: var(--accent-green); height: 100%; width: {{ (completed / total * 100) if total > 0 else 0 }}%;"></div>
-        </div>
-    </div>
-</div>
-
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header"><span>OPERATIONS</span></div>
-    <div class="panel-body">
+<!-- Sidebar + Main ops layout -->
+<div class="ewo-layout" style="margin-top: var(--space-md);">
+    <!-- Sidebar -->
+    <div class="ewo-sidebar">
+        <div class="ewo-sidebar-header">OPERATIONS</div>
         {% for op_data in ops %}
         {% set op = op_data.step %}
-        <div class="op-block" id="op-{{ op.order }}" data-op-order="{{ op.order }}">
-            <div class="op-header">
-                <span class="op-number mono">OP {{ op.step_number }}</span>
-                <span class="op-title">{{ op.title }}</span>
-                <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-{{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
-                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
-                {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
-                <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
-                {% endif %}
-            </div>
-            {% if op.instructions %}
-            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
-            {% endif %}
-            {% if op_data.sub_steps %}
-            <!-- Sub-steps -->
-            <div class="op-steps">
-                {% for step in op_data.sub_steps %}
-                <div class="step-row" id="step-{{ step.order }}" data-step-order="{{ step.order }}">
-                    <div class="step-row-header">
-                        <span class="step-number mono">{{ step.step_number }}</span>
-                        <span class="step-title">{{ step.title }}</span>
-{{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status == 'completed' else ("info" if step.status == 'in_progress' else ("warn" if step.status == 'skipped' else "default"))) }}
-                    </div>
-                    {% if step.instructions %}
-                    <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
-                    {% endif %}
-                    <div class="step-actions">
-                        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-                        {% if status_val in ['pending', 'in_progress'] %}
-                            {% if step.status == 'pending' %}
-                            <button class="btn btn-sm btn-primary" onclick="startStep({{ step.order }})">START</button>
-                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
-                            {% elif step.status == 'in_progress' %}
-                            <button class="btn btn-sm btn-primary" onclick="completeStep({{ step.order }})">COMPLETE</button>
-                            <button class="btn btn-sm text-yellow" onclick="showNCModal({{ step.order }})">LOG NC</button>
-                            <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
-                            {% endif %}
-                        {% endif %}
-                        {% if step.execution and step.execution.started_at %}
-                        <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
-                            {{ step.execution.started_at.strftime('%H:%M:%S') }}
-                            {% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <!-- No sub-steps, op itself is executable -->
-            <div class="step-actions" style="padding: var(--space-sm) var(--space-md);">
-                {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-                {% if status_val in ['pending', 'in_progress'] %}
-                    {% if op.status == 'pending' %}
-                    <button class="btn btn-primary" onclick="startStep({{ op.order }})">START</button>
-                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
-                    {% elif op.status == 'in_progress' %}
-                    <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
-                    <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
-                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
-                    {% endif %}
-                {% endif %}
-                {% if op.execution and op.execution.started_at %}
-                <span class="text-muted mono" style="margin-left: auto;">
-                    Started: {{ op.execution.started_at.strftime('%H:%M:%S') }}
-                    {% if op.execution.completed_at %} | Completed: {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
-                </span>
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
+        <a href="#op-{{ op.order }}" class="ewo-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
+            <span class="mono">OP {{ op.step_number }}</span>
+            <span class="ewo-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+            <span class="ewo-sidebar-status ewo-sidebar-status--{{ op.status }}"></span>
+        </a>
         {% endfor %}
-    </div>
-</div>
-
-{% if contingency_ops %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header"><span>CONTINGENCY OPERATIONS</span></div>
-    <div class="panel-body">
+        {% if contingency_ops %}
+        <div class="ewo-sidebar-divider"></div>
         {% for op_data in contingency_ops %}
         {% set op = op_data.step %}
-        <div class="op-block op-contingency" id="op-{{ op.order }}" data-op-order="{{ op.order }}">
+        <a href="#op-{{ op.order }}" class="ewo-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
+            <span class="mono">OP {{ op.step_number }}</span>
+            <span class="ewo-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+            <span class="ewo-sidebar-status ewo-sidebar-status--{{ op.status }}"></span>
+        </a>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Main content -->
+    <div class="ewo-main">
+        {% for op_data in ops + contingency_ops %}
+        {% set op = op_data.step %}
+        <div class="op-block{% if op.is_contingency %} op-contingency{% endif %}" id="op-{{ op.order }}">
             <div class="op-header">
                 <span class="op-number mono">OP {{ op.step_number }}</span>
-{{ ok.status("CONTINGENCY", "warn") }}
+                {% if op.is_contingency %}{{ ok.status("CONTINGENCY", "warn") }}{% endif %}
                 <span class="op-title">{{ op.title }}</span>
                 <span class="op-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-{{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
-                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+                {{ ok.status(op.status | upper | replace('_', ' '), "ok" if op.status in ['completed', 'signed_off'] else ("info" if op.status == 'in_progress' else ("warn" if op.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
                 {% if op.status == 'awaiting_signoff' and inst_status in ['pending', 'in_progress'] %}
                 <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ op.order }})" style="margin-left: var(--space-sm);">SIGN OFF</button>
                 {% endif %}
             </div>
-            {% if op.instructions %}
-            <div class="op-instructions" data-markdown>{{ op.instructions }}</div>
-            {% endif %}
+
             {% if op_data.sub_steps %}
-            <div class="op-steps">
-                {% for step in op_data.sub_steps %}
-                <div class="step-row" id="step-{{ step.order }}" data-step-order="{{ step.order }}">
-                    <div class="step-row-header">
-                        <span class="step-number mono">{{ step.step_number }}</span>
-                        <span class="step-title">{{ step.title }}</span>
-{{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status == 'completed' else ("info" if step.status == 'in_progress' else ("warn" if step.status == 'skipped' else "default"))) }}
-                    </div>
+            <!-- Sub-steps as collapsible details -->
+            {% for step in op_data.sub_steps %}
+            {% set vs = version_steps_map.get(step.order, {}) %}
+            {% set schema = vs.get('required_data_schema') %}
+            {% set has_schema = schema and schema.get('fields') %}
+            <details class="step-details" id="step-{{ step.order }}"{% if step.status == 'in_progress' %} open{% endif %}>
+                <summary class="step-summary">
+                    <span class="step-number mono">{{ step.step_number }}</span>
+                    <span class="step-title">{{ step.title }}</span>
+                    {{ ok.status(step.status | upper | replace('_', ' '), "ok" if step.status in ['completed', 'signed_off'] else ("info" if step.status == 'in_progress' else ("warn" if step.status in ['skipped', 'awaiting_signoff'] else "default"))) }}
+                    {% if vs.get('requires_signoff') and step.status != 'signed_off' %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% if step.execution and step.execution.started_at %}
+                    <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
+                        {{ step.execution.started_at.strftime('%H:%M:%S') }}{% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                    </span>
+                    {% endif %}
+                </summary>
+                <div class="step-detail-body">
                     {% if step.instructions %}
                     <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
                     {% endif %}
+
+                    {% if has_schema %}
+                    <!-- Data capture form -->
+                    <div class="step-data-capture">
+                        <div class="form-label" style="margin-bottom: var(--space-xs);">DATA CAPTURE</div>
+                        {% for field in schema.get('fields', []) %}
+                        <div class="form-group" style="margin-bottom: var(--space-sm);">
+                            <label class="form-label" style="font-size: 0.75rem;">{{ field.label }}{% if field.required %} <span class="text-red">*</span>{% endif %}{% if field.get('unit') %} ({{ field.unit }}){% endif %}</label>
+                            {% if step.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
+                                {% if field.type == 'text' %}
+                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
+                                {% elif field.type == 'number' %}
+                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %}{% if field.get('step') %} step="{{ field.step }}"{% else %} step="any"{% endif %}{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %} value="{{ step.execution.data_captured[field.name] }}"{% endif %}>
+                                {% elif field.type == 'checkbox' %}
+                                <label style="display: flex; align-items: center; gap: var(--space-sm);">
+                                    <input type="checkbox" data-capture-field="{{ field.name }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] %} checked{% endif %}>
+                                    <span>{{ field.label }}</span>
+                                </label>
+                                {% elif field.type == 'select' %}
+                                <select class="form-select" data-capture-field="{{ field.name }}">
+                                    <option value="">Select...</option>
+                                    {% for opt in field.get('options', []) %}
+                                    <option value="{{ opt }}"{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] == opt %} selected{% endif %}>{{ opt }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% elif field.type == 'textarea' %}
+                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}">{% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %}{{ step.execution.data_captured[field.name] }}{% endif %}</textarea>
+                                {% endif %}
+                        </div>
+                            {% else %}
+                                {# Read-only display for completed/pending steps #}
+                                {% if step.execution and step.execution.data_captured and step.execution.data_captured[field.name] is defined %}
+                                <div class="mono" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                                    {% if field.type == 'checkbox' %}{{ 'YES' if step.execution.data_captured[field.name] else 'NO' }}{% else %}{{ step.execution.data_captured[field.name] }}{% endif %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                        </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Notes -->
+                    {% if step.status in ['in_progress', 'completed', 'signed_off', 'awaiting_signoff'] %}
+                    <div class="step-notes" style="margin-top: var(--space-sm);">
+                        <label class="form-label" style="font-size: 0.75rem;">NOTES</label>
+                        {% if step.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
+                        <textarea class="form-textarea step-notes-input" rows="2" placeholder="Operator notes..."
+                                  onblur="saveNotes({{ step.order }}, this.value)">{% if step.execution and step.execution.notes %}{{ step.execution.notes }}{% endif %}</textarea>
+                        {% elif step.execution and step.execution.notes %}
+                        <div class="mono" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); white-space: pre-wrap;">{{ step.execution.notes }}</div>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions -->
                     <div class="step-actions">
-                        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-                        {% if status_val in ['pending', 'in_progress'] %}
+                        {% if inst_status in ['pending', 'in_progress'] %}
                             {% if step.status == 'pending' %}
                             <button class="btn btn-sm btn-primary" onclick="startStep({{ step.order }})">START</button>
                             <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
@@ -222,44 +224,99 @@
                             <button class="btn btn-sm btn-primary" onclick="completeStep({{ step.order }})">COMPLETE</button>
                             <button class="btn btn-sm text-yellow" onclick="showNCModal({{ step.order }})">LOG NC</button>
                             <button class="btn btn-sm" onclick="showSkipModal({{ step.order }}, '{{ step.title | e }}')">SKIP</button>
+                            {% elif step.status == 'awaiting_signoff' %}
+                            <button class="btn btn-sm btn-signoff" onclick="signoffStep({{ step.order }})">SIGN OFF</button>
                             {% endif %}
-                        {% endif %}
-                        {% if step.execution and step.execution.started_at %}
-                        <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
-                            {{ step.execution.started_at.strftime('%H:%M:%S') }}
-                            {% if step.execution.completed_at %} - {{ step.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
-                        </span>
                         {% endif %}
                     </div>
                 </div>
-                {% endfor %}
-            </div>
+            </details>
+            {% endfor %}
             {% else %}
-            <div class="step-actions" style="padding: var(--space-sm) var(--space-md);">
-                {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-                {% if status_val in ['pending', 'in_progress'] %}
-                    {% if op.status == 'pending' %}
-                    <button class="btn btn-primary" onclick="startStep({{ op.order }})">START</button>
-                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
-                    {% elif op.status == 'in_progress' %}
-                    <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
-                    <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
-                    <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+            <!-- No sub-steps, op itself is executable -->
+            {% set vs = version_steps_map.get(op.order, {}) %}
+            {% set schema = vs.get('required_data_schema') %}
+            {% set has_schema = schema and schema.get('fields') %}
+            <details class="step-details" id="step-{{ op.order }}"{% if op.status == 'in_progress' %} open{% endif %}>
+                <summary class="step-summary" style="padding-left: var(--space-md);">
+                    <span class="step-title">{{ op.title }}</span>
+                    {% if vs.get('requires_signoff') and op.status != 'signed_off' %}{{ ok.status("SIGNOFF", "info") }}{% endif %}
+                    {% if op.execution and op.execution.started_at %}
+                    <span class="text-muted mono" style="margin-left: auto; font-size: 0.75rem;">
+                        {{ op.execution.started_at.strftime('%H:%M:%S') }}{% if op.execution.completed_at %} - {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
+                    </span>
                     {% endif %}
-                {% endif %}
-                {% if op.execution and op.execution.started_at %}
-                <span class="text-muted mono" style="margin-left: auto;">
-                    Started: {{ op.execution.started_at.strftime('%H:%M:%S') }}
-                    {% if op.execution.completed_at %} | Completed: {{ op.execution.completed_at.strftime('%H:%M:%S') }}{% endif %}
-                </span>
-                {% endif %}
-            </div>
+                </summary>
+                <div class="step-detail-body">
+                    {% if op.instructions %}
+                    <div class="step-instructions" data-markdown>{{ op.instructions }}</div>
+                    {% endif %}
+
+                    {% if has_schema %}
+                    <div class="step-data-capture">
+                        <div class="form-label" style="margin-bottom: var(--space-xs);">DATA CAPTURE</div>
+                        {% for field in schema.get('fields', []) %}
+                        <div class="form-group" style="margin-bottom: var(--space-sm);">
+                            <label class="form-label" style="font-size: 0.75rem;">{{ field.label }}{% if field.required %} <span class="text-red">*</span>{% endif %}{% if field.get('unit') %} ({{ field.unit }}){% endif %}</label>
+                            {% if op.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
+                                {% if field.type == 'text' %}
+                                <input type="text" class="form-input" data-capture-field="{{ field.name }}" placeholder="{{ field.get('placeholder', '') }}">
+                                {% elif field.type == 'number' %}
+                                <input type="number" class="form-input" data-capture-field="{{ field.name }}"{% if field.get('min') is not none %} min="{{ field.min }}"{% endif %}{% if field.get('max') is not none %} max="{{ field.max }}"{% endif %} step="{{ field.get('step', 'any') }}">
+                                {% elif field.type == 'checkbox' %}
+                                <label style="display: flex; align-items: center; gap: var(--space-sm);"><input type="checkbox" data-capture-field="{{ field.name }}"> {{ field.label }}</label>
+                                {% elif field.type == 'select' %}
+                                <select class="form-select" data-capture-field="{{ field.name }}"><option value="">Select...</option>{% for opt in field.get('options', []) %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}</select>
+                                {% elif field.type == 'textarea' %}
+                                <textarea class="form-textarea" data-capture-field="{{ field.name }}" rows="{{ field.get('rows', 3) }}"></textarea>
+                                {% endif %}
+                            {% else %}
+                                {% if op.execution and op.execution.data_captured and op.execution.data_captured[field.name] is defined %}
+                                <div class="mono" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                                    {% if field.type == 'checkbox' %}{{ 'YES' if op.execution.data_captured[field.name] else 'NO' }}{% else %}{{ op.execution.data_captured[field.name] }}{% endif %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if op.status in ['in_progress', 'completed', 'signed_off', 'awaiting_signoff'] %}
+                    <div class="step-notes" style="margin-top: var(--space-sm);">
+                        <label class="form-label" style="font-size: 0.75rem;">NOTES</label>
+                        {% if op.status == 'in_progress' and inst_status in ['pending', 'in_progress'] %}
+                        <textarea class="form-textarea step-notes-input" rows="2" placeholder="Operator notes..."
+                                  onblur="saveNotes({{ op.order }}, this.value)">{% if op.execution and op.execution.notes %}{{ op.execution.notes }}{% endif %}</textarea>
+                        {% elif op.execution and op.execution.notes %}
+                        <div class="mono" style="padding: var(--space-xs) var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); white-space: pre-wrap;">{{ op.execution.notes }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="step-actions">
+                        {% if inst_status in ['pending', 'in_progress'] %}
+                            {% if op.status == 'pending' %}
+                            <button class="btn btn-primary" onclick="startStep({{ op.order }})">START</button>
+                            <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                            {% elif op.status == 'in_progress' %}
+                            <button class="btn btn-primary" onclick="completeStep({{ op.order }})">COMPLETE</button>
+                            <button class="btn text-yellow" onclick="showNCModal({{ op.order }})">LOG NC</button>
+                            <button class="btn" onclick="showSkipModal({{ op.order }}, '{{ op.title | e }}')">SKIP</button>
+                            {% elif op.status == 'awaiting_signoff' %}
+                            <button class="btn btn-signoff" onclick="signoffStep({{ op.order }})">SIGN OFF</button>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </details>
             {% endif %}
         </div>
         {% endfor %}
     </div>
 </div>
-{% endif %}
 
 {% if kit_items %}
 <div class="panel" style="margin-top: var(--space-md);">
@@ -326,13 +383,12 @@
                 {% endfor %}
             </tbody>
         </table>
-        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-        {% if status_val == 'completed' %}
+        {% if inst_status == 'completed' %}
         <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
             <button class="btn btn-primary" onclick="consumeParts()">CONSUME PARTS</button>
         </div>
         <div id="consume-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-        {% elif status_val in ['pending', 'in_progress'] %}
+        {% elif inst_status in ['pending', 'in_progress'] %}
         <p class="text-muted" style="margin-top: var(--space-md);">Parts can be consumed after the procedure is completed.</p>
         {% endif %}
         {% endif %}
@@ -341,7 +397,6 @@
 {% endif %}
 
 {% if productions %}
-<!-- Production panel: auto-allocated outputs with lifecycle tracking -->
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
         <span>PRODUCTION</span>
@@ -403,29 +458,19 @@
 </div>
 
 {% if bom_items or unplanned_consumptions %}
-<!-- BOM Reconciliation -->
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header"><span>BOM RECONCILIATION</span></div>
     <div class="panel-body">
         {% if bom_items %}
         <table class="data-table">
-            <thead>
-                <tr>
-                    <th>PART</th>
-                    <th style="width: 100px; text-align: right;">REQUIRED</th>
-                    <th style="width: 100px; text-align: right;">CONSUMED</th>
-                    <th style="width: 100px; text-align: right;">VARIANCE</th>
-                </tr>
-            </thead>
+            <thead><tr><th>PART</th><th style="width:100px;text-align:right;">REQUIRED</th><th style="width:100px;text-align:right;">CONSUMED</th><th style="width:100px;text-align:right;">VARIANCE</th></tr></thead>
             <tbody>
                 {% for item in bom_items %}
                 <tr>
                     <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
-                    <td class="mono" style="text-align: right;">{{ item.qty_required }}</td>
-                    <td class="mono" style="text-align: right;">{{ item.qty_consumed }}</td>
-                    <td class="mono" style="text-align: right; {% if item.variance > 0 %}color: var(--accent-yellow);{% elif item.variance < 0 %}color: var(--accent-red);{% endif %}">
-                        {% if item.variance > 0 %}+{% endif %}{{ item.variance }}
-                    </td>
+                    <td class="mono" style="text-align:right;">{{ item.qty_required }}</td>
+                    <td class="mono" style="text-align:right;">{{ item.qty_consumed }}</td>
+                    <td class="mono" style="text-align:right;{% if item.variance > 0 %}color:var(--accent-yellow);{% elif item.variance < 0 %}color:var(--accent-red);{% endif %}">{% if item.variance > 0 %}+{% endif %}{{ item.variance }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -435,17 +480,12 @@
         <div style="margin-top: var(--space-md);">
             <strong class="text-yellow">UNPLANNED CONSUMPTIONS</strong>
             <table class="data-table" style="margin-top: var(--space-sm);">
-                <thead>
-                    <tr>
-                        <th>PART</th>
-                        <th style="width: 100px; text-align: right;">QTY</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>PART</th><th style="width:100px;text-align:right;">QTY</th></tr></thead>
                 <tbody>
                     {% for item in unplanned_consumptions %}
                     <tr>
                         <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
-                        <td class="mono" style="text-align: right;">{{ item.qty_consumed }}</td>
+                        <td class="mono" style="text-align:right;">{{ item.qty_consumed }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -457,52 +497,30 @@
 {% endif %}
 
 {% elif output_items %}
-<!-- Fallback: manual output recording for non-auto-allocated procedures -->
 <div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>ASSEMBLY OUTPUT</span>
-    </div>
+    <div class="panel-header"><span>ASSEMBLY OUTPUT</span></div>
     <div class="panel-body">
         <table class="data-table" id="output-table">
-            <thead>
-                <tr>
-                    <th>PART</th>
-                    <th style="width: 100px; text-align: right;">EXPECTED</th>
-                    <th style="width: 100px;">QTY</th>
-                    <th style="width: 150px;">LOCATION *</th>
-                    <th style="width: 100px;">LOT</th>
-                    <th style="width: 150px;">SERIAL</th>
-                </tr>
-            </thead>
+            <thead><tr><th>PART</th><th style="width:100px;text-align:right;">EXPECTED</th><th style="width:100px;">QTY</th><th style="width:150px;">LOCATION *</th><th style="width:100px;">LOT</th><th style="width:150px;">SERIAL</th></tr></thead>
             <tbody>
                 {% for out in output_items %}
                 <tr data-part-id="{{ out.part_id }}">
                     <td><a href="/parts/{{ out.part_id }}">{{ out.part.name }}</a></td>
-                    <td class="mono" style="text-align: right;">{{ out.quantity_produced }}</td>
-                    <td>
-                        <input type="number" name="out_{{ out.part_id }}_qty" class="form-input"
-                               step="0.0001" min="0" value="{{ out.quantity_produced }}">
-                    </td>
-                    <td>
-                        <input type="text" name="out_{{ out.part_id }}_loc" class="form-input" placeholder="Location">
-                    </td>
-                    <td>
-                        <input type="text" name="out_{{ out.part_id }}_lot" class="form-input" placeholder="Lot #">
-                    </td>
-                    <td>
-                        <input type="text" name="out_{{ out.part_id }}_serial" class="form-input" placeholder="Serial #">
-                    </td>
+                    <td class="mono" style="text-align:right;">{{ out.quantity_produced }}</td>
+                    <td><input type="number" name="out_{{ out.part_id }}_qty" class="form-input" step="0.0001" min="0" value="{{ out.quantity_produced }}"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_loc" class="form-input" placeholder="Location"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_lot" class="form-input" placeholder="Lot #"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_serial" class="form-input" placeholder="Serial #"></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-        {% if status_val == 'completed' %}
+        {% if inst_status == 'completed' %}
         <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
             <button class="btn btn-primary" onclick="produceOutput()">RECORD OUTPUT</button>
         </div>
         <div id="produce-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-        {% elif status_val in ['pending', 'in_progress'] %}
+        {% elif inst_status in ['pending', 'in_progress'] %}
         <p class="text-muted" style="margin-top: var(--space-md);">Output can be recorded after the procedure is completed.</p>
         {% endif %}
     </div>
@@ -518,8 +536,7 @@
         </div>
     </div>
     <div class="panel-body">
-        {% set status_val = instance.status.value if instance.status.value is defined else instance.status %}
-        {% if status_val in ['pending', 'in_progress'] %}
+        {% if inst_status in ['pending', 'in_progress'] %}
         <div style="margin-bottom: var(--space-md); display: flex; gap: var(--space-sm); align-items: center;">
             <input type="file" id="attachment-file" class="form-input" style="flex: 1;">
             {{ ok.btn("UPLOAD", variant="primary", attrs='onclick="uploadAttachment()"') }}
@@ -621,11 +638,34 @@ async function startStep(stepNumber) {
 }
 
 async function completeStep(stepNumber) {
+    const data = {};
+
+    // Collect data capture fields
+    const stepEl = document.getElementById('step-' + stepNumber);
+    if (stepEl) {
+        const fields = stepEl.querySelectorAll('[data-capture-field]');
+        if (fields.length > 0) {
+            data.data_captured = {};
+            fields.forEach(f => {
+                const name = f.dataset.captureField;
+                if (f.type === 'checkbox') data.data_captured[name] = f.checked;
+                else if (f.type === 'number') data.data_captured[name] = f.value ? parseFloat(f.value) : null;
+                else data.data_captured[name] = f.value || null;
+            });
+        }
+
+        // Collect notes
+        const notesEl = stepEl.querySelector('.step-notes-input');
+        if (notesEl && notesEl.value.trim()) {
+            data.notes = notesEl.value.trim();
+        }
+    }
+
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/complete`, {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({}),
+            body: JSON.stringify(data),
         });
         if (response.ok) {
             window.location.reload();
@@ -655,9 +695,20 @@ async function signoffStep(stepNumber) {
     }
 }
 
+async function saveNotes(stepNumber, value) {
+    try {
+        await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/notes`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ notes: value.trim() || null }),
+        });
+    } catch (e) {
+        console.error('Failed to save notes:', e);
+    }
+}
+
 async function abortExecution() {
     if (!confirm('Are you sure you want to abort this execution?')) return;
-
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}`, {
             method: 'PATCH',
@@ -679,7 +730,6 @@ function showNCModal(stepNumber) {
     document.getElementById('nc-step').value = stepNumber;
     document.getElementById('nc-modal').style.display = 'block';
 }
-
 function hideNCModal() {
     document.getElementById('nc-modal').style.display = 'none';
     document.getElementById('nc-form').reset();
@@ -690,19 +740,11 @@ async function submitNC(event) {
     const form = document.getElementById('nc-form');
     const errorDiv = document.getElementById('nc-error');
     errorDiv.style.display = 'none';
-
     const stepNumber = form.step_number.value;
-    const data = {
-        title: form.title.value,
-        description: form.description.value || null,
-        priority: form.priority.value,
-    };
-
+    const data = { title: form.title.value, description: form.description.value || null, priority: form.priority.value };
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/nc`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(data),
+            method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
         });
         if (response.ok) {
             const issue = await response.json();
@@ -724,7 +766,6 @@ function showSkipModal(stepNumber, stepTitle) {
     document.getElementById('skip-step-title').textContent = stepTitle;
     document.getElementById('skip-modal').style.display = 'block';
 }
-
 function hideSkipModal() {
     document.getElementById('skip-modal').style.display = 'none';
     document.getElementById('skip-form').reset();
@@ -735,17 +776,11 @@ async function submitSkip(event) {
     const form = document.getElementById('skip-form');
     const errorDiv = document.getElementById('skip-error');
     errorDiv.style.display = 'none';
-
     const stepNumber = form.step_number.value;
-    const data = {
-        reason: form.reason.value || null,
-    };
-
+    const data = { reason: form.reason.value || null };
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/skip`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify(data),
+            method: 'POST', headers: getHeaders(), body: JSON.stringify(data),
         });
         if (response.ok) {
             window.location.reload();
@@ -761,57 +796,38 @@ async function submitSkip(event) {
 }
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        hideNCModal();
-        hideSkipModal();
-    }
+    if (e.key === 'Escape') { hideNCModal(); hideSkipModal(); }
 });
 
-// Kit availability loading
+// Kit availability
 async function loadKitAvailability() {
     try {
-        const response = await fetch(`/api/procedure-instances/${instanceId}/kit-availability`, {
-            headers: getHeaders(),
-        });
+        const response = await fetch(`/api/procedure-instances/${instanceId}/kit-availability`, { headers: getHeaders() });
         if (response.ok) {
             const data = await response.json();
             populateKitTable(data.items);
         }
-    } catch (e) {
-        console.error('Failed to load kit availability:', e);
-    }
+    } catch (e) { console.error('Failed to load kit availability:', e); }
 }
 
 function populateKitTable(items) {
     for (const item of items) {
         const row = document.querySelector(`tr[data-part-id="${item.part_id}"]`);
         if (!row) continue;
-
-        // Update availability cell
         const availCell = row.querySelector('.availability-cell');
         availCell.textContent = item.quantity_available.toFixed(4);
-        if (!item.is_available) {
-            availCell.classList.add('text-red');
-        }
-
-        // Populate location dropdown
+        if (!item.is_available) availCell.classList.add('text-red');
         const select = row.querySelector('.inv-select');
         select.innerHTML = '<option value="">Select location...</option>';
         for (const loc of item.available_locations) {
             const opt = document.createElement('option');
             opt.value = loc.inventory_record_id;
             opt.textContent = `${loc.location} (${loc.quantity.toFixed(4)})${loc.lot_number ? ' - Lot: ' + loc.lot_number : ''}`;
-            opt.dataset.maxQty = loc.quantity;
             select.appendChild(opt);
         }
-
-        // Auto-select first location with enough quantity
         const required = parseFloat(row.dataset.required);
         for (const loc of item.available_locations) {
-            if (loc.quantity >= required) {
-                select.value = loc.inventory_record_id;
-                break;
-            }
+            if (loc.quantity >= required) { select.value = loc.inventory_record_id; break; }
         }
     }
 }
@@ -819,414 +835,195 @@ function populateKitTable(items) {
 async function consumeParts() {
     const errorDiv = document.getElementById('consume-error');
     errorDiv.style.display = 'none';
-
     const items = [];
     const rows = document.querySelectorAll('#kit-table tbody tr');
-
     for (const row of rows) {
-        const partId = row.dataset.partId;
         const select = row.querySelector('.inv-select');
         const qtyInput = row.querySelector('.qty-input');
-
-        if (!select.value) {
-            errorDiv.textContent = 'Please select a location for all parts';
-            errorDiv.style.display = 'block';
-            return;
-        }
-
+        if (!select.value) { errorDiv.textContent = 'Please select a location for all parts'; errorDiv.style.display = 'block'; return; }
         const qty = parseFloat(qtyInput.value);
         if (qty <= 0) continue;
-
-        items.push({
-            inventory_record_id: parseInt(select.value),
-            quantity: qty,
-        });
+        items.push({ inventory_record_id: parseInt(select.value), quantity: qty });
     }
-
-    if (items.length === 0) {
-        errorDiv.textContent = 'No parts to consume';
-        errorDiv.style.display = 'block';
-        return;
-    }
-
+    if (items.length === 0) { errorDiv.textContent = 'No parts to consume'; errorDiv.style.display = 'block'; return; }
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/consume`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ items: items }),
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({ items }),
         });
-
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            const error = await response.json();
-            errorDiv.textContent = formatApiError(error.detail, 'Failed to consume parts');
-            errorDiv.style.display = 'block';
-        }
-    } catch (e) {
-        errorDiv.textContent = 'Network error: ' + e.message;
-        errorDiv.style.display = 'block';
-    }
+        if (response.ok) { window.location.reload(); }
+        else { const error = await response.json(); errorDiv.textContent = formatApiError(error.detail, 'Failed to consume parts'); errorDiv.style.display = 'block'; }
+    } catch (e) { errorDiv.textContent = 'Network error: ' + e.message; errorDiv.style.display = 'block'; }
 }
 
 async function produceOutput() {
     const errorDiv = document.getElementById('produce-error');
     errorDiv.style.display = 'none';
-
     const items = [];
     const rows = document.querySelectorAll('#output-table tbody tr');
-
     for (const row of rows) {
         const partId = row.dataset.partId;
-        const qtyInput = row.querySelector(`input[name="out_${partId}_qty"]`);
-        const locInput = row.querySelector(`input[name="out_${partId}_loc"]`);
-        const lotInput = row.querySelector(`input[name="out_${partId}_lot"]`);
-        const serialInput = row.querySelector(`input[name="out_${partId}_serial"]`);
-
-        const qty = parseFloat(qtyInput.value);
-        const loc = locInput.value.trim();
-
+        const qty = parseFloat(row.querySelector(`input[name="out_${partId}_qty"]`).value);
+        const loc = row.querySelector(`input[name="out_${partId}_loc"]`).value.trim();
         if (qty > 0) {
-            if (!loc) {
-                errorDiv.textContent = 'Please enter a location for all output items';
-                errorDiv.style.display = 'block';
-                return;
-            }
-
-            items.push({
-                part_id: parseInt(partId),
-                quantity: qty,
-                location: loc,
-                lot_number: lotInput.value.trim() || null,
-                serial_number: serialInput.value.trim() || null,
-            });
+            if (!loc) { errorDiv.textContent = 'Please enter a location for all output items'; errorDiv.style.display = 'block'; return; }
+            items.push({ part_id: parseInt(partId), quantity: qty, location: loc,
+                lot_number: row.querySelector(`input[name="out_${partId}_lot"]`).value.trim() || null,
+                serial_number: row.querySelector(`input[name="out_${partId}_serial"]`).value.trim() || null });
         }
     }
-
-    if (items.length === 0) {
-        errorDiv.textContent = 'No output items to record';
-        errorDiv.style.display = 'block';
-        return;
-    }
-
+    if (items.length === 0) { errorDiv.textContent = 'No output items to record'; errorDiv.style.display = 'block'; return; }
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/produce`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ items: items }),
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({ items }),
         });
-
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            const error = await response.json();
-            errorDiv.textContent = formatApiError(error.detail, 'Failed to record output');
-            errorDiv.style.display = 'block';
-        }
-    } catch (e) {
-        errorDiv.textContent = 'Network error: ' + e.message;
-        errorDiv.style.display = 'block';
-    }
+        if (response.ok) { window.location.reload(); }
+        else { const error = await response.json(); errorDiv.textContent = formatApiError(error.detail, 'Failed to record output'); errorDiv.style.display = 'block'; }
+    } catch (e) { errorDiv.textContent = 'Network error: ' + e.message; errorDiv.style.display = 'block'; }
 }
 
 async function finalizeProduction() {
     const locationInput = document.getElementById('finalize-location');
     const errorDiv = document.getElementById('finalize-error');
     if (errorDiv) errorDiv.style.display = 'none';
-
     const location = locationInput ? locationInput.value.trim() : '';
-    if (!location) {
-        if (errorDiv) {
-            errorDiv.textContent = 'Please enter a storage location';
-            errorDiv.style.display = 'block';
-        }
-        return;
-    }
-
+    if (!location) { if (errorDiv) { errorDiv.textContent = 'Please enter a storage location'; errorDiv.style.display = 'block'; } return; }
     if (!confirm('Finalize production? This will set output quantities and record assembly genealogy.')) return;
-
     try {
         const response = await fetch(`/api/procedure-instances/${instanceId}/finalize`, {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ location: location }),
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({ location }),
         });
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            const error = await response.json();
-            if (errorDiv) {
-                errorDiv.textContent = formatApiError(error.detail, 'Failed to finalize production');
-                errorDiv.style.display = 'block';
-            } else {
-                alert(formatApiError(error.detail, 'Failed to finalize production'));
-            }
-        }
-    } catch (e) {
-        const msg = 'Network error: ' + e.message;
-        if (errorDiv) {
-            errorDiv.textContent = msg;
-            errorDiv.style.display = 'block';
-        } else {
-            alert(msg);
-        }
-    }
+        if (response.ok) { window.location.reload(); }
+        else { const error = await response.json(); const msg = formatApiError(error.detail, 'Failed to finalize production'); if (errorDiv) { errorDiv.textContent = msg; errorDiv.style.display = 'block'; } else alert(msg); }
+    } catch (e) { const msg = 'Network error: ' + e.message; if (errorDiv) { errorDiv.textContent = msg; errorDiv.style.display = 'block'; } else alert(msg); }
 }
 
-// Load kit availability on page load if kit section exists
-if (document.getElementById('kit-table')) {
-    loadKitAvailability();
-}
+if (document.getElementById('kit-table')) { loadKitAvailability(); }
 
 // ============ Collaboration ============
-
 let collaboration = null;
 let isParticipant = false;
 
 function initCollaboration() {
     collaboration = new ExecutionCollaboration(instanceId);
-
-    // Setup event listeners for connection status
     window.opalEvents.on('connected', updateConnectionStatus);
     window.opalEvents.on('disconnected', updateConnectionStatus);
-
-    // Load initial participants
     loadParticipants();
-
-    // Update connection status
     updateConnectionStatus();
 }
 
 function updateConnectionStatus() {
     const statusEl = document.getElementById('connection-status');
     const textEl = document.getElementById('connection-text');
-
-    if (window.opalEvents.isConnected) {
-        statusEl.classList.add('connected');
-        textEl.textContent = 'LIVE';
-    } else {
-        statusEl.classList.remove('connected');
-        textEl.textContent = 'OFFLINE';
-    }
+    if (window.opalEvents.isConnected) { statusEl.classList.add('connected'); textEl.textContent = 'LIVE'; }
+    else { statusEl.classList.remove('connected'); textEl.textContent = 'OFFLINE'; }
 }
 
 async function loadParticipants() {
     try {
-        const response = await fetch(`/api/procedure-instances/${instanceId}/participants`, {
-            headers: getHeaders(),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            renderParticipants(data.participants);
-        }
-    } catch (e) {
-        console.error('Failed to load participants:', e);
-    }
+        const response = await fetch(`/api/procedure-instances/${instanceId}/participants`, { headers: getHeaders() });
+        if (response.ok) { const data = await response.json(); renderParticipants(data.participants); }
+    } catch (e) { console.error('Failed to load participants:', e); }
 }
 
 function renderParticipants(participants) {
     const container = document.getElementById('participants-list');
     const currentUserId = parseInt(localStorage.getItem('opal_user_id'));
-
     if (!participants || participants.length === 0) {
         container.innerHTML = '<span class="text-muted">No active participants</span>';
-        updateJoinLeaveButtons(false);
-        return;
+        updateJoinLeaveButtons(false); return;
     }
-
-    // Check if current user is a participant
     isParticipant = participants.some(p => p.user_id === currentUserId);
     updateJoinLeaveButtons(isParticipant);
-
     container.innerHTML = participants.map(p => {
         const isSelf = p.user_id === currentUserId;
-        return `
-            <div class="participant ${isSelf ? 'self' : ''}" data-user-id="${p.user_id}">
-                <span class="participant-avatar">${p.user_name.charAt(0).toUpperCase()}</span>
-                <span class="participant-name">${p.user_name}${isSelf ? ' (you)' : ''}</span>
-                ${p.last_step ? `<span class="participant-step">Step ${p.last_step}</span>` : ''}
-            </div>
-        `;
+        return `<div class="participant ${isSelf ? 'self' : ''}" data-user-id="${p.user_id}">
+            <span class="participant-avatar">${p.user_name.charAt(0).toUpperCase()}</span>
+            <span class="participant-name">${p.user_name}${isSelf ? ' (you)' : ''}</span>
+            ${p.last_step ? `<span class="participant-step">Step ${p.last_step}</span>` : ''}
+        </div>`;
     }).join('');
 }
 
 function updateJoinLeaveButtons(participating) {
     const joinBtn = document.getElementById('join-btn');
     const leaveBtn = document.getElementById('leave-btn');
-
     if (joinBtn && leaveBtn) {
-        if (participating) {
-            joinBtn.style.display = 'none';
-            leaveBtn.style.display = 'inline-block';
-        } else {
-            joinBtn.style.display = 'inline-block';
-            leaveBtn.style.display = 'none';
-        }
+        joinBtn.style.display = participating ? 'none' : 'inline-block';
+        leaveBtn.style.display = participating ? 'inline-block' : 'none';
     }
 }
 
 async function joinExecution() {
-    if (!localStorage.getItem('opal_user_id')) {
-        alert('Please select a user first');
-        return;
-    }
-
+    if (!localStorage.getItem('opal_user_id')) { alert('Please select a user first'); return; }
     try {
-        const response = await fetch(`/api/procedure-instances/${instanceId}/join`, {
-            method: 'POST',
-            headers: getHeaders(),
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            renderParticipants(data.participants);
-            window.opalEvents.setActivity(`executing:${instanceId}`);
-        } else {
-            const error = await response.json();
-            alert(formatApiError(error.detail, 'Failed to join execution'));
-        }
-    } catch (e) {
-        alert('Network error: ' + e.message);
-    }
+        const response = await fetch(`/api/procedure-instances/${instanceId}/join`, { method: 'POST', headers: getHeaders() });
+        if (response.ok) { const data = await response.json(); renderParticipants(data.participants); window.opalEvents.setActivity(`executing:${instanceId}`); }
+        else { const error = await response.json(); alert(formatApiError(error.detail, 'Failed to join execution')); }
+    } catch (e) { alert('Network error: ' + e.message); }
 }
 
 async function leaveExecution() {
-    try {
-        await fetch(`/api/procedure-instances/${instanceId}/leave`, {
-            method: 'POST',
-            headers: getHeaders(),
-        });
-
-        window.opalEvents.setActivity(null);
-        loadParticipants();
-    } catch (e) {
-        alert('Network error: ' + e.message);
-    }
+    try { await fetch(`/api/procedure-instances/${instanceId}/leave`, { method: 'POST', headers: getHeaders() }); window.opalEvents.setActivity(null); loadParticipants(); }
+    catch (e) { alert('Network error: ' + e.message); }
 }
 
-// Initialize collaboration on page load
 document.addEventListener('DOMContentLoaded', initCollaboration);
 
 // ============ Attachments ============
-
 async function loadAttachments() {
     try {
-        const response = await fetch(`/api/attachments?procedure_instance_id=${instanceId}`, {
-            headers: getHeaders(),
-        });
-        if (response.ok) {
-            const data = await response.json();
-            renderAttachments(data);
-        }
-    } catch (e) {
-        console.error('Failed to load attachments:', e);
-    }
+        const response = await fetch(`/api/attachments?procedure_instance_id=${instanceId}`, { headers: getHeaders() });
+        if (response.ok) { const data = await response.json(); renderAttachments(data); }
+    } catch (e) { console.error('Failed to load attachments:', e); }
 }
+
+function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
 function renderAttachments(attachments) {
     const container = document.getElementById('attachments-list');
     const countEl = document.getElementById('attachment-count');
     countEl.textContent = attachments.length;
-
-    if (attachments.length === 0) {
-        container.innerHTML = '<span class="text-muted">No attachments</span>';
-        return;
-    }
-
-    let html = '<table class="data-table"><thead><tr>';
-    html += '<th>FILENAME</th><th style="width:100px;">SIZE</th><th style="width:120px;">TYPE</th><th style="width:180px;">UPLOADED</th><th style="width:60px;"></th>';
-    html += '</tr></thead><tbody>';
-
+    if (attachments.length === 0) { container.innerHTML = '<span class="text-muted">No attachments</span>'; return; }
+    let html = '<table class="data-table"><thead><tr><th>FILENAME</th><th style="width:100px;">SIZE</th><th style="width:120px;">TYPE</th><th style="width:180px;">UPLOADED</th><th style="width:60px;"></th></tr></thead><tbody>';
     for (const att of attachments) {
         const sizeKb = (att.size_bytes / 1024).toFixed(1);
-        html += `<tr>`;
-        html += `<td><a href="/api/attachments/${att.id}/download" class="mono">${escapeHtml(att.original_filename)}</a></td>`;
-        html += `<td class="mono" style="text-align:right;">${sizeKb} KB</td>`;
-        html += `<td class="mono">${escapeHtml(att.mime_type)}</td>`;
-        html += `<td class="timestamp">${att.created_at.replace('T', ' ').substring(0, 19)}Z</td>`;
-        html += `<td><button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteAttachment(${att.id})">X</button></td>`;
-        html += `</tr>`;
+        html += `<tr><td><a href="/api/attachments/${att.id}/download" class="mono">${escapeHtml(att.original_filename)}</a></td><td class="mono" style="text-align:right;">${sizeKb} KB</td><td class="mono">${escapeHtml(att.mime_type)}</td><td class="timestamp">${att.created_at.replace('T', ' ').substring(0, 19)}Z</td><td><button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteAttachment(${att.id})">X</button></td></tr>`;
     }
-
     html += '</tbody></table>';
     container.innerHTML = html;
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 async function uploadAttachment() {
     const fileInput = document.getElementById('attachment-file');
-    if (!fileInput.files.length) {
-        alert('Please select a file');
-        return;
-    }
-
+    if (!fileInput.files.length) { alert('Please select a file'); return; }
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
     formData.append('procedure_instance_id', instanceId);
-
     try {
         const headers = {};
         const userId = localStorage.getItem('opal_user_id');
         if (userId) headers['X-User-Id'] = userId;
-
-        const response = await fetch('/api/attachments/upload', {
-            method: 'POST',
-            headers: headers,
-            body: formData,
-        });
-
-        if (response.ok) {
-            fileInput.value = '';
-            loadAttachments();
-        } else {
-            const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to upload file'));
-        }
-    } catch (e) {
-        alert('Network error: ' + e.message);
-    }
+        const response = await fetch('/api/attachments/upload', { method: 'POST', headers, body: formData });
+        if (response.ok) { fileInput.value = ''; loadAttachments(); }
+        else { const error = await response.json(); alert('Error: ' + (error.detail || 'Failed to upload file')); }
+    } catch (e) { alert('Network error: ' + e.message); }
 }
 
 async function deleteAttachment(attachmentId) {
     if (!confirm('Delete this attachment?')) return;
-
     try {
-        const response = await fetch(`/api/attachments/${attachmentId}`, {
-            method: 'DELETE',
-            headers: getHeaders(),
-        });
-
-        if (response.ok) {
-            loadAttachments();
-        } else {
-            const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to delete attachment'));
-        }
-    } catch (e) {
-        alert('Network error: ' + e.message);
-    }
+        const response = await fetch(`/api/attachments/${attachmentId}`, { method: 'DELETE', headers: getHeaders() });
+        if (response.ok) { loadAttachments(); }
+        else { const error = await response.json(); alert('Error: ' + (error.detail || 'Failed to delete attachment')); }
+    } catch (e) { alert('Network error: ' + e.message); }
 }
 
-// Load attachments on page load
 document.addEventListener('DOMContentLoaded', loadAttachments);
 
-// Auto-leave on page unload if participating
 window.addEventListener('beforeunload', function() {
     if (isParticipant) {
-        // Use sendBeacon for reliable delivery on page unload
         const userId = localStorage.getItem('opal_user_id');
-        if (userId) {
-            navigator.sendBeacon(
-                `/api/procedure-instances/${instanceId}/leave`,
-                new Blob([JSON.stringify({})], { type: 'application/json' })
-            );
-        }
+        if (userId) { navigator.sendBeacon(`/api/procedure-instances/${instanceId}/leave`, new Blob([JSON.stringify({})], { type: 'application/json' })); }
     }
 });
 </script>

@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb("tWO", "/procedures") }}
 {{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
 {{ ok.crumb("STEP " ~ step.step_number) }}
 {% endblock %}
@@ -36,6 +36,10 @@
                         <label style="display: flex; align-items: center; gap: var(--space-sm);">
                             <input type="checkbox" id="is_contingency" name="is_contingency" {% if step.is_contingency %}checked{% endif %} {% if step.parent_step_id %}disabled{% endif %}>
                             <span>Contingency {% if step.parent_step_id %}(inherited){% endif %}</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: var(--space-sm); margin-top: var(--space-sm);">
+                            <input type="checkbox" id="requires_signoff" name="requires_signoff" {% if step.requires_signoff %}checked{% endif %}>
+                            <span>Requires sign-off</span>
                         </label>
                     </div>
                 </div>
@@ -99,6 +103,106 @@
     </div>
 </div>
 
+<!-- Data Capture Schema Builder -->
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header">
+        <span>DATA CAPTURE FIELDS</span>
+        <div class="panel-header-actions">
+            {{ ok.btn("+ ADD FIELD", variant="primary", attrs='onclick="showAddField()"') }}
+        </div>
+    </div>
+    <div class="panel-body">
+        <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
+            Define data fields operators must fill in during execution.
+        </p>
+        <div id="schema-fields-list">
+            <!-- Populated by JS from step.required_data_schema -->
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Field Modal -->
+<div id="field-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header" id="field-modal-title">ADD DATA CAPTURE FIELD</div>
+            <div class="panel-body">
+                <form id="field-form" onsubmit="saveField(event)">
+                    <input type="hidden" id="field-edit-index" value="-1">
+                    <div class="form-group">
+                        <label class="form-label" for="field-name">FIELD NAME *</label>
+                        <input type="text" id="field-name" class="form-input" required placeholder="e.g., torque_value" pattern="[a-z0-9_]+">
+                        <small class="form-help">Lowercase, underscores only (used as key)</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="field-label">DISPLAY LABEL *</label>
+                        <input type="text" id="field-label" class="form-input" required placeholder="e.g., Torque Value">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="field-type">TYPE *</label>
+                        <select id="field-type" class="form-select" required onchange="toggleTypeExtras(this.value)">
+                            <option value="text">Text</option>
+                            <option value="number">Number</option>
+                            <option value="checkbox">Checkbox</option>
+                            <option value="select">Dropdown</option>
+                            <option value="textarea">Multi-line Text</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: var(--space-sm);">
+                            <input type="checkbox" id="field-required">
+                            <span>Required</span>
+                        </label>
+                    </div>
+                    <!-- Type-specific extras -->
+                    <div id="extras-number" style="display: none;">
+                        <div style="display: flex; gap: var(--space-md);">
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label" for="field-min">MIN</label>
+                                <input type="number" id="field-min" class="form-input" step="any">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label" for="field-max">MAX</label>
+                                <input type="number" id="field-max" class="form-input" step="any">
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label" for="field-unit">UNIT</label>
+                                <input type="text" id="field-unit" class="form-input" placeholder="e.g., Nm">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="field-step">STEP</label>
+                            <input type="number" id="field-step" class="form-input" step="any" placeholder="e.g., 0.1">
+                        </div>
+                    </div>
+                    <div id="extras-text" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="field-placeholder">PLACEHOLDER</label>
+                            <input type="text" id="field-placeholder" class="form-input">
+                        </div>
+                    </div>
+                    <div id="extras-select" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="field-options">OPTIONS (one per line) *</label>
+                            <textarea id="field-options" class="form-textarea" rows="4" placeholder="Aluminum&#10;Steel&#10;Titanium"></textarea>
+                        </div>
+                    </div>
+                    <div id="extras-textarea" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="field-rows">ROWS</label>
+                            <input type="number" id="field-rows" class="form-input" min="2" max="20" value="3">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideFieldModal()"') }}
+                        {{ ok.btn("SAVE FIELD", variant="primary", type="submit") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add Part Modal -->
 <div id="add-part-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
@@ -145,11 +249,26 @@
 const procedureId = {{ procedure.id }};
 const stepId = {{ step.id }};
 
+// Schema fields state
+let schemaFields = [];
+try {
+    const raw = {{ step.required_data_schema | tojson if step.required_data_schema else '{}' }};
+    schemaFields = (raw && raw.fields) ? raw.fields : [];
+} catch (e) {
+    schemaFields = [];
+}
+
 function getHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     const userId = localStorage.getItem('opal_user_id');
     if (userId) headers['X-User-Id'] = userId;
     return headers;
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 async function updateStep(event) {
@@ -159,11 +278,15 @@ async function updateStep(event) {
     const errorDiv = document.getElementById('form-error');
     errorDiv.style.display = 'none';
 
+    const schema = schemaFields.length > 0 ? { fields: schemaFields } : null;
+
     const data = {
         title: form.title.value,
         instructions: form.instructions.value || null,
         estimated_duration_minutes: form.estimated_duration_minutes.value ? parseInt(form.estimated_duration_minutes.value) : null,
         is_contingency: form.is_contingency.checked,
+        requires_signoff: form.requires_signoff.checked,
+        required_data_schema: schema,
     };
 
     try {
@@ -186,7 +309,141 @@ async function updateStep(event) {
     }
 }
 
-// Step parts functions
+// ============ Schema Builder ============
+
+function renderSchemaFields() {
+    const container = document.getElementById('schema-fields-list');
+    if (schemaFields.length === 0) {
+        container.innerHTML = '<span class="text-muted">No data capture fields defined</span>';
+        return;
+    }
+
+    let html = '<table class="data-table"><thead><tr>';
+    html += '<th>NAME</th><th>LABEL</th><th style="width:80px;">TYPE</th><th style="width:60px;">REQ</th><th style="width:100px;"></th>';
+    html += '</tr></thead><tbody>';
+
+    schemaFields.forEach((f, i) => {
+        html += `<tr>`;
+        html += `<td class="mono">${escapeHtml(f.name)}</td>`;
+        html += `<td>${escapeHtml(f.label)}</td>`;
+        html += `<td>${escapeHtml(f.type)}</td>`;
+        html += `<td>${f.required ? 'YES' : '-'}</td>`;
+        html += `<td style="display:flex;gap:var(--space-xs);">`;
+        html += `<button class="btn btn-sm" onclick="editField(${i})">EDIT</button>`;
+        html += `<button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteField(${i})">X</button>`;
+        html += `</td>`;
+        html += `</tr>`;
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function toggleTypeExtras(type) {
+    document.getElementById('extras-number').style.display = type === 'number' ? 'block' : 'none';
+    document.getElementById('extras-text').style.display = type === 'text' ? 'block' : 'none';
+    document.getElementById('extras-select').style.display = type === 'select' ? 'block' : 'none';
+    document.getElementById('extras-textarea').style.display = type === 'textarea' ? 'block' : 'none';
+}
+
+function showAddField() {
+    document.getElementById('field-modal-title').textContent = 'ADD DATA CAPTURE FIELD';
+    document.getElementById('field-edit-index').value = '-1';
+    document.getElementById('field-form').reset();
+    toggleTypeExtras('text');
+    document.getElementById('field-modal').style.display = 'block';
+}
+
+function hideFieldModal() {
+    document.getElementById('field-modal').style.display = 'none';
+}
+
+function editField(index) {
+    const f = schemaFields[index];
+    document.getElementById('field-modal-title').textContent = 'EDIT FIELD';
+    document.getElementById('field-edit-index').value = index;
+    document.getElementById('field-name').value = f.name;
+    document.getElementById('field-label').value = f.label;
+    document.getElementById('field-type').value = f.type;
+    document.getElementById('field-required').checked = !!f.required;
+    toggleTypeExtras(f.type);
+
+    if (f.type === 'number') {
+        document.getElementById('field-min').value = f.min != null ? f.min : '';
+        document.getElementById('field-max').value = f.max != null ? f.max : '';
+        document.getElementById('field-unit').value = f.unit || '';
+        document.getElementById('field-step').value = f.step || '';
+    } else if (f.type === 'text') {
+        document.getElementById('field-placeholder').value = f.placeholder || '';
+    } else if (f.type === 'select') {
+        document.getElementById('field-options').value = (f.options || []).join('\n');
+    } else if (f.type === 'textarea') {
+        document.getElementById('field-rows').value = f.rows || 3;
+    }
+
+    document.getElementById('field-modal').style.display = 'block';
+}
+
+function deleteField(index) {
+    if (!confirm('Delete this data capture field?')) return;
+    schemaFields.splice(index, 1);
+    renderSchemaFields();
+}
+
+function saveField(event) {
+    event.preventDefault();
+    const editIndex = parseInt(document.getElementById('field-edit-index').value);
+    const type = document.getElementById('field-type').value;
+
+    const field = {
+        name: document.getElementById('field-name').value.trim(),
+        label: document.getElementById('field-label').value.trim(),
+        type: type,
+        required: document.getElementById('field-required').checked,
+    };
+
+    if (type === 'number') {
+        const min = document.getElementById('field-min').value;
+        const max = document.getElementById('field-max').value;
+        const unit = document.getElementById('field-unit').value.trim();
+        const step = document.getElementById('field-step').value;
+        if (min !== '') field.min = parseFloat(min);
+        if (max !== '') field.max = parseFloat(max);
+        if (unit) field.unit = unit;
+        if (step !== '') field.step = parseFloat(step);
+    } else if (type === 'text') {
+        const ph = document.getElementById('field-placeholder').value.trim();
+        if (ph) field.placeholder = ph;
+    } else if (type === 'select') {
+        const opts = document.getElementById('field-options').value.split('\n').map(s => s.trim()).filter(Boolean);
+        if (opts.length === 0) { alert('Please enter at least one option'); return; }
+        field.options = opts;
+    } else if (type === 'textarea') {
+        field.rows = parseInt(document.getElementById('field-rows').value) || 3;
+    }
+
+    // Check for duplicate names (except when editing same index)
+    const dupIdx = schemaFields.findIndex(f => f.name === field.name);
+    if (dupIdx >= 0 && dupIdx !== editIndex) {
+        alert('A field with this name already exists');
+        return;
+    }
+
+    if (editIndex >= 0) {
+        schemaFields[editIndex] = field;
+    } else {
+        schemaFields.push(field);
+    }
+
+    hideFieldModal();
+    renderSchemaFields();
+}
+
+// Initialize schema builder on load
+document.addEventListener('DOMContentLoaded', renderSchemaFields);
+
+// ============ Step Parts ============
+
 function showAddPart() {
     document.getElementById('add-part-modal').style.display = 'block';
 }
@@ -250,6 +507,7 @@ async function removePart(partId) {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         hideAddPart();
+        hideFieldModal();
     }
 });
 </script>

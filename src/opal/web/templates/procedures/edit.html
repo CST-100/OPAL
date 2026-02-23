@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("PROCEDURES", "/procedures") }}
+{{ ok.crumb("tWO", "/procedures") }}
 {{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
 {{ ok.crumb("EDIT") }}
 {% endblock %}
@@ -11,7 +11,7 @@
 {% block content %}
 <div class="panel" style="max-width: 600px;">
     <div class="panel-header">
-        <span>EDIT PROCEDURE</span>
+        <span>EDIT tWO</span>
     </div>
     <div class="panel-body">
         <form id="edit-procedure-form" onsubmit="updateProcedure(event)">
