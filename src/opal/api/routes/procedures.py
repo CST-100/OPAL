@@ -622,6 +622,13 @@ async def publish_version(
     )
     next_version = (max_version or 0) + 1
 
+    # Bulk-load step kit items for all steps in this procedure
+    step_ids = [s.id for s in steps]
+    all_step_kits = db.query(StepKit).filter(StepKit.step_id.in_(step_ids)).all()
+    step_kit_map: dict[int, list[StepKit]] = {}
+    for sk in all_step_kits:
+        step_kit_map.setdefault(sk.step_id, []).append(sk)
+
     # Create snapshot with hierarchical structure
     def step_to_dict(step: ProcedureStep) -> dict:
         return {
@@ -637,6 +644,16 @@ async def publish_version(
             "requires_signoff": step.requires_signoff,
             "estimated_duration_minutes": step.estimated_duration_minutes,
             "workcenter_id": step.workcenter_id,
+            "step_kit": [
+                {
+                    "part_id": sk.part_id,
+                    "part_name": sk.part.name,
+                    "quantity_required": float(sk.quantity_required),
+                    "usage_type": sk.usage_type.value if hasattr(sk.usage_type, 'value') else sk.usage_type,
+                    "notes": sk.notes,
+                }
+                for sk in step_kit_map.get(step.id, [])
+            ],
         }
 
     # Snapshot kit and output items alongside steps

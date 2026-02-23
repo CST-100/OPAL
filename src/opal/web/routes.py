@@ -1586,6 +1586,20 @@ async def executions_detail(request: Request, db: DbSession, instance_id: int) -
     )
     context["consumptions"] = consumptions
 
+    # Group consumptions by step execution ID for step-level display
+    step_consumptions: dict[int, list] = {}
+    for c in consumptions:
+        if c.step_execution_id:
+            step_consumptions.setdefault(c.step_execution_id, []).append(c)
+    context["step_consumptions"] = step_consumptions
+
+    # Step execution ID -> step number lookup
+    step_exec_lookup = {
+        se.id: se.step_number_str or str(se.step_number)
+        for se in instance.step_executions
+    }
+    context["step_exec_lookup"] = step_exec_lookup
+
     # Get outputs (what this procedure produces)
     output_items = db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == instance.procedure_id).all()
     context["output_items"] = output_items

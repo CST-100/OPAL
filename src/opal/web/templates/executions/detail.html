@@ -156,6 +156,55 @@
                     <div class="step-instructions" data-markdown>{{ step.instructions }}</div>
                     {% endif %}
 
+                    {% set step_kit = vs.get('step_kit', []) %}
+                    {% set step_exec = step.execution %}
+                    {% set step_cons = step_consumptions.get(step_exec.id, []) if step_exec else [] %}
+                    {% if step_kit or step_cons %}
+                    <div class="step-kit-panel" style="margin: var(--space-sm) 0;">
+                        <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">
+                            STEP PARTS
+                            {% if step_cons %}{{ ok.status("CONSUMED " ~ step_cons|length, "ok") }}{% endif %}
+                        </div>
+                        {% if step_kit %}
+                        <table class="data-table" data-step-kit="{{ step.order }}">
+                            <thead><tr>
+                                <th>PART</th>
+                                <th style="width:60px;text-align:right;">QTY</th>
+                                <th style="width:80px;">TYPE</th>
+                                <th style="width:180px;">SOURCE</th>
+                                <th style="width:80px;">QTY</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sk in step_kit %}
+                                <tr data-part-id="{{ sk.part_id }}" data-required="{{ sk.quantity_required }}">
+                                    <td>{{ sk.part_name }}{% if sk.notes %} <span class="text-muted">({{ sk.notes }})</span>{% endif %}</td>
+                                    <td class="mono" style="text-align:right;">{{ sk.quantity_required }}</td>
+                                    <td>{{ ok.status(sk.usage_type|upper, "info" if sk.usage_type == 'tooling' else "default") }}</td>
+                                    <td><select class="form-select form-select-sm sk-inv-select" data-part-id="{{ sk.part_id }}"><option>Loading...</option></select></td>
+                                    <td><input type="number" class="form-input sk-qty-input" data-part-id="{{ sk.part_id }}" step="0.0001" min="0" value="{{ sk.quantity_required }}" style="width:70px;"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if step.status == 'in_progress' and inst_status in ['in_progress'] %}
+                        <div style="display:flex;justify-content:flex-end;margin-top:var(--space-xs);">
+                            <button class="btn btn-sm btn-primary" onclick="consumeStepParts({{ step.order }})">CONSUME</button>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if step_cons %}
+                        <div style="margin-top:var(--space-xs);">
+                            {% for c in step_cons %}
+                            <span class="mono text-muted" style="font-size:0.75rem;">
+                                {{ c.inventory_record.part.name }} x{{ c.quantity }} from {{ c.inventory_record.location }}
+                                {% if c.usage_type.value == 'tooling' %}(TOOLING){% endif %}
+                            </span><br>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     {% if has_schema %}
                     <!-- Data capture form -->
                     <div class="step-data-capture">
@@ -252,6 +301,55 @@
                     <div class="step-instructions" data-markdown>{{ op.instructions }}</div>
                     {% endif %}
 
+                    {% set step_kit = vs.get('step_kit', []) %}
+                    {% set step_exec = op.execution %}
+                    {% set step_cons = step_consumptions.get(step_exec.id, []) if step_exec else [] %}
+                    {% if step_kit or step_cons %}
+                    <div class="step-kit-panel" style="margin: var(--space-sm) 0;">
+                        <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">
+                            STEP PARTS
+                            {% if step_cons %}{{ ok.status("CONSUMED " ~ step_cons|length, "ok") }}{% endif %}
+                        </div>
+                        {% if step_kit %}
+                        <table class="data-table" data-step-kit="{{ op.order }}">
+                            <thead><tr>
+                                <th>PART</th>
+                                <th style="width:60px;text-align:right;">QTY</th>
+                                <th style="width:80px;">TYPE</th>
+                                <th style="width:180px;">SOURCE</th>
+                                <th style="width:80px;">QTY</th>
+                            </tr></thead>
+                            <tbody>
+                                {% for sk in step_kit %}
+                                <tr data-part-id="{{ sk.part_id }}" data-required="{{ sk.quantity_required }}">
+                                    <td>{{ sk.part_name }}{% if sk.notes %} <span class="text-muted">({{ sk.notes }})</span>{% endif %}</td>
+                                    <td class="mono" style="text-align:right;">{{ sk.quantity_required }}</td>
+                                    <td>{{ ok.status(sk.usage_type|upper, "info" if sk.usage_type == 'tooling' else "default") }}</td>
+                                    <td><select class="form-select form-select-sm sk-inv-select" data-part-id="{{ sk.part_id }}"><option>Loading...</option></select></td>
+                                    <td><input type="number" class="form-input sk-qty-input" data-part-id="{{ sk.part_id }}" step="0.0001" min="0" value="{{ sk.quantity_required }}" style="width:70px;"></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if op.status == 'in_progress' and inst_status in ['in_progress'] %}
+                        <div style="display:flex;justify-content:flex-end;margin-top:var(--space-xs);">
+                            <button class="btn btn-sm btn-primary" onclick="consumeStepParts({{ op.order }})">CONSUME</button>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                        {% if step_cons %}
+                        <div style="margin-top:var(--space-xs);">
+                            {% for c in step_cons %}
+                            <span class="mono text-muted" style="font-size:0.75rem;">
+                                {{ c.inventory_record.part.name }} x{{ c.quantity }} from {{ c.inventory_record.location }}
+                                {% if c.usage_type.value == 'tooling' %}(TOOLING){% endif %}
+                            </span><br>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
                     {% if has_schema %}
                     <div class="step-data-capture">
                         <div class="form-label" style="margin-bottom: var(--space-xs);">DATA CAPTURE</div>
@@ -339,6 +437,7 @@
                     <th style="width: 100px; text-align: right;">QTY</th>
                     <th style="width: 150px;">LOCATION</th>
                     <th style="width: 100px;">LOT</th>
+                    <th style="width: 80px;">STEP</th>
                 </tr>
             </thead>
             <tbody>
@@ -348,6 +447,7 @@
                     <td class="mono" style="text-align: right;">{{ c.quantity }}</td>
                     <td class="mono">{{ c.inventory_record.location }}</td>
                     <td class="mono">{{ c.inventory_record.lot_number or '-' }}</td>
+                    <td class="mono">{% if c.step_execution_id %}{{ step_exec_lookup.get(c.step_execution_id, '-') }}{% else %}-{% endif %}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -383,13 +483,13 @@
                 {% endfor %}
             </tbody>
         </table>
-        {% if inst_status == 'completed' %}
+        {% if inst_status in ['in_progress', 'completed'] %}
         <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
             <button class="btn btn-primary" onclick="consumeParts()">CONSUME PARTS</button>
         </div>
         <div id="consume-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-        {% elif inst_status in ['pending', 'in_progress'] %}
-        <p class="text-muted" style="margin-top: var(--space-md);">Parts can be consumed after the procedure is completed.</p>
+        {% elif inst_status == 'pending' %}
+        <p class="text-muted" style="margin-top: var(--space-md);">Parts can be consumed after the execution is started.</p>
         {% endif %}
         {% endif %}
     </div>
@@ -456,6 +556,36 @@
         {% endif %}
     </div>
 </div>
+{% elif output_items %}
+<div class="panel" style="margin-top: var(--space-md);">
+    <div class="panel-header"><span>ASSEMBLY OUTPUT</span></div>
+    <div class="panel-body">
+        <table class="data-table" id="output-table">
+            <thead><tr><th>PART</th><th style="width:100px;text-align:right;">EXPECTED</th><th style="width:100px;">QTY</th><th style="width:150px;">LOCATION *</th><th style="width:100px;">LOT</th><th style="width:150px;">SERIAL</th></tr></thead>
+            <tbody>
+                {% for out in output_items %}
+                <tr data-part-id="{{ out.part_id }}">
+                    <td><a href="/parts/{{ out.part_id }}">{{ out.part.name }}</a></td>
+                    <td class="mono" style="text-align:right;">{{ out.quantity_produced }}</td>
+                    <td><input type="number" name="out_{{ out.part_id }}_qty" class="form-input" step="0.0001" min="0" value="{{ out.quantity_produced }}"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_loc" class="form-input" placeholder="Location"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_lot" class="form-input" placeholder="Lot #"></td>
+                    <td><input type="text" name="out_{{ out.part_id }}_serial" class="form-input" placeholder="Serial #"></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if inst_status in ['in_progress', 'completed'] %}
+        <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
+            <button class="btn btn-primary" onclick="produceOutput()">RECORD OUTPUT</button>
+        </div>
+        <div id="produce-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+        {% elif inst_status == 'pending' %}
+        <p class="text-muted" style="margin-top: var(--space-md);">Output can be recorded after the execution is started.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
 
 {% if bom_items or unplanned_consumptions %}
 <div class="panel" style="margin-top: var(--space-md);">
@@ -491,37 +621,6 @@
                 </tbody>
             </table>
         </div>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
-
-{% elif output_items %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header"><span>ASSEMBLY OUTPUT</span></div>
-    <div class="panel-body">
-        <table class="data-table" id="output-table">
-            <thead><tr><th>PART</th><th style="width:100px;text-align:right;">EXPECTED</th><th style="width:100px;">QTY</th><th style="width:150px;">LOCATION *</th><th style="width:100px;">LOT</th><th style="width:150px;">SERIAL</th></tr></thead>
-            <tbody>
-                {% for out in output_items %}
-                <tr data-part-id="{{ out.part_id }}">
-                    <td><a href="/parts/{{ out.part_id }}">{{ out.part.name }}</a></td>
-                    <td class="mono" style="text-align:right;">{{ out.quantity_produced }}</td>
-                    <td><input type="number" name="out_{{ out.part_id }}_qty" class="form-input" step="0.0001" min="0" value="{{ out.quantity_produced }}"></td>
-                    <td><input type="text" name="out_{{ out.part_id }}_loc" class="form-input" placeholder="Location"></td>
-                    <td><input type="text" name="out_{{ out.part_id }}_lot" class="form-input" placeholder="Lot #"></td>
-                    <td><input type="text" name="out_{{ out.part_id }}_serial" class="form-input" placeholder="Serial #"></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if inst_status == 'completed' %}
-        <div style="display: flex; justify-content: flex-end; margin-top: var(--space-md);">
-            <button class="btn btn-primary" onclick="produceOutput()">RECORD OUTPUT</button>
-        </div>
-        <div id="produce-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-        {% elif inst_status in ['pending', 'in_progress'] %}
-        <p class="text-muted" style="margin-top: var(--space-md);">Output can be recorded after the procedure is completed.</p>
         {% endif %}
     </div>
 </div>
@@ -898,6 +997,72 @@ async function finalizeProduction() {
 }
 
 if (document.getElementById('kit-table')) { loadKitAvailability(); }
+
+// ============ Step Kit ============
+async function loadStepKitAvailability() {
+    const tables = document.querySelectorAll('[data-step-kit]');
+    if (!tables.length) return;
+    // Collect unique part IDs across all step kit tables
+    const partIds = new Set();
+    tables.forEach(t => t.querySelectorAll('tbody tr[data-part-id]').forEach(r => partIds.add(r.dataset.partId)));
+    // Fetch inventory for each part
+    const inventoryByPart = {};
+    await Promise.all([...partIds].map(async (pid) => {
+        try {
+            const resp = await fetch(`/api/inventory?part_id=${pid}&page_size=100`, { headers: getHeaders() });
+            if (resp.ok) { inventoryByPart[pid] = await resp.json(); }
+        } catch (e) { console.error('Failed to load inventory for part', pid, e); }
+    }));
+    // Populate selects
+    document.querySelectorAll('.sk-inv-select').forEach(select => {
+        const pid = select.dataset.partId;
+        const records = inventoryByPart[pid];
+        select.innerHTML = '<option value="">Select...</option>';
+        if (!records) return;
+        const items = records.items || records;
+        for (const rec of items) {
+            if (parseFloat(rec.quantity) <= 0) continue;
+            const opt = document.createElement('option');
+            opt.value = rec.id;
+            opt.textContent = `${rec.location} (${parseFloat(rec.quantity).toFixed(4)})${rec.lot_number ? ' - Lot: ' + rec.lot_number : ''}`;
+            select.appendChild(opt);
+        }
+        // Auto-select first option with enough quantity
+        const row = select.closest('tr');
+        const required = parseFloat(row?.dataset.required || 0);
+        for (const rec of items) {
+            if (parseFloat(rec.quantity) >= required) { select.value = rec.id; break; }
+        }
+    });
+}
+
+async function consumeStepParts(stepNumber) {
+    const table = document.querySelector(`[data-step-kit="${stepNumber}"]`);
+    if (!table) return;
+    const items = [];
+    const rows = table.querySelectorAll('tbody tr');
+    for (const row of rows) {
+        const select = row.querySelector('.sk-inv-select');
+        const qtyInput = row.querySelector('.sk-qty-input');
+        if (!select || !select.value) { alert('Please select a source location for all parts'); return; }
+        const qty = parseFloat(qtyInput.value);
+        if (qty <= 0) continue;
+        // Determine usage type from the row's status badge
+        const typeBadge = row.querySelector('.status');
+        const usageType = typeBadge && typeBadge.textContent.trim().toLowerCase() === 'tooling' ? 'tooling' : 'consume';
+        items.push({ inventory_record_id: parseInt(select.value), quantity: qty, usage_type: usageType });
+    }
+    if (items.length === 0) { alert('No parts to consume'); return; }
+    try {
+        const response = await fetch(`/api/procedure-instances/${instanceId}/steps/${stepNumber}/consume`, {
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({ items }),
+        });
+        if (response.ok) { window.location.reload(); }
+        else { const error = await response.json(); alert(formatApiError(error.detail, 'Failed to consume step parts')); }
+    } catch (e) { alert('Network error: ' + e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadStepKitAvailability);
 
 // ============ Collaboration ============
 let collaboration = null;
