@@ -625,6 +625,15 @@ async def parts_detail(request: Request, db: DbSession, part_id: int) -> HTMLRes
     )
     context["consumption_history"] = consumption_history
 
+    # BOM: components of this assembly (design-level)
+    from opal.db.models.part import BOMLine
+    bom_lines = db.query(BOMLine).filter(BOMLine.assembly_id == part.id).all()
+    context["bom_lines"] = bom_lines
+
+    # BOM: assemblies this part is used in (where-used)
+    where_used = db.query(BOMLine).filter(BOMLine.component_id == part.id).all()
+    context["where_used"] = where_used
+
     return templates.TemplateResponse("parts/detail.html", context)
 
 
@@ -1337,6 +1346,47 @@ async def procedures_version_detail(request: Request, db: DbSession, version_id:
     context["version"] = version
     context["procedure"] = procedure
     context["versions"] = versions
+
+    # Build hierarchical step structure from version content
+    version_steps = version.content.get("steps", [])
+    children_map: dict[int, list[dict]] = {}
+    for step in version_steps:
+        parent_id = step.get("parent_step_id")
+        if parent_id is not None:
+            children_map.setdefault(parent_id, []).append(step)
+
+    ops: list[dict[str, Any]] = []
+    contingency_ops: list[dict[str, Any]] = []
+    for step in version_steps:
+        if step.get("parent_step_id") is None:
+            step_data = {
+                "step": step,
+                "sub_steps": sorted(
+                    children_map.get(step.get("id"), []),
+                    key=lambda s: s["order"],
+                ),
+            }
+            if step.get("is_contingency"):
+                contingency_ops.append(step_data)
+            else:
+                ops.append(step_data)
+
+    context["ops"] = ops
+    context["contingency_ops"] = contingency_ops
+
+    # Resolve part names for kit/output items in snapshot
+    part_ids: set[int] = set()
+    for item in version.content.get("kit_items", []):
+        part_ids.add(item["part_id"])
+    for item in version.content.get("output_items", []):
+        part_ids.add(item["part_id"])
+
+    kit_parts: dict[int, dict[str, str]] = {}
+    if part_ids:
+        parts = db.query(Part).filter(Part.id.in_(part_ids)).all()
+        kit_parts = {p.id: {"name": p.name, "internal_pn": p.internal_pn} for p in parts}
+    context["kit_parts"] = kit_parts
+
     return templates.TemplateResponse("procedures/version_detail.html", context)
 
 

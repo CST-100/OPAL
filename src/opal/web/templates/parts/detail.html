@@ -161,47 +161,89 @@
             </div>
         </div>
 
-        <!-- Sub-components (if assembly) -->
-        {% if part.components %}
+        <!-- BOM Components (this part as assembly) -->
         <div class="panel" style="margin-bottom: var(--space-md);">
             <div class="panel-header">
-                <span>SUB-COMPONENTS ({{ part.components | length }})</span>
+                <span>BOM COMPONENTS ({{ bom_lines | length }})</span>
+                <div class="panel-header-actions">
+                    {{ ok.btn("+ ADD COMPONENT", variant="primary", attrs='onclick="showAddComponent()"') }}
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if bom_lines %}
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>COMPONENT PN</th>
+                            <th>NAME</th>
+                            <th style="text-align: right; width: 60px;">QTY</th>
+                            <th style="width: 120px;">REF DES</th>
+                            <th>NOTES</th>
+                            <th style="width: 120px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in bom_lines %}
+                        <tr>
+                            <td class="mono"><a href="/parts/{{ line.component.id }}">{{ line.component.internal_pn }}</a></td>
+                            <td><a href="/parts/{{ line.component.id }}">{{ line.component.name }}</a></td>
+                            <td class="mono" style="text-align: right;">{{ line.quantity }}</td>
+                            <td class="mono">{{ line.reference_designator or '-' }}</td>
+                            <td class="text-secondary">{{ line.notes or '-' }}</td>
+                            <td>
+                                {{ ok.btn("EDIT", size="sm", attrs='onclick="editBomLine(' ~ line.id ~ ', ' ~ line.quantity ~ ', \'' ~ (line.reference_designator or '') | replace("'", "\\'") ~ '\', \'' ~ (line.notes or '') | replace("'", "\\'") ~ '\')"') }}
+                                {{ ok.btn("X", size="sm", variant="danger", attrs='onclick="deleteBomLine(' ~ line.id ~ ')"') }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                {{ ok.empty("No BOM components defined") }}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if bom_lines %}
+        <!-- BOM Tree -->
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                <span>BOM TREE</span>
+            </div>
+            <div class="panel-body">
+                <div id="bom-tree" class="mono" style="font-size: 0.875rem;">
+                    <span class="text-muted">Loading tree...</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- BOM Where Used (this part as component) -->
+        {% if where_used %}
+        <div class="panel" style="margin-bottom: var(--space-md);">
+            <div class="panel-header">
+                <span>WHERE USED ({{ where_used | length }})</span>
             </div>
             <div class="panel-body">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>INTERNAL PN</th>
-                            <th>NAME</th>
-                            <th style="text-align: right;">QTY</th>
+                            <th>ASSEMBLY PN</th>
+                            <th>ASSEMBLY NAME</th>
+                            <th style="text-align: right; width: 60px;">QTY</th>
+                            <th style="width: 120px;">REF DES</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for comp in part.components %}
+                        {% for line in where_used %}
                         <tr>
-                            <td class="mono"><a href="/parts/{{ comp.id }}">{{ comp.internal_pn }}</a></td>
-                            <td><a href="/parts/{{ comp.id }}">{{ comp.name }}</a></td>
-                            <td class="mono" style="text-align: right;">{{ '%g' % comp.total_quantity if comp.total_quantity else '0' }}</td>
+                            <td class="mono"><a href="/parts/{{ line.assembly.id }}">{{ line.assembly.internal_pn }}</a></td>
+                            <td><a href="/parts/{{ line.assembly.id }}">{{ line.assembly.name }}</a></td>
+                            <td class="mono" style="text-align: right;">{{ line.quantity }}</td>
+                            <td class="mono">{{ line.reference_designator or '-' }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Where Used (if sub-component) -->
-        {% if part.parent_id %}
-        <div class="panel">
-            <div class="panel-header">
-                <span>WHERE USED</span>
-            </div>
-            <div class="panel-body">
-                <table class="data-table">
-                    <tr>
-                        <th style="width: 150px;">PARENT ASSEMBLY</th>
-                        <td><a href="/parts/{{ part.parent.id }}" class="mono">{{ part.parent.internal_pn }}</a> - {{ part.parent.name }}</td>
-                    </tr>
                 </table>
             </div>
         </div>
@@ -305,4 +347,310 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Add Component Modal -->
+<div id="add-component-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">ADD COMPONENT TO BOM</div>
+            <div class="panel-body">
+                <form id="add-component-form" onsubmit="addComponent(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="bom-part-search">COMPONENT PART *</label>
+                        <div class="part-search-container">
+                            <input type="text"
+                                   id="bom-part-search"
+                                   class="form-input part-search-input"
+                                   placeholder="Search parts..."
+                                   autocomplete="off"
+                                   hx-get="/parts/search"
+                                   hx-trigger="keyup changed delay:200ms"
+                                   hx-target="#bom-part-results"
+                                   hx-vals='{"limit": 5}'
+                                   name="q">
+                            <input type="hidden" id="bom-part" name="component_id" required>
+                            <div id="bom-part-results" class="part-search-dropdown"></div>
+                            <div id="bom-part-selected" class="part-search-selected" style="display: none;">
+                                <span class="part-id"></span>
+                                <span class="part-name"></span>
+                                <span class="part-search-clear" onclick="clearPartSelection('bom')">&times;</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="bom-qty">QUANTITY *</label>
+                        <input type="number" id="bom-qty" name="quantity" class="form-input" min="1" value="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="bom-refdes">REFERENCE DESIGNATOR</label>
+                        <input type="text" id="bom-refdes" name="reference_designator" class="form-input" placeholder="e.g., R1, C3, U2">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="bom-notes">NOTES</label>
+                        <input type="text" id="bom-notes" name="notes" class="form-input">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideAddComponent()"') }}
+                        {{ ok.btn("ADD", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="bom-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit BOM Line Modal -->
+<div id="edit-bom-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
+        <div class="panel">
+            <div class="panel-header">EDIT BOM LINE</div>
+            <div class="panel-body">
+                <form id="edit-bom-form" onsubmit="updateBomLine(event)">
+                    <input type="hidden" id="edit-bom-line-id">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-bom-qty">QUANTITY *</label>
+                        <input type="number" id="edit-bom-qty" class="form-input" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-bom-refdes">REFERENCE DESIGNATOR</label>
+                        <input type="text" id="edit-bom-refdes" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-bom-notes">NOTES</label>
+                        <input type="text" id="edit-bom-notes" class="form-input">
+                    </div>
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
+                        {{ ok.btn("CANCEL", attrs='onclick="hideEditBom()"') }}
+                        {{ ok.btn("SAVE", variant="primary", type="submit") }}
+                    </div>
+                </form>
+                <div id="edit-bom-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const partId = {{ part.id }};
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Part search component
+function selectPart(el) {
+    const partId = el.dataset.partId;
+    const partName = el.dataset.partName;
+    const partPn = el.dataset.partPn;
+
+    const container = el.closest('.part-search-dropdown').parentElement;
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const dropdown = container.querySelector('.part-search-dropdown');
+    const selected = container.querySelector('.part-search-selected');
+
+    hiddenInput.value = partId;
+    selected.querySelector('.part-id').textContent = partId;
+    selected.querySelector('.part-name').textContent = partPn ? `${partPn} - ${partName}` : partName;
+    selected.style.display = 'flex';
+    searchInput.style.display = 'none';
+    dropdown.classList.remove('active');
+    dropdown.innerHTML = '';
+}
+
+function clearPartSelection(prefix) {
+    const container = document.getElementById(prefix + '-part-search').closest('.part-search-container');
+    const hiddenInput = container.querySelector('input[type="hidden"]');
+    const searchInput = container.querySelector('.part-search-input');
+    const selected = container.querySelector('.part-search-selected');
+
+    hiddenInput.value = '';
+    searchInput.value = '';
+    searchInput.style.display = 'block';
+    selected.style.display = 'none';
+    searchInput.focus();
+}
+
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.classList.contains('part-search-dropdown')) {
+        const dropdown = evt.detail.target;
+        if (dropdown.innerHTML.trim()) {
+            dropdown.classList.add('active');
+        } else {
+            dropdown.classList.remove('active');
+        }
+    }
+});
+
+document.addEventListener('click', function(evt) {
+    if (!evt.target.closest('.part-search-container')) {
+        document.querySelectorAll('.part-search-dropdown').forEach(d => d.classList.remove('active'));
+    }
+});
+
+// Add Component
+function showAddComponent() {
+    document.getElementById('add-component-modal').style.display = 'block';
+}
+
+function hideAddComponent() {
+    document.getElementById('add-component-modal').style.display = 'none';
+    document.getElementById('add-component-form').reset();
+    document.getElementById('bom-part').value = '';
+    document.getElementById('bom-part-search').value = '';
+    document.getElementById('bom-part-search').style.display = 'block';
+    document.getElementById('bom-part-selected').style.display = 'none';
+    document.getElementById('bom-part-results').innerHTML = '';
+    document.getElementById('bom-error').style.display = 'none';
+}
+
+async function addComponent(event) {
+    event.preventDefault();
+    const errorDiv = document.getElementById('bom-error');
+    errorDiv.style.display = 'none';
+    const form = document.getElementById('add-component-form');
+
+    const data = {
+        component_id: parseInt(form.component_id.value),
+        quantity: parseInt(form.quantity.value),
+        reference_designator: form.reference_designator.value || null,
+        notes: form.notes.value || null,
+    };
+
+    try {
+        const response = await fetch(`/api/bom/assemblies/${partId}`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to add component');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Edit BOM Line
+function editBomLine(lineId, qty, refdes, notes) {
+    document.getElementById('edit-bom-line-id').value = lineId;
+    document.getElementById('edit-bom-qty').value = qty;
+    document.getElementById('edit-bom-refdes').value = refdes;
+    document.getElementById('edit-bom-notes').value = notes;
+    document.getElementById('edit-bom-error').style.display = 'none';
+    document.getElementById('edit-bom-modal').style.display = 'block';
+}
+
+function hideEditBom() {
+    document.getElementById('edit-bom-modal').style.display = 'none';
+}
+
+async function updateBomLine(event) {
+    event.preventDefault();
+    const lineId = document.getElementById('edit-bom-line-id').value;
+    const errorDiv = document.getElementById('edit-bom-error');
+    errorDiv.style.display = 'none';
+
+    const data = {
+        quantity: parseInt(document.getElementById('edit-bom-qty').value),
+        reference_designator: document.getElementById('edit-bom-refdes').value || null,
+        notes: document.getElementById('edit-bom-notes').value || null,
+    };
+
+    try {
+        const response = await fetch(`/api/bom/${lineId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify(data),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = formatApiError(error.detail, 'Failed to update BOM line');
+            errorDiv.style.display = 'block';
+        }
+    } catch (e) {
+        errorDiv.textContent = 'Network error: ' + e.message;
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Delete BOM Line
+async function deleteBomLine(lineId) {
+    if (!confirm('Remove this component from the BOM?')) return;
+
+    try {
+        const response = await fetch(`/api/bom/${lineId}`, {
+            method: 'DELETE',
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to remove component'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// BOM Tree
+async function loadBomTree() {
+    try {
+        const response = await fetch(`/api/bom/assemblies/${partId}/tree`, {
+            headers: getHeaders(),
+        });
+        if (response.ok) {
+            const tree = await response.json();
+            document.getElementById('bom-tree').innerHTML = renderTreeNode(tree, 0, true);
+        }
+    } catch (e) {
+        document.getElementById('bom-tree').innerHTML = '<span class="text-red">Failed to load tree</span>';
+    }
+}
+
+function renderTreeNode(node, depth, isRoot) {
+    const indent = '\u00a0\u00a0'.repeat(depth);
+    const prefix = isRoot ? '' : indent + '\u251c\u2500 ';
+    const name = escapeHtml(node.name);
+    const pn = escapeHtml(node.external_pn || '');
+    const label = pn ? `${pn} - ${name}` : name;
+    const qty = isRoot ? '' : ` x${node.quantity}`;
+    const refdes = node.reference_designator ? ` [${escapeHtml(node.reference_designator)}]` : '';
+    let html = `<div>${prefix}<a href="/parts/${node.part_id}">${label}</a>${qty}${refdes}</div>`;
+    for (const child of node.children || []) {
+        html += renderTreeNode(child, depth + 1, false);
+    }
+    return html;
+}
+
+if (document.getElementById('bom-tree')) {
+    loadBomTree();
+}
+
+// Escape key handler
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        hideAddComponent();
+        hideEditBom();
+    }
+});
+</script>
 {% endblock %}
