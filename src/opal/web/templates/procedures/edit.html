@@ -28,8 +28,8 @@
             <div class="form-group">
                 <label class="form-label" for="procedure_type">TYPE</label>
                 <select id="procedure_type" name="procedure_type" class="form-select">
-                    <option value="op" {% if procedure.procedure_type.value == "op" %}selected{% endif %}>OP - Work Order (no output)</option>
-                    <option value="build" {% if procedure.procedure_type.value == "build" %}selected{% endif %}>BUILD - Produces assembly</option>
+                    <option value="op" {% if procedure.procedure_type == "op" %}selected{% endif %}>OP - Work Order (no output)</option>
+                    <option value="build" {% if procedure.procedure_type == "build" %}selected{% endif %}>BUILD - Produces assembly</option>
                 </select>
             </div>
 

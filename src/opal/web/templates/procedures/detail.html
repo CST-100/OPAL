@@ -13,7 +13,7 @@
         <div class="panel-header">
             <span>{{ procedure.name }}</span>
             <div class="panel-header-actions">
-                {{ ok.status(procedure.status.value | upper, "ok" if procedure.status.value == "active" else ("error" if procedure.status.value == "deprecated" else "warn")) }}
+                {{ ok.status(procedure.status | upper, "ok" if procedure.status == "active" else ("error" if procedure.status == "deprecated" else "warn")) }}
             </div>
         </div>
         <div class="panel-body">
@@ -24,14 +24,14 @@
                 </tr>
                 <tr>
                     <th>TYPE</th>
-                    <td>{{ ok.status(procedure.procedure_type.value | upper, "info" if procedure.procedure_type.value == "build" else "default") }}</td>
+                    <td>{{ ok.status(procedure.procedure_type | upper, "info" if procedure.procedure_type == "build" else "default") }}</td>
                 </tr>
                 <tr>
                     <th>STATUS</th>
                     <td>
                         <select id="status-select" class="form-select" style="width: auto;" onchange="updateStatus(this.value)">
                             {% for s in statuses %}
-                            <option value="{{ s }}" {% if procedure.status.value == s %}selected{% endif %}>{{ s | upper }}</option>
+                            <option value="{{ s }}" {% if procedure.status == s %}selected{% endif %}>{{ s | upper }}</option>
                             {% endfor %}
                         </select>
                     </td>
@@ -351,7 +351,7 @@
     </div>
 </div>
 
-{% if procedure.procedure_type.value == "build" %}
+{% if procedure.procedure_type == "build" %}
 <div class="panel" style="margin-top: var(--space-md);">
     <div class="panel-header">
         <span>OUTPUTS (ASSEMBLY PRODUCTS)</span>

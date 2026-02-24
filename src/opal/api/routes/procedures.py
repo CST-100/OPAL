@@ -54,6 +54,7 @@ class ProcedureResponse(BaseModel):
     name: str
     description: str | None = None
     status: str
+    procedure_type: str = "op"
     current_version_id: int | None = None
     created_at: datetime
     updated_at: datetime
@@ -253,8 +254,8 @@ async def create_procedure(
     procedure = MasterProcedure(
         name=data.name,
         description=data.description,
-        procedure_type=ProcedureType(data.procedure_type),
-        status=ProcedureStatus.DRAFT,
+        procedure_type=ProcedureType(data.procedure_type).value,
+        status=ProcedureStatus.DRAFT.value,
     )
     db.add(procedure)
     db.flush()
@@ -288,6 +289,7 @@ async def get_procedure(
         name=procedure.name,
         description=procedure.description,
         status=procedure.status.value if hasattr(procedure.status, "value") else str(procedure.status),
+        procedure_type=procedure.procedure_type.value if hasattr(procedure.procedure_type, "value") else str(procedure.procedure_type),
         current_version_id=procedure.current_version_id,
         created_at=procedure.created_at,
         updated_at=procedure.updated_at,
@@ -319,12 +321,12 @@ async def update_procedure(
         procedure.description = data.description
     if data.status is not None:
         try:
-            procedure.status = ProcedureStatus(data.status)
+            procedure.status = ProcedureStatus(data.status).value
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {data.status}")
     if data.procedure_type is not None:
         try:
-            procedure.procedure_type = ProcedureType(data.procedure_type)
+            procedure.procedure_type = ProcedureType(data.procedure_type).value
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid procedure type: {data.procedure_type}")
 
@@ -1068,6 +1070,7 @@ async def add_output(
         quantity_produced=Decimal(str(data.quantity_produced)),
     )
     db.add(output)
+    db.flush()
     log_create(db, output, user_id)
     db.commit()
     db.refresh(output)

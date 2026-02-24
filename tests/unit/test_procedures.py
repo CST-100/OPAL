@@ -276,6 +276,30 @@ def test_kit_crud(client):
     assert len(verify_response.json()) == 0
 
 
+def test_update_procedure_type(client):
+    """Test changing procedure_type from op to build persists correctly."""
+    create_response = client.post(
+        "/api/procedures",
+        json={"name": "Build Procedure", "procedure_type": "op"},
+    )
+    assert create_response.status_code == 201
+    proc_id = create_response.json()["id"]
+    assert create_response.json()["procedure_type"] == "op"
+
+    # PATCH to build
+    patch_response = client.patch(
+        f"/api/procedures/{proc_id}",
+        json={"procedure_type": "build"},
+    )
+    assert patch_response.status_code == 200
+    assert patch_response.json()["procedure_type"] == "build"
+
+    # GET should also show build
+    get_response = client.get(f"/api/procedures/{proc_id}")
+    assert get_response.status_code == 200
+    assert get_response.json()["procedure_type"] == "build"
+
+
 def test_cannot_add_duplicate_kit_item(client):
     """Test cannot add same part twice to kit."""
     proc_response = client.post("/api/procedures", json={"name": "Duplicate Kit Test"})
