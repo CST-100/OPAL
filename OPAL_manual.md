@@ -19,8 +19,9 @@
 9. [Data Analysis](#data-analysis)
 10. [User Interface Guide](#user-interface-guide)
 11. [Advanced Features](#advanced-features)
-12. [Traceability & Compliance](#traceability--compliance)
-13. [Troubleshooting](#troubleshooting)
+12. [Onshape Integration](#onshape-integration)
+13. [Traceability & Compliance](#traceability--compliance)
+14. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -1920,6 +1921,222 @@ New: {"name": "Battery Module 12S1P", "tier": 1}
 ```
 
 Complete change history for compliance and troubleshooting.
+
+---
+
+## Onshape Integration
+
+### Overview
+
+OPAL integrates with [Onshape](https://www.onshape.com/) CAD for bidirectional BOM and metadata synchronization. This allows hardware teams to keep their CAD models and ERP system in lockstep without manual data entry.
+
+**Key behaviors:**
+
+- **Off by default** — zero overhead unless credentials are configured. No background tasks, no API calls, no extra UI elements.
+- **Bidirectional sync** — Pull BOM structure and part names from Onshape into OPAL. Push OPAL part numbers and metadata back to Onshape custom properties.
+- **Data ownership** — Onshape owns part names, descriptions, and BOM structure. OPAL owns internal part numbers, inventory, tiers, and categories.
+- **Change detection** — SHA-256 hashes of synced fields prevent redundant API calls. Only changed parts are synced.
+- **Audit trail** — Every sync operation is logged with counters, timestamps, and error details.
+
+### Setup
+
+#### 1. Generate Onshape API Keys
+
+1. Log in to [Onshape Developer Portal](https://dev-portal.onshape.com/)
+2. Navigate to **API Keys**
+3. Click **Create New API Key**
+4. Copy the **Access Key** and **Secret Key** — the secret is shown only once
+
+#### 2. Configure Environment Variables
+
+Set the following environment variables before starting OPAL:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPAL_ONSHAPE_ACCESS_KEY` | Yes | `""` | Onshape API access key |
+| `OPAL_ONSHAPE_SECRET_KEY` | Yes | `""` | Onshape API secret key |
+| `OPAL_ONSHAPE_BASE_URL` | No | `https://cad.onshape.com` | Onshape API base URL (change for enterprise instances) |
+| `OPAL_ONSHAPE_POLL_INTERVAL_MINUTES` | No | `15` | Minutes between automatic pull syncs (0 to disable polling) |
+| `OPAL_ONSHAPE_WEBHOOK_SECRET` | No | `""` | Shared secret for webhook HMAC-SHA256 verification |
+
+Example:
+
+```bash
+export OPAL_ONSHAPE_ACCESS_KEY="your-access-key"
+export OPAL_ONSHAPE_SECRET_KEY="your-secret-key"
+export OPAL_ONSHAPE_POLL_INTERVAL_MINUTES=15
+```
+
+The integration activates when both `OPAL_ONSHAPE_ACCESS_KEY` and `OPAL_ONSHAPE_SECRET_KEY` are non-empty.
+
+#### 3. Register Documents in opal.project.yaml
+
+Add an `onshape` section to your project configuration file:
+
+```yaml
+onshape:
+  documents:
+    - name: "Main Assembly"
+      document_id: "abc123def456"
+      workspace_id: "ws789ghi"
+      element_id: "elem012jkl"
+      auto_sync: true
+
+    - name: "Flight Computer"
+      document_id: "xyz999uvw111"
+      workspace_id: ""              # Auto-detected on first sync
+      element_id: "elem222mno"
+      auto_sync: false              # Manual sync only
+
+  field_mapping:
+    internal_pn: "Part Number"      # OPAL field → Onshape custom property name
+    category: "Category"
+    tier: "Tier"
+
+  default_tier: 1                   # Tier assigned to newly synced parts
+  default_category: "structures"    # Category assigned to newly synced parts
+```
+
+**Field reference:**
+
+| Field | Description |
+|-------|-------------|
+| `documents` | List of Onshape documents to sync with |
+| `documents[].name` | Human-readable label (shown in Settings UI) |
+| `documents[].document_id` | Onshape document ID (from the URL: `/documents/{document_id}/...`) |
+| `documents[].workspace_id` | Workspace ID (leave empty to auto-detect default workspace) |
+| `documents[].element_id` | Element ID of the assembly or part studio to sync |
+| `documents[].auto_sync` | Include this document in automatic polling syncs |
+| `field_mapping` | Maps OPAL field names to Onshape custom property names |
+| `default_tier` | Tier level assigned to parts created by pull sync |
+| `default_category` | Category assigned to parts created by pull sync |
+
+To find document, workspace, and element IDs, open the Onshape document in your browser. The URL has the format:
+```
+https://cad.onshape.com/documents/{document_id}/w/{workspace_id}/e/{element_id}
+```
+
+### Sync Workflows
+
+#### Pull Sync (Onshape → OPAL)
+
+Pull sync fetches BOM structure and part metadata from Onshape and creates or updates OPAL parts.
+
+**What happens:**
+
+1. Fetches the BOM and parts list from the Onshape API
+2. For each part in the BOM:
+   - Computes a `pull_hash` (SHA-256 of name, description, part number)
+   - If the part is new: creates an OPAL Part with an auto-assigned `internal_pn`, creates an OnshapeLink record
+   - If the part exists and the hash changed: updates the part name and description
+   - If the hash matches: skips (no changes)
+3. Syncs BOM structure: creates, updates, or removes BOM lines for parent-child relationships
+4. Marks links as **stale** for parts no longer present in the Onshape BOM
+
+**How to trigger:**
+
+- **Settings UI**: Click the **PULL** button in the Onshape Integration panel
+- **API**: `POST /api/onshape/sync/pull` (optionally with `?document_id=...` to sync one document)
+- **Automatic polling**: Runs on the configured interval for documents with `auto_sync: true`
+- **Webhook**: Onshape sends a notification, OPAL triggers pull automatically
+
+#### Push Sync (OPAL → Onshape)
+
+Push sync writes OPAL metadata (part numbers, categories, tiers) back to Onshape custom properties.
+
+**What happens:**
+
+1. Queries all non-stale OnshapeLink records for the document
+2. For each linked part:
+   - Computes a `push_hash` (SHA-256 of internal_pn, category, tier)
+   - If the hash matches the last push: skips (no changes)
+   - If changed: fetches existing metadata from Onshape, maps OPAL fields to Onshape property IDs using `field_mapping`, and sends the update
+
+**How to trigger:**
+
+- **Settings UI**: Click the **PUSH** button in the Onshape Integration panel
+- **API**: `POST /api/onshape/sync/push` (optionally with `?document_id=...`)
+- **Automatic**: After a pull sync creates new parts, push runs automatically to sync the new part numbers back to Onshape
+
+#### Automatic Polling
+
+When credentials are configured and `OPAL_ONSHAPE_POLL_INTERVAL_MINUTES` is greater than 0, OPAL starts a background polling loop at application startup.
+
+**Behavior:**
+
+1. Sleeps for the configured interval
+2. For each registered document with `auto_sync: true`:
+   - Runs a pull sync
+   - If new parts were created, automatically runs a push sync to write part numbers back
+3. Repeats until the application shuts down
+
+Set `OPAL_ONSHAPE_POLL_INTERVAL_MINUTES=0` to disable polling entirely.
+
+#### Webhooks (Advanced)
+
+For real-time sync without polling, configure an Onshape webhook to notify OPAL when documents change.
+
+**Prerequisites:**
+
+- OPAL must be reachable from the internet (e.g., via a tunnel or public URL)
+- Set `OPAL_ONSHAPE_WEBHOOK_SECRET` to a shared secret string
+
+**Endpoint:** `POST /api/onshape/webhook`
+
+**Verification:** If `OPAL_ONSHAPE_WEBHOOK_SECRET` is set, OPAL verifies the `X-Onshape-Signature` header using HMAC-SHA256. Requests with invalid signatures are rejected.
+
+**Behavior:** When a webhook fires, OPAL extracts the `documentId` from the payload, matches it to a registered document, and triggers a pull sync.
+
+### Settings UI
+
+Navigate to **Settings** to find the **ONSHAPE INTEGRATION** panel. This panel appears when credentials are configured.
+
+**Panel contents:**
+
+- **Status indicator**: `CONNECTED` (credentials + documents configured) or `CREDENTIALS ONLY` (credentials set but no documents registered)
+- **PULL button**: Triggers a pull sync for all registered documents
+- **PUSH button**: Triggers a push sync for all registered documents
+- **Status table**: Shows connection status and polling interval
+- **Registered Documents table**: Lists all documents from `opal.project.yaml` with their name, document ID, element ID, and auto_sync status
+- **Sync Result**: Shows the result of the last manual sync operation
+- **Recent Sync Log**: Table of recent sync operations with timestamps, direction, trigger, status, and counters
+
+### Part Detail
+
+Parts linked to Onshape display a **LINKED** badge on their detail page. The badge links to the Onshape document URL. If the part's Onshape name is available, it is shown next to the link.
+
+If the link is **stale** (the part was removed from the Onshape BOM), a **STALE** warning badge is displayed instead.
+
+The last sync timestamp is shown when available.
+
+### API Reference
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/onshape/status` | Integration status: enabled, connected, registered documents, poll interval |
+| `POST` | `/api/onshape/sync/pull` | Trigger pull sync (optional `?document_id=...`) |
+| `POST` | `/api/onshape/sync/push` | Trigger push sync (optional `?document_id=...`) |
+| `GET` | `/api/onshape/sync/logs` | Recent sync logs (`?limit=20&direction=pull\|push`) |
+| `GET` | `/api/onshape/links` | List Onshape-linked parts (`?document_id=...&stale=true\|false`) |
+| `DELETE` | `/api/onshape/links/{link_id}` | Unlink a part from Onshape (does not delete the OPAL part) |
+| `POST` | `/api/onshape/webhook` | Onshape webhook receiver (HMAC-verified if secret configured) |
+
+### Troubleshooting
+
+**Sync fails with authentication errors:**
+Verify `OPAL_ONSHAPE_ACCESS_KEY` and `OPAL_ONSHAPE_SECRET_KEY` are correct. Regenerate the API key pair in the Onshape Developer Portal if needed.
+
+**Sync returns no parts:**
+Check that `document_id` and `element_id` in `opal.project.yaml` are correct. Open the Onshape document in a browser and verify the URL matches. If `workspace_id` is empty, ensure the document has a default workspace.
+
+**Rate limiting (429 errors):**
+The Onshape client retries automatically with exponential backoff (respects `Retry-After` headers). If rate limiting persists, increase `OPAL_ONSHAPE_POLL_INTERVAL_MINUTES` or reduce the number of registered documents.
+
+**Stale links:**
+A link becomes stale when the part is removed from the Onshape BOM. The OPAL part is not deleted — only the link is marked stale. To clean up, unlink the part via `DELETE /api/onshape/links/{link_id}` or re-add the part in Onshape and run another pull sync.
+
+**Checking sync history:**
+View the sync log table in **Settings → Onshape Integration** or query `GET /api/onshape/sync/logs`. Each entry shows direction, trigger, status, and counters for parts and BOM lines created/updated/removed.
 
 ---
 

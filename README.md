@@ -34,6 +34,7 @@ Run it. The launcher initializes the database on first launch, starts the server
 - **Inventory & Procurement**: Parts database, inventory tracking, purchase order management
 - **Procedures**: Versioned procedure templates with step-by-step execution
 - **Issues**: Manual and auto-created issue tracking
+- **Onshape Integration**: Bidirectional BOM and metadata sync with Onshape CAD
 - **Local-first**: Runs on a single laptop, accessible to network
 
 ## Development Setup

@@ -52,6 +52,7 @@ uv run pyinstaller opal.spec                         # Output: dist/opal
 - `src/opal/web/routes.py` — All HTMX web routes (~85KB single file)
 - `src/opal/config.py` — Settings via pydantic-settings, all env vars use `OPAL_` prefix
 - `src/opal/project.py` — `opal.project.yaml` loader (project-level config: tiers, part numbering, categories)
+- `src/opal/integrations/onshape/` — Onshape CAD integration (client, sync engine, polling)
 - `src/opal/mcp/server.py` — MCP server for Claude Code integration
 - `src/opal/launcher.py` — Textual TUI desktop launcher
 - `src/opal/__main__.py` — CLI entry point (`opal` command)
