@@ -644,6 +644,15 @@ async def parts_detail(request: Request, db: DbSession, part_id: int) -> HTMLRes
     )
     context["test_templates"] = test_templates
 
+    # Onshape link (if integration is active)
+    onshape_link = None
+    try:
+        from opal.db.models.onshape_link import OnshapeLink
+        onshape_link = db.query(OnshapeLink).filter(OnshapeLink.part_id == part.id).first()
+    except Exception:
+        pass
+    context["onshape_link"] = onshape_link
+
     return templates.TemplateResponse("parts/detail.html", context)
 
 
@@ -2394,6 +2403,17 @@ async def settings_page(request: Request, db: DbSession) -> HTMLResponse:
         max_upload = f"{max_bytes / (1024 * 1024):.0f} MB"
 
     context["project"] = project
+
+    # Onshape integration context
+    onshape_enabled = settings.onshape_enabled
+    context["onshape_enabled"] = onshape_enabled
+    context["onshape_connected"] = False
+    context["onshape_documents"] = []
+    context["onshape_poll_interval"] = settings.onshape_poll_interval_minutes
+    if onshape_enabled and project and project.onshape.documents:
+        context["onshape_connected"] = True
+        context["onshape_documents"] = project.onshape.documents
+
     context["sys_info"] = {
         "opal_version": context["opal_version"],
         "python_version": platform.python_version(),
@@ -2409,6 +2429,23 @@ async def settings_page(request: Request, db: DbSession) -> HTMLResponse:
     }
 
     return templates.TemplateResponse("settings/index.html", context)
+
+
+@router.get("/settings/onshape/sync-log", response_class=HTMLResponse)
+async def settings_onshape_sync_log(request: Request, db: DbSession) -> HTMLResponse:
+    """HTMX partial: recent Onshape sync log entries."""
+    from opal.db.models.onshape_link import OnshapeSyncLog
+
+    sync_logs = (
+        db.query(OnshapeSyncLog)
+        .order_by(OnshapeSyncLog.id.desc())
+        .limit(10)
+        .all()
+    )
+    return templates.TemplateResponse(
+        "settings/onshape_sync_log.html",
+        {"request": request, "sync_logs": sync_logs},
+    )
 
 
 # ============ AUDIT LOG ============

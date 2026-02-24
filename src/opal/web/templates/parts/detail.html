@@ -57,6 +57,21 @@
                     <th>QR CODE</th>
                     <td><img src="/api/parts/{{ part.id }}/qrcode" alt="QR Code" style="width: 80px; height: 80px; background: white; padding: 4px;"></td>
                 </tr>
+                {% if onshape_link %}
+                <tr>
+                    <th>ONSHAPE</th>
+                    <td>
+                        {{ ok.status("LINKED", "ok") }}
+                        <a href="https://cad.onshape.com/documents/{{ onshape_link.document_id }}" target="_blank" class="mono" style="margin-left: var(--space-sm);">{{ onshape_link.onshape_name or 'Open in Onshape' }}</a>
+                        {% if onshape_link.last_synced_at %}
+                        <span class="text-muted" style="margin-left: var(--space-sm);">synced {{ ok.timestamp(onshape_link.last_synced_at) }}</span>
+                        {% endif %}
+                        {% if onshape_link.stale %}
+                        {{ ok.status("STALE", "warn") }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
                 {% if part.reorder_point is not none %}
                 <tr>
                     <th>REORDER POINT</th>

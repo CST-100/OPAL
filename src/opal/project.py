@@ -25,6 +25,30 @@ class PartNumberingConfig(BaseModel):
     format: str = "{prefix}{sep}{tier_code}{sep}{sequence}"
 
 
+class OnshapeDocumentRef(BaseModel):
+    """Reference to an Onshape document to sync with."""
+
+    name: str = Field(description="Human-readable name for this document")
+    document_id: str = Field(description="Onshape document ID")
+    workspace_id: str = Field(default="", description="Workspace ID (auto-detected if empty)")
+    element_id: str = Field(description="Assembly or part studio element ID")
+    auto_sync: bool = Field(default=True, description="Include in automated poll syncs")
+
+
+class OnshapeConfig(BaseModel):
+    """Onshape integration configuration in project config."""
+
+    documents: list[OnshapeDocumentRef] = Field(default_factory=list)
+    field_mapping: dict[str, str] = Field(
+        default_factory=lambda: {
+            "internal_pn": "Part Number",
+        },
+        description="Mapping of OPAL field names to Onshape custom property names",
+    )
+    default_tier: int = Field(default=1, description="Default tier for newly synced parts")
+    default_category: str = Field(default="", description="Default category for newly synced parts")
+
+
 class RequirementConfig(BaseModel):
     """Project-level requirement definition."""
 
@@ -68,6 +92,7 @@ class ProjectConfig(BaseModel):
     categories: list[str] = Field(default_factory=list)
     cad_directories: list[str] = Field(default_factory=list)
     custom_fields: dict[str, Any] = Field(default_factory=dict)
+    onshape: OnshapeConfig = Field(default_factory=OnshapeConfig)
 
     # Set after loading - the directory containing the config file
     project_dir: Path | None = None
@@ -333,6 +358,24 @@ def save_project_config(config: ProjectConfig) -> None:
         "categories": config.categories,
         "cad_directories": config.cad_directories,
     }
+
+    # Only include onshape config if documents are configured
+    if config.onshape.documents:
+        config_data["onshape"] = {
+            "documents": [
+                {
+                    "name": d.name,
+                    "document_id": d.document_id,
+                    "workspace_id": d.workspace_id,
+                    "element_id": d.element_id,
+                    "auto_sync": d.auto_sync,
+                }
+                for d in config.onshape.documents
+            ],
+            "field_mapping": config.onshape.field_mapping,
+            "default_tier": config.onshape.default_tier,
+            "default_category": config.onshape.default_category,
+        }
 
     with open(config_path, "w") as f:
         yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)

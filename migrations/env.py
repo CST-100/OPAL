@@ -18,6 +18,8 @@ from opal.db.models import (  # noqa: F401
     Issue,
     Kit,
     MasterProcedure,
+    OnshapeLink,
+    OnshapeSyncLog,
     Part,
     ProcedureInstance,
     ProcedureStep,

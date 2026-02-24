@@ -1,5 +1,8 @@
 """FastAPI application factory."""
 
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -26,7 +29,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     settings = get_settings()
     settings.ensure_directories()
+
+    # Start Onshape polling if enabled
+    polling_task: asyncio.Task | None = None
+    if settings.onshape_enabled and settings.onshape_poll_interval_minutes > 0:
+        try:
+            from opal.integrations.onshape.polling import onshape_polling_loop
+
+            polling_task = asyncio.create_task(
+                onshape_polling_loop(settings.onshape_poll_interval_minutes)
+            )
+            logging.getLogger(__name__).info(
+                "Onshape polling enabled (every %d min)",
+                settings.onshape_poll_interval_minutes,
+            )
+        except Exception:
+            logging.getLogger(__name__).warning("Failed to start Onshape polling", exc_info=True)
+
     yield
+
+    # Cancel polling on shutdown
+    if polling_task and not polling_task.done():
+        polling_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await polling_task
 
 
 def create_app() -> FastAPI:

@@ -87,6 +87,28 @@ class Settings(BaseSettings):
     # Authentication
     auth_mode: str = Field(default="local", description="Auth mode: 'local' or 'exe'")
 
+    # Onshape integration (off by default)
+    onshape_access_key: str = Field(
+        default="", description="Onshape API access key"
+    )
+    onshape_secret_key: str = Field(
+        default="", description="Onshape API secret key"
+    )
+    onshape_base_url: str = Field(
+        default="https://cad.onshape.com", description="Onshape API base URL"
+    )
+    onshape_poll_interval_minutes: int = Field(
+        default=15, description="Minutes between automatic pull syncs (0 to disable)"
+    )
+    onshape_webhook_secret: str = Field(
+        default="", description="Shared secret for Onshape webhook HMAC verification"
+    )
+
+    @property
+    def onshape_enabled(self) -> bool:
+        """True when Onshape API credentials are configured."""
+        return bool(self.onshape_access_key and self.onshape_secret_key)
+
     # File uploads
     upload_dir: Path = Field(
         default_factory=_default_upload_dir,
@@ -176,6 +198,11 @@ def configure_for_project(
         max_upload_size=base.max_upload_size,
         allowed_mime_types=base.allowed_mime_types,
         auth_mode=base.auth_mode,
+        onshape_access_key=base.onshape_access_key,
+        onshape_secret_key=base.onshape_secret_key,
+        onshape_base_url=base.onshape_base_url,
+        onshape_poll_interval_minutes=base.onshape_poll_interval_minutes,
+        onshape_webhook_secret=base.onshape_webhook_secret,
     )
     _active_project = project
 

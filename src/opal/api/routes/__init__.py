@@ -48,3 +48,14 @@ router.include_router(project.router)  # Has its own /project prefix
 router.include_router(search.router)  # Has its own /search prefix
 router.include_router(attachments.router)  # Has its own /attachments prefix
 router.include_router(undo.router)  # Has its own /undo prefix
+
+# Onshape integration — conditionally mounted when credentials are configured
+try:
+    from opal.config import get_active_settings
+
+    if get_active_settings().onshape_enabled:
+        from opal.api.routes import onshape
+
+        router.include_router(onshape.router)  # Has its own /onshape prefix
+except Exception:
+    pass  # Onshape integration not available or not configured

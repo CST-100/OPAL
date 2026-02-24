@@ -1,0 +1,48 @@
+{% import 'opalkit/_macros.html' as ok %}
+
+{% if sync_logs %}
+<table class="data-table">
+    <thead>
+        <tr>
+            {{ ok.th("TIME", width="180px") }}
+            {{ ok.th("DIR", width="60px") }}
+            {{ ok.th("TRIGGER", width="80px") }}
+            {{ ok.th("STATUS", width="80px") }}
+            {{ ok.th("PARTS +", width="70px") }}
+            {{ ok.th("PARTS ~", width="70px") }}
+            {{ ok.th("BOM +", width="60px") }}
+            {{ ok.th("BOM ~", width="60px") }}
+            {{ ok.th("BOM -", width="60px") }}
+            {{ ok.th("SUMMARY") }}
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in sync_logs %}
+        <tr>
+            <td>{{ ok.timestamp(log.started_at) }}</td>
+            <td class="mono">{{ log.direction|upper }}</td>
+            <td class="mono">{{ log.trigger }}</td>
+            <td>
+                {% if log.status == 'success' %}
+                {{ ok.status("OK", "ok") }}
+                {% elif log.status == 'partial' %}
+                {{ ok.status("PARTIAL", "warn") }}
+                {% elif log.status == 'error' %}
+                {{ ok.status("ERROR", "error") }}
+                {% else %}
+                {{ ok.status(log.status|upper, "default") }}
+                {% endif %}
+            </td>
+            <td class="mono">{{ log.parts_created }}</td>
+            <td class="mono">{{ log.parts_updated }}</td>
+            <td class="mono">{{ log.bom_lines_created }}</td>
+            <td class="mono">{{ log.bom_lines_updated }}</td>
+            <td class="mono">{{ log.bom_lines_removed }}</td>
+            <td class="text-muted">{{ log.summary or '-' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+{{ ok.empty("No sync operations recorded yet") }}
+{% endif %}
