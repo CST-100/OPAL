@@ -919,9 +919,12 @@ def _check_instance_completion(instance: ProcedureInstance, db: DbSession) -> No
                         step_exec.status = StepStatus.COMPLETED
                         step_exec.completed_at = datetime.now(timezone.utc)
                         # Use the last child's completer
+                        def _to_aware(dt: datetime) -> datetime:
+                            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
                         last_child = max(
                             (c for c in children if c.completed_at),
-                            key=lambda c: c.completed_at,
+                            key=lambda c: _to_aware(c.completed_at),
                             default=None,
                         )
                         if last_child and last_child.completed_by_id:
