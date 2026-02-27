@@ -18,7 +18,7 @@ async def onshape_polling_loop(interval_minutes: int) -> None:
     from opal.config import get_active_project, get_active_settings
     from opal.db.base import SessionLocal
     from opal.integrations.onshape.client import OnshapeClient
-    from opal.integrations.onshape.sync import pull_sync, push_sync
+    from opal.integrations.onshape.sync import pull_sync
 
     logger.info("Onshape polling started (interval=%d min)", interval_minutes)
 
@@ -49,20 +49,10 @@ async def onshape_polling_loop(interval_minutes: int) -> None:
                 logger.info("Polling Onshape document: %s", doc_ref.name)
                 db = SessionLocal()
                 try:
-                    # Pull sync
-                    sync_log = await asyncio.to_thread(
+                    # Pull sync (auto-pushes PNs for new parts internally)
+                    await asyncio.to_thread(
                         pull_sync, db, client, doc_ref, None, "poll"
                     )
-
-                    # If new parts were created, push their PNs back
-                    if sync_log.parts_created > 0:
-                        logger.info(
-                            "Push sync triggered for %d new parts",
-                            sync_log.parts_created,
-                        )
-                        await asyncio.to_thread(
-                            push_sync, db, client, doc_ref, None, "poll"
-                        )
                 finally:
                     db.close()
 

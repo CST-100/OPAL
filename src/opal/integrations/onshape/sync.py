@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
-from opal.core.audit import get_model_dict, log_create, log_update
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.integrations.onshape.client import OnshapeClient
 from opal.integrations.onshape.models import OnshapeBOMItem
 from opal.project import OnshapeDocumentRef
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from opal.db.models.onshape_link import OnshapeSyncLog
 
 logger = logging.getLogger(__name__)
+
+ROOT_ASSEMBLY_MARKER = "__asm_root__"
 
 
 def _compute_pull_hash(name: str, description: str | None, part_number: str | None) -> str:
@@ -56,6 +58,184 @@ def _generate_internal_pn(db: Session, tier: int) -> str:
     return project.generate_part_number(tier, count + 1)
 
 
+def _fetch_part_studio_items(
+    client: OnshapeClient,
+    document_id: str,
+    workspace_id: str,
+    element_id: str,
+) -> list[OnshapeBOMItem]:
+    """Fetch parts from a part studio and wrap them as BOM items.
+
+    Part studios contain a flat list of parts (no hierarchy), so each
+    part is returned with quantity=1 and no children.
+    """
+    parts = client.get_parts(
+        document_id=document_id,
+        workspace_id=workspace_id,
+        element_id=element_id,
+    )
+    logger.info("Part studio returned %d parts for element %s", len(parts), element_id)
+    for p in parts:
+        logger.debug("  part: id=%r name=%r pn=%r", p.part_id, p.name, p.part_number)
+    return [
+        OnshapeBOMItem(
+            item_source={"partId": p.part_id, "material": p.material},
+            source_element_id=element_id,
+            part_id=p.part_id,
+            part_name=p.name,
+            part_number=p.part_number,
+            description=p.description,
+            quantity=1,
+            children=[],
+        )
+        for p in parts
+    ]
+
+
+def _flatten_bom(items: list[OnshapeBOMItem]) -> list[OnshapeBOMItem]:
+    """Flatten nested BOM into a deduplicated list of all items.
+
+    Deduplicates by composite key (source_element_id:part_id) since
+    Onshape part_ids are only unique within a Part Studio element.
+    Parts from different Part Studios with the same part_id are kept
+    as separate entries.
+    """
+    seen: set[str] = set()  # composite key: "source_element_id:part_id"
+    result: list[OnshapeBOMItem] = []
+
+    def _walk(items: list[OnshapeBOMItem]) -> None:
+        for item in items:
+            dedup_key = f"{item.source_element_id}:{item.part_id}"
+            if item.part_id and dedup_key not in seen:
+                seen.add(dedup_key)
+                result.append(item)
+            elif not item.part_id:
+                result.append(item)
+            if item.children:
+                _walk(item.children)
+
+    _walk(items)
+    return result
+
+
+def _sync_bom_structure(
+    db: Session,
+    bom_items: list[OnshapeBOMItem],
+    assembly_part_id: int,
+    onshape_to_opal: dict[str, int],
+    user_id: int | None,
+    visited: set[int] | None = None,
+    default_element_id: str = "",
+) -> tuple[int, int, int]:
+    """Sync BOM lines from hierarchical Onshape BOM items.
+
+    Returns (created, updated, removed) counts.
+
+    Args:
+        db: Database session.
+        bom_items: Children of the current assembly level.
+        assembly_part_id: OPAL Part.id of the parent assembly.
+        onshape_to_opal: Mapping from composite key "source_eid:part_id" to OPAL Part.id.
+        user_id: User who triggered the sync.
+        visited: Set of OPAL Part.ids already visited (cycle detection).
+        default_element_id: Fallback element_id when item has no source_element_id.
+    """
+    from opal.db.models.part import BOMLine
+
+    if visited is None:
+        visited = set()
+
+    if assembly_part_id in visited:
+        logger.warning(
+            "Cycle detected: OPAL Part %d already visited, skipping BOM sync",
+            assembly_part_id,
+        )
+        return (0, 0, 0)
+
+    visited = visited | {assembly_part_id}  # Copy to allow DAG structures
+
+    created = 0
+    updated = 0
+    removed = 0
+
+    # Build map of current BOM lines for this assembly
+    existing_lines = {
+        bl.component_id: bl
+        for bl in db.query(BOMLine)
+        .filter(BOMLine.assembly_id == assembly_part_id)
+        .all()
+    }
+
+    # Pass 1: resolve all items to component_id, accumulate quantities,
+    # and track the first item ("representative") for children recursion.
+    component_agg: dict[int, tuple[int, OnshapeBOMItem]] = {}  # comp_id → (total_qty, first_item)
+
+    for item in bom_items:
+        if not item.part_id:
+            continue
+
+        source_eid = item.source_element_id or default_element_id
+        composite_key = f"{source_eid}:{item.part_id}"
+        component_id = onshape_to_opal.get(composite_key)
+        if component_id is None:
+            logger.warning(
+                "Child link not found in mapping for Onshape key=%r, skipping",
+                composite_key,
+            )
+            continue
+
+        if component_id in component_agg:
+            existing_qty, representative = component_agg[component_id]
+            component_agg[component_id] = (existing_qty + item.quantity, representative)
+        else:
+            component_agg[component_id] = (item.quantity, item)
+
+    # Pass 2: create/update BOM lines with accumulated quantities
+    seen_component_ids: set[int] = set()
+
+    for component_id, (total_qty, representative) in component_agg.items():
+        seen_component_ids.add(component_id)
+
+        if component_id in existing_lines:
+            # Update quantity if changed
+            bl = existing_lines[component_id]
+            if bl.quantity != total_qty:
+                old_values = get_model_dict(bl)
+                bl.quantity = total_qty
+                log_update(db, bl, old_values, user_id)
+                updated += 1
+        else:
+            # Create new BOM line
+            bl = BOMLine(
+                assembly_id=assembly_part_id,
+                component_id=component_id,
+                quantity=total_qty,
+            )
+            db.add(bl)
+            db.flush()
+            log_create(db, bl, user_id)
+            created += 1
+
+        # Recurse into representative's children
+        if representative.children:
+            c, u, r = _sync_bom_structure(
+                db, representative.children, component_id, onshape_to_opal, user_id,
+                visited, default_element_id,
+            )
+            created += c
+            updated += u
+            removed += r
+
+    # Remove BOM lines for components no longer in Onshape BOM
+    for comp_id, bl in existing_lines.items():
+        if comp_id not in seen_component_ids:
+            log_delete(db, bl, user_id)
+            db.delete(bl)
+            removed += 1
+
+    return (created, updated, removed)
+
+
 def pull_sync(
     db: Session,
     client: OnshapeClient,
@@ -81,7 +261,7 @@ def pull_sync(
     """
     from opal.config import get_active_project
     from opal.db.models.onshape_link import OnshapeLink, OnshapeSyncLog
-    from opal.db.models.part import BOMLine, Part
+    from opal.db.models.part import Part
 
     now = datetime.now(UTC)
     sync_log = OnshapeSyncLog(
@@ -102,71 +282,195 @@ def pull_sync(
     errors: list[str] = []
     parts_created = 0
     parts_updated = 0
+    parts_restored = 0
     bom_lines_created = 0
     bom_lines_updated = 0
     bom_lines_removed = 0
     new_part_ids: list[int] = []
 
     try:
-        # Resolve workspace_id if not provided
+        # ── Phase 0: Fetch + validate ─────────────────────────
+
         workspace_id = doc_ref.workspace_id
         if not workspace_id:
             doc = client.get_document(doc_ref.document_id)
             workspace_id = doc.default_workspace_id or ""
 
-        # Fetch BOM from Onshape
-        bom = client.get_bom(
-            document_id=doc_ref.document_id,
-            workspace_id=workspace_id,
-            element_id=doc_ref.element_id,
+        is_part_studio = doc_ref.element_type == "part_studio"
+
+        if is_part_studio:
+            flat_items = _fetch_part_studio_items(
+                client,
+                document_id=doc_ref.document_id,
+                workspace_id=workspace_id,
+                element_id=doc_ref.element_id,
+            )
+            bom_items: list[OnshapeBOMItem] = []
+        else:
+            bom = client.get_bom(
+                document_id=doc_ref.document_id,
+                workspace_id=workspace_id,
+                element_id=doc_ref.element_id,
+            )
+            bom_items = bom.items
+            flat_items = _flatten_bom(bom.items)
+
+            # Surface BOM parse warnings as sync errors for visibility
+            for w in bom.warnings:
+                errors.append(f"BOM parse [{w.field}]: {w.message}")
+
+        logger.info(
+            "Fetched %d items from Onshape (element_type=%s)",
+            len(flat_items), doc_ref.element_type,
         )
 
-        # Collect all Onshape part IDs seen in the BOM (flat)
-        seen_onshape_part_ids: set[str] = set()
+        # Validate: warn on empty names
+        for item in flat_items:
+            if not item.part_id or item.is_standard_content:
+                continue
+            if not item.part_name:
+                msg = f"Empty name for Onshape part_id={item.part_id!r}"
+                errors.append(msg)
+                logger.warning(msg)
 
-        def _flatten_bom(items: list[OnshapeBOMItem]) -> list[OnshapeBOMItem]:
-            """Flatten nested BOM into a list of all items."""
-            result = []
-            for item in items:
-                result.append(item)
-                if item.children:
-                    result.extend(_flatten_bom(item.children))
-            return result
+        # ── Phase 0b: Root assembly (assemblies only) ─────────
 
-        flat_items = _flatten_bom(bom.items)
+        onshape_to_opal: dict[str, int] = {}  # composite key "source_eid:part_id" → OPAL Part.id
+        root_assembly_part_id: int | None = None
+        seen_link_ids: set[int] = set()
+        seen_source_eids: set[str] = set()
 
-        # ── Sync parts ──────────────────────────────────────────
+        if not is_part_studio:
+            root_link = (
+                db.query(OnshapeLink)
+                .filter(
+                    OnshapeLink.document_id == doc_ref.document_id,
+                    OnshapeLink.element_id == doc_ref.element_id,
+                    OnshapeLink.part_id_onshape == ROOT_ASSEMBLY_MARKER,
+                )
+                .first()
+            )
+            if root_link:
+                root_assembly_part_id = root_link.part_id
+                root_link.last_synced_at = now
+                root_link.stale = False
+                root_part = root_link.part
+                if root_part.name != doc_ref.name:
+                    old_values = get_model_dict(root_part)
+                    root_part.name = doc_ref.name
+                    log_update(db, root_part, old_values, user_id)
+            else:
+                internal_pn = _generate_internal_pn(db, default_tier)
+                root_part = Part(
+                    name=doc_ref.name,
+                    internal_pn=internal_pn,
+                    tier=default_tier,
+                    category=default_category,
+                )
+                db.add(root_part)
+                db.flush()
+                log_create(db, root_part, user_id)
+
+                root_link = OnshapeLink(
+                    part_id=root_part.id,
+                    document_id=doc_ref.document_id,
+                    element_id=doc_ref.element_id,
+                    part_id_onshape=ROOT_ASSEMBLY_MARKER,
+                    onshape_name=doc_ref.name,
+                    last_synced_at=now,
+                )
+                db.add(root_link)
+                db.flush()
+                log_create(db, root_link, user_id)
+
+                root_assembly_part_id = root_part.id
+                parts_created += 1
+            seen_link_ids.add(root_link.id)
+
+        # ── Phase 1: Part resolution ──────────────────────────
+
+        # Name-based dedup: track part_name → OPAL Part.id so that the same
+        # physical part from different Onshape coordinates (different Part Studios
+        # with different partId values) maps to a single OPAL Part.
+        name_to_part_id: dict[str, int] = {}
+
+        # Pre-populate from existing links for this document (handles re-sync
+        # when BOM order changes between syncs)
+        existing_doc_links = (
+            db.query(OnshapeLink)
+            .join(Part, OnshapeLink.part_id == Part.id)
+            .filter(
+                OnshapeLink.document_id == doc_ref.document_id,
+                OnshapeLink.stale.is_(False),
+                Part.deleted_at.is_(None),
+            )
+            .all()
+        )
+        for el in existing_doc_links:
+            if el.onshape_name:
+                name_to_part_id[el.onshape_name] = el.part_id
+
+        items_with_empty_id = 0
+        items_unchanged = 0
 
         for item in flat_items:
             if not item.part_id:
+                items_with_empty_id += 1
+                logger.warning("Skipping item with empty part_id: name=%r", item.part_name)
                 continue
-            seen_onshape_part_ids.add(item.part_id)
+            if item.is_standard_content:
+                logger.debug("Skipping standard content: name=%r", item.part_name)
+                continue
 
-            pull_hash = _compute_pull_hash(item.part_name, None, item.part_number)
+            # Use the part's source Part Studio element_id for link scoping,
+            # falling back to the doc_ref element_id for part studios or items
+            # without an itemSource.elementId.
+            source_eid = item.source_element_id or doc_ref.element_id
+            composite_key = f"{source_eid}:{item.part_id}"
 
-            # Look up existing link
+            pull_hash = _compute_pull_hash(item.part_name, item.description, item.part_number)
+
             link = (
                 db.query(OnshapeLink)
                 .filter(
                     OnshapeLink.document_id == doc_ref.document_id,
+                    OnshapeLink.element_id == source_eid,
                     OnshapeLink.part_id_onshape == item.part_id,
                 )
                 .first()
             )
 
             if link:
-                # Existing link — check if Onshape data changed
+                part = link.part
+                if part.deleted_at is not None:
+                    old_values = get_model_dict(part)
+                    part.deleted_at = None
+                    log_update(db, part, old_values, user_id)
+                    parts_restored += 1
+                    logger.info(
+                        "Restored soft-deleted part %s (Onshape %s)",
+                        part.internal_pn, item.part_id,
+                    )
+
                 if link.pull_hash == pull_hash:
-                    # No changes from Onshape side
                     link.last_synced_at = now
                     link.stale = False
+                    items_unchanged += 1
+                    onshape_to_opal[composite_key] = part.id
+                    seen_link_ids.add(link.id)
+                    seen_source_eids.add(source_eid)
+                    if item.part_name:
+                        name_to_part_id[item.part_name] = part.id
                     continue
 
-                # Update OPAL Part's CAD-owned fields
-                part = link.part
                 old_values = get_model_dict(part)
                 part.name = item.part_name
-                # description stays — Onshape BOM doesn't always carry it
+                part.external_pn = item.part_number or part.external_pn
+                if item.description:
+                    part.description = item.description
+                material = (item.item_source or {}).get("material")
+                if material:
+                    part.metadata_ = {**(part.metadata_ or {}), "material": material}
                 log_update(db, part, old_values, user_id)
 
                 link.onshape_name = item.part_name
@@ -175,24 +479,41 @@ def pull_sync(
                 link.last_synced_at = now
                 link.stale = False
                 parts_updated += 1
+                onshape_to_opal[composite_key] = part.id
+                seen_link_ids.add(link.id)
+                seen_source_eids.add(source_eid)
+                if item.part_name:
+                    name_to_part_id[item.part_name] = part.id
 
             else:
-                # New part — create OPAL Part + OnshapeLink
+                # Name-based dedup: if another Onshape coordinate already
+                # resolved to an OPAL Part with the same name, reuse it
+                # instead of creating a duplicate.
+                if item.part_name and item.part_name in name_to_part_id:
+                    onshape_to_opal[composite_key] = name_to_part_id[item.part_name]
+                    seen_source_eids.add(source_eid)
+                    continue
+
                 internal_pn = _generate_internal_pn(db, default_tier)
                 part = Part(
                     name=item.part_name,
+                    description=item.description or None,
                     internal_pn=internal_pn,
+                    external_pn=item.part_number or None,
                     tier=default_tier,
                     category=default_category,
                 )
+                material = (item.item_source or {}).get("material")
+                if material:
+                    part.metadata_ = {"material": material}
                 db.add(part)
-                db.flush()  # Get part.id
+                db.flush()
                 log_create(db, part, user_id)
 
                 link = OnshapeLink(
                     part_id=part.id,
                     document_id=doc_ref.document_id,
-                    element_id=doc_ref.element_id,
+                    element_id=source_eid,
                     part_id_onshape=item.part_id,
                     onshape_name=item.part_name,
                     onshape_part_number=item.part_number,
@@ -205,109 +526,42 @@ def pull_sync(
 
                 parts_created += 1
                 new_part_ids.append(part.id)
+                onshape_to_opal[composite_key] = part.id
+                seen_link_ids.add(link.id)
+                seen_source_eids.add(source_eid)
+                if item.part_name:
+                    name_to_part_id[item.part_name] = part.id
 
-        # ── Sync BOM structure ──────────────────────────────────
+        # ── Phase 2: BOM structure (assemblies only) ──────────
 
-        def _sync_bom_children(
-            parent_items: list[OnshapeBOMItem],
-            assembly_part_id: int | None,
-        ) -> None:
-            nonlocal bom_lines_created, bom_lines_updated, bom_lines_removed
-
-            if assembly_part_id is None:
-                return
-
-            # Build map of current BOM lines for this assembly
-            existing_lines = {
-                bl.component_id: bl
-                for bl in db.query(BOMLine)
-                .filter(BOMLine.assembly_id == assembly_part_id)
-                .all()
-            }
-
-            seen_component_ids: set[int] = set()
-
-            for item in parent_items:
-                if not item.part_id:
-                    continue
-
-                # Find the OPAL part for this Onshape part
-                child_link = (
-                    db.query(OnshapeLink)
-                    .filter(
-                        OnshapeLink.document_id == doc_ref.document_id,
-                        OnshapeLink.part_id_onshape == item.part_id,
-                    )
-                    .first()
+        if not is_part_studio and root_assembly_part_id is not None:
+            bom_lines_created, bom_lines_updated, bom_lines_removed = (
+                _sync_bom_structure(
+                    db, bom_items, root_assembly_part_id,
+                    onshape_to_opal, user_id,
+                    default_element_id=doc_ref.element_id,
                 )
-                if not child_link:
-                    continue
+            )
 
-                component_id = child_link.part_id
-                seen_component_ids.add(component_id)
+        # ── Mark stale links ──────────────────────────────────
 
-                if component_id in existing_lines:
-                    # Update quantity if changed
-                    bl = existing_lines[component_id]
-                    if bl.quantity != item.quantity:
-                        old_values = get_model_dict(bl)
-                        bl.quantity = item.quantity
-                        log_update(db, bl, old_values, user_id)
-                        bom_lines_updated += 1
-                else:
-                    # Create new BOM line
-                    bl = BOMLine(
-                        assembly_id=assembly_part_id,
-                        component_id=component_id,
-                        quantity=item.quantity,
-                    )
-                    db.add(bl)
-                    db.flush()
-                    log_create(db, bl, user_id)
-                    bom_lines_created += 1
-
-                # Recurse into children
-                if item.children:
-                    _sync_bom_children(item.children, child_link.part_id)
-
-            # Remove BOM lines for components no longer in Onshape BOM
-            for comp_id, bl in existing_lines.items():
-                if comp_id not in seen_component_ids:
-                    db.delete(bl)
-                    bom_lines_removed += 1
-
-        # The top-level BOM items are children of the root assembly.
-        # Find or create the root assembly part from the document.
-        # For now, sync BOM for each top-level item that has children.
-        for item in bom.items:
-            if not item.part_id or not item.children:
-                continue
-            parent_link = (
+        if seen_link_ids:
+            # Include the assembly element itself so the root link isn't orphaned
+            seen_source_eids.add(doc_ref.element_id)
+            stale_links = (
                 db.query(OnshapeLink)
                 .filter(
                     OnshapeLink.document_id == doc_ref.document_id,
-                    OnshapeLink.part_id_onshape == item.part_id,
+                    OnshapeLink.element_id.in_(seen_source_eids),
+                    OnshapeLink.id.notin_(seen_link_ids),
+                    OnshapeLink.stale.is_(False),
                 )
-                .first()
+                .all()
             )
-            if parent_link:
-                _sync_bom_children(item.children, parent_link.part_id)
+            for link in stale_links:
+                link.stale = True
 
-        # ── Mark stale links ───────────────────────────────────
-
-        stale_links = (
-            db.query(OnshapeLink)
-            .filter(
-                OnshapeLink.document_id == doc_ref.document_id,
-                OnshapeLink.part_id_onshape.notin_(seen_onshape_part_ids) if seen_onshape_part_ids else True,
-                OnshapeLink.stale.is_(False),
-            )
-            .all()
-        )
-        for link in stale_links:
-            link.stale = True
-
-        # ── Finalize ───────────────────────────────────────────
+        # ── Finalize ──────────────────────────────────────────
 
         sync_log.completed_at = datetime.now(UTC)
         sync_log.status = "success"
@@ -316,11 +570,44 @@ def pull_sync(
         sync_log.bom_lines_created = bom_lines_created
         sync_log.bom_lines_updated = bom_lines_updated
         sync_log.bom_lines_removed = bom_lines_removed
-        sync_log.summary = (
-            f"Pull sync complete: {parts_created} parts created, "
-            f"{parts_updated} updated, {bom_lines_created} BOM lines created, "
-            f"{bom_lines_updated} updated, {bom_lines_removed} removed"
+
+        summary_parts = [
+            f"{parts_created} parts created",
+            f"{parts_updated} updated",
+        ]
+        if parts_restored > 0:
+            summary_parts.append(f"{parts_restored} restored")
+        if not is_part_studio:
+            summary_parts.append(f"{bom_lines_created} BOM lines added")
+
+        summary = "Pull sync complete: " + ", ".join(summary_parts)
+
+        all_eids = seen_source_eids | {doc_ref.element_id}
+        total_linked = (
+            db.query(OnshapeLink)
+            .filter(
+                OnshapeLink.document_id == doc_ref.document_id,
+                OnshapeLink.element_id.in_(all_eids),
+                OnshapeLink.stale.is_(False),
+            )
+            .count()
         )
+
+        if total_linked > 0 and parts_created == 0 and parts_updated == 0 and parts_restored == 0:
+            suffix = "part" if total_linked == 1 else "parts"
+            summary += f" — {total_linked} {suffix} already linked"
+        elif total_linked > 0:
+            suffix = "part" if total_linked == 1 else "parts"
+            summary += f" ({total_linked} {suffix} linked total)"
+
+        if len(flat_items) == 0:
+            summary += (
+                f"\n(API returned 0 items: "
+                f"{items_with_empty_id} skipped [no ID], "
+                f"{items_unchanged} unchanged)"
+            )
+
+        sync_log.summary = summary
 
         if errors:
             sync_log.status = "partial"
@@ -328,6 +615,22 @@ def pull_sync(
 
         db.commit()
         logger.info("Pull sync complete: %s", sync_log.summary)
+
+        # ── Auto-push PNs for newly created parts ─────────────
+        if new_part_ids:
+            logger.info(
+                "Auto-pushing PNs for %d newly created parts", len(new_part_ids)
+            )
+            push_log = push_sync(
+                db, client, doc_ref, user_id,
+                trigger="auto",
+                part_ids=new_part_ids,
+            )
+            if push_log.parts_updated:
+                logger.info(
+                    "Auto-push complete: %d PNs written to Onshape",
+                    push_log.parts_updated,
+                )
 
     except Exception as e:
         sync_log.completed_at = datetime.now(UTC)
@@ -391,7 +694,8 @@ def push_sync(
             doc = client.get_document(doc_ref.document_id)
             workspace_id = doc.default_workspace_id or ""
 
-        # Query links for this document
+        # Query links for this document (links store source element_id which
+        # may differ from doc_ref.element_id for assembly BOM items)
         query = db.query(OnshapeLink).filter(
             OnshapeLink.document_id == doc_ref.document_id,
             OnshapeLink.stale.is_(False),
@@ -402,6 +706,8 @@ def push_sync(
         links = query.all()
 
         for link in links:
+            if link.part_id_onshape == ROOT_ASSEMBLY_MARKER:
+                continue
             part = link.part
             push_hash = _compute_push_hash(part.internal_pn, part.category, part.tier)
 

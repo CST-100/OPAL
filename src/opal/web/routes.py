@@ -404,6 +404,7 @@ async def parts_table(
         query = query.filter(
             or_(
                 Part.name.ilike(search_term),
+                Part.internal_pn.ilike(search_term),
                 Part.external_pn.ilike(search_term),
                 Part.description.ilike(search_term),
             )
@@ -2445,6 +2446,362 @@ async def settings_onshape_sync_log(request: Request, db: DbSession) -> HTMLResp
     return templates.TemplateResponse(
         "settings/onshape_sync_log.html",
         {"request": request, "sync_logs": sync_logs},
+    )
+
+
+@router.get("/settings/onshape/documents", response_class=HTMLResponse)
+async def settings_onshape_documents(request: Request, db: DbSession) -> HTMLResponse:
+    """HTMX partial: Onshape registered documents table + add form."""
+    from opal.config import get_active_project, get_active_settings
+
+    settings = get_active_settings()
+    project = get_active_project()
+    documents = project.onshape.documents if project else []
+    context = get_base_context(request, db, "")
+    context["onshape_documents"] = documents
+    context["onshape_enabled"] = settings.onshape_enabled
+    context["onshape_doc_error"] = None
+    context["onshape_doc_success"] = None
+    return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+
+@router.post("/settings/onshape/documents", response_class=HTMLResponse)
+async def settings_onshape_add_document(request: Request, db: DbSession) -> HTMLResponse:
+    """HTMX: add an Onshape document from a pasted URL."""
+    import asyncio
+
+    from opal.config import get_active_project, get_active_settings
+    from opal.integrations.onshape.client import (
+        OnshapeApiError,
+        OnshapeClient,
+        parse_onshape_url,
+    )
+    from opal.project import OnshapeDocumentRef, save_project_config
+
+    settings = get_active_settings()
+    project = get_active_project()
+
+    form = await request.form()
+    url = str(form.get("url", "")).strip()
+    name_override = str(form.get("name", "")).strip()
+
+    documents = project.onshape.documents if project else []
+    context = get_base_context(request, db, "")
+    context["onshape_documents"] = documents
+    context["onshape_enabled"] = settings.onshape_enabled
+    context["onshape_doc_error"] = None
+    context["onshape_doc_success"] = None
+
+    if not url:
+        context["onshape_doc_error"] = "URL is required"
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+    if not project:
+        context["onshape_doc_error"] = "No project configured"
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+    parsed = parse_onshape_url(url)
+    if not parsed:
+        context["onshape_doc_error"] = (
+            "Invalid Onshape URL. Expected: https://cad.onshape.com/documents/..."
+        )
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+    document_id, wvm_type, wvm_id, element_id = parsed
+
+    if wvm_type != "w":
+        context["onshape_doc_error"] = (
+            "Only workspace URLs (/w/) are supported. Open the document in a workspace."
+        )
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+    workspace_id = wvm_id
+
+    # Duplicate check
+    for doc in project.onshape.documents:
+        if doc.document_id == document_id and doc.element_id == element_id:
+            context["onshape_doc_error"] = f"Already registered as '{doc.name}'"
+            return templates.TemplateResponse(
+                "settings/onshape_documents.html", context
+            )
+
+    # Auto-detect element type
+    client = OnshapeClient(
+        access_key=settings.onshape_access_key,
+        secret_key=settings.onshape_secret_key,
+        base_url=settings.onshape_base_url,
+    )
+    try:
+        elements = await asyncio.to_thread(
+            client.get_elements, document_id, workspace_id
+        )
+    except OnshapeApiError as e:
+        context["onshape_doc_error"] = f"Onshape API error: {e.detail}"
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+    finally:
+        client.close()
+
+    matched = next((el for el in elements if el.id == element_id), None)
+    if not matched:
+        context["onshape_doc_error"] = "Element not found in the Onshape document"
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+    type_map = {"PARTSTUDIO": "part_studio", "ASSEMBLY": "assembly"}
+    element_type = type_map.get(matched.element_type)
+    if not element_type:
+        context["onshape_doc_error"] = (
+            f"Unsupported element type: {matched.element_type}. "
+            "Only assemblies and part studios are supported."
+        )
+        return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+    doc_name = name_override if name_override else matched.name
+
+    doc_ref = OnshapeDocumentRef(
+        name=doc_name,
+        document_id=document_id,
+        workspace_id=workspace_id,
+        element_id=element_id,
+        element_type=element_type,
+        auto_sync=True,
+    )
+    project.onshape.documents.append(doc_ref)
+    save_project_config(project)
+
+    context["onshape_documents"] = project.onshape.documents
+    context["onshape_doc_success"] = f"Added '{doc_name}' ({element_type.replace('_', ' ')})"
+    return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+
+@router.post("/settings/onshape/documents/remove", response_class=HTMLResponse)
+async def settings_onshape_remove_document(
+    request: Request, db: DbSession
+) -> HTMLResponse:
+    """HTMX: remove an Onshape document from config."""
+    from opal.config import get_active_project, get_active_settings
+    from opal.project import save_project_config
+
+    settings = get_active_settings()
+    project = get_active_project()
+
+    form = await request.form()
+    document_id = str(form.get("document_id", ""))
+    element_id = str(form.get("element_id", ""))
+
+    context = get_base_context(request, db, "")
+    context["onshape_enabled"] = settings.onshape_enabled
+    context["onshape_doc_error"] = None
+    context["onshape_doc_success"] = None
+
+    if project:
+        removed_name = None
+        for doc in project.onshape.documents:
+            if doc.document_id == document_id and doc.element_id == element_id:
+                removed_name = doc.name
+                break
+
+        project.onshape.documents = [
+            d
+            for d in project.onshape.documents
+            if not (d.document_id == document_id and d.element_id == element_id)
+        ]
+        save_project_config(project)
+
+        if removed_name:
+            context["onshape_doc_success"] = f"Removed '{removed_name}'"
+
+    context["onshape_documents"] = project.onshape.documents if project else []
+    return templates.TemplateResponse("settings/onshape_documents.html", context)
+
+
+@router.post("/settings/onshape/sync/pull", response_class=HTMLResponse)
+async def settings_onshape_sync_pull(request: Request, db: DbSession) -> HTMLResponse:
+    """HTMX: trigger pull sync from Onshape, return HTML result."""
+    import asyncio
+
+    from opal.config import get_active_project, get_active_settings
+    from opal.db.base import SessionLocal
+    from opal.db.models.onshape_link import OnshapeSyncLog
+    from opal.integrations.onshape.client import OnshapeClient
+    from opal.integrations.onshape.sync import pull_sync
+
+    settings = get_active_settings()
+    project = get_active_project()
+
+    # Resolve user from cookie
+    user_id: int | None = None
+    cookie_user_id = request.cookies.get("opal_user_id")
+    if cookie_user_id:
+        try:
+            user_id = int(cookie_user_id)
+        except (ValueError, TypeError):
+            pass
+
+    if not settings.onshape_enabled or not project or not project.onshape.documents:
+        sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+        return templates.TemplateResponse(
+            "settings/onshape_sync_result.html",
+            {
+                "request": request,
+                "status": "error",
+                "summary": "Onshape not enabled or no documents configured",
+                "error_message": None,
+                "sync_logs": sync_logs,
+            },
+        )
+
+    doc_refs = project.onshape.documents
+    client = OnshapeClient(
+        access_key=settings.onshape_access_key,
+        secret_key=settings.onshape_secret_key,
+        base_url=settings.onshape_base_url,
+    )
+
+    def _run_sync() -> list[dict[str, str | None]]:
+        results: list[dict[str, str | None]] = []
+        thread_db = SessionLocal()
+        try:
+            for doc_ref in doc_refs:
+                sync_log = pull_sync(thread_db, client, doc_ref, user_id, "manual")
+                results.append({"status": sync_log.status, "summary": sync_log.summary})
+        finally:
+            thread_db.close()
+        return results
+
+    try:
+        results = await asyncio.to_thread(_run_sync)
+    except Exception as e:
+        db.commit()  # Release stale read snapshot so we see thread-committed data
+        sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+        return templates.TemplateResponse(
+            "settings/onshape_sync_result.html",
+            {
+                "request": request,
+                "status": "error",
+                "summary": f"Pull sync failed: {e}",
+                "error_message": str(e),
+                "sync_logs": sync_logs,
+            },
+        )
+    finally:
+        client.close()
+
+    # Combine results: worst status wins, summaries joined
+    worst = "success"
+    for r in results:
+        if r["status"] == "error":
+            worst = "error"
+            break
+        if r["status"] == "partial":
+            worst = "partial"
+    combined_summary = "\n".join(r["summary"] or "" for r in results)
+
+    # Re-query sync logs — commit first to release stale read snapshot
+    db.commit()
+    sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+    return templates.TemplateResponse(
+        "settings/onshape_sync_result.html",
+        {
+            "request": request,
+            "status": worst,
+            "summary": combined_summary,
+            "error_message": None,
+            "sync_logs": sync_logs,
+        },
+    )
+
+
+@router.post("/settings/onshape/sync/push", response_class=HTMLResponse)
+async def settings_onshape_sync_push(request: Request, db: DbSession) -> HTMLResponse:
+    """HTMX: trigger push sync to Onshape, return HTML result."""
+    import asyncio
+
+    from opal.config import get_active_project, get_active_settings
+    from opal.db.base import SessionLocal
+    from opal.db.models.onshape_link import OnshapeSyncLog
+    from opal.integrations.onshape.client import OnshapeClient
+    from opal.integrations.onshape.sync import push_sync
+
+    settings = get_active_settings()
+    project = get_active_project()
+
+    user_id: int | None = None
+    cookie_user_id = request.cookies.get("opal_user_id")
+    if cookie_user_id:
+        try:
+            user_id = int(cookie_user_id)
+        except (ValueError, TypeError):
+            pass
+
+    if not settings.onshape_enabled or not project or not project.onshape.documents:
+        sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+        return templates.TemplateResponse(
+            "settings/onshape_sync_result.html",
+            {
+                "request": request,
+                "status": "error",
+                "summary": "Onshape not enabled or no documents configured",
+                "error_message": None,
+                "sync_logs": sync_logs,
+            },
+        )
+
+    doc_refs = project.onshape.documents
+    client = OnshapeClient(
+        access_key=settings.onshape_access_key,
+        secret_key=settings.onshape_secret_key,
+        base_url=settings.onshape_base_url,
+    )
+
+    def _run_sync() -> list[dict[str, str | None]]:
+        results: list[dict[str, str | None]] = []
+        thread_db = SessionLocal()
+        try:
+            for doc_ref in doc_refs:
+                sync_log = push_sync(thread_db, client, doc_ref, user_id, "manual")
+                results.append({"status": sync_log.status, "summary": sync_log.summary})
+        finally:
+            thread_db.close()
+        return results
+
+    try:
+        results = await asyncio.to_thread(_run_sync)
+    except Exception as e:
+        db.commit()  # Release stale read snapshot so we see thread-committed data
+        sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+        return templates.TemplateResponse(
+            "settings/onshape_sync_result.html",
+            {
+                "request": request,
+                "status": "error",
+                "summary": f"Push sync failed: {e}",
+                "error_message": str(e),
+                "sync_logs": sync_logs,
+            },
+        )
+    finally:
+        client.close()
+
+    # Combine results: worst status wins, summaries joined
+    worst = "success"
+    for r in results:
+        if r["status"] == "error":
+            worst = "error"
+            break
+        if r["status"] == "partial":
+            worst = "partial"
+    combined_summary = "\n".join(r["summary"] or "" for r in results)
+
+    db.commit()  # Release stale read snapshot so we see thread-committed data
+    sync_logs = db.query(OnshapeSyncLog).order_by(OnshapeSyncLog.id.desc()).limit(10).all()
+    return templates.TemplateResponse(
+        "settings/onshape_sync_result.html",
+        {
+            "request": request,
+            "status": worst,
+            "summary": combined_summary,
+            "error_message": None,
+            "sync_logs": sync_logs,
+        },
     )
 
 

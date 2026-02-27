@@ -1,0 +1,90 @@
+{% import 'opalkit/_macros.html' as ok %}
+
+{# HTMX partial: Onshape registered documents table + add form #}
+<div id="onshape-documents">
+    {% if onshape_doc_error %}
+    <div class="alert alert-error" style="margin-bottom: var(--space-md);">
+        {{ onshape_doc_error }}
+    </div>
+    {% endif %}
+    {% if onshape_doc_success %}
+    <div class="alert alert-success" style="margin-bottom: var(--space-md);">
+        {{ onshape_doc_success }}
+    </div>
+    {% endif %}
+
+    {% if onshape_documents %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                {{ ok.th("NAME") }}
+                {{ ok.th("TYPE", width="120px") }}
+                {{ ok.th("DOCUMENT ID", width="220px") }}
+                {{ ok.th("ELEMENT ID", width="220px") }}
+                {{ ok.th("AUTO SYNC", width="80px") }}
+                {{ ok.th("", width="80px") }}
+            </tr>
+        </thead>
+        <tbody>
+            {% for doc in onshape_documents %}
+            <tr>
+                <td>{{ doc.name }}</td>
+                <td>
+                    {% if doc.element_type == "assembly" %}
+                    {{ ok.status("ASSEMBLY", "ok") }}
+                    {% elif doc.element_type == "part_studio" %}
+                    {{ ok.status("PART STUDIO", "default") }}
+                    {% else %}
+                    {{ doc.element_type }}
+                    {% endif %}
+                </td>
+                <td class="mono">{{ doc.document_id }}</td>
+                <td class="mono">{{ doc.element_id }}</td>
+                <td>{{ ok.status("ON", "ok") if doc.auto_sync else ok.status("OFF", "default") }}</td>
+                <td>
+                    <form hx-post="/settings/onshape/documents/remove"
+                          hx-target="#onshape-documents"
+                          hx-swap="outerHTML"
+                          hx-confirm="Remove '{{ doc.name }}' from registered documents?">
+                        <input type="hidden" name="document_id" value="{{ doc.document_id }}">
+                        <input type="hidden" name="element_id" value="{{ doc.element_id }}">
+                        <button type="submit" class="btn btn-sm btn-danger">REMOVE</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    {{ ok.empty("No Onshape documents registered") }}
+    {% endif %}
+
+    {# Add document form #}
+    {% if onshape_enabled %}
+    <div style="margin-top: var(--space-md); border-top: 1px solid var(--c-border); padding-top: var(--space-md);">
+        <div class="form-label">ADD DOCUMENT</div>
+        <form hx-post="/settings/onshape/documents"
+              hx-target="#onshape-documents"
+              hx-swap="outerHTML"
+              hx-indicator="#onshape-add-spinner"
+              style="display: flex; gap: var(--space-sm); align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 2; min-width: 300px;">
+                <input type="text" name="url" class="form-input mono"
+                       placeholder="Paste Onshape URL..."
+                       style="width: 100%;" required>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <input type="text" name="name" class="form-input"
+                       placeholder="Name (auto-detected)"
+                       style="width: 100%;">
+            </div>
+            <div>
+                <button type="submit" class="btn btn-primary">
+                    ADD
+                    <span id="onshape-add-spinner" class="htmx-indicator" style="margin-left: 4px;">...</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</div>

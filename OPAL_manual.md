@@ -1980,12 +1980,14 @@ onshape:
       document_id: "abc123def456"
       workspace_id: "ws789ghi"
       element_id: "elem012jkl"
+      element_type: "assembly"      # Default — syncs BOM hierarchy
       auto_sync: true
 
-    - name: "Flight Computer"
+    - name: "Machined Parts"
       document_id: "xyz999uvw111"
       workspace_id: ""              # Auto-detected on first sync
       element_id: "elem222mno"
+      element_type: "part_studio"   # Flat parts list, no BOM hierarchy
       auto_sync: false              # Manual sync only
 
   field_mapping:
@@ -2006,6 +2008,7 @@ onshape:
 | `documents[].document_id` | Onshape document ID (from the URL: `/documents/{document_id}/...`) |
 | `documents[].workspace_id` | Workspace ID (leave empty to auto-detect default workspace) |
 | `documents[].element_id` | Element ID of the assembly or part studio to sync |
+| `documents[].element_type` | `"assembly"` (default) or `"part_studio"` — determines which Onshape API is used |
 | `documents[].auto_sync` | Include this document in automatic polling syncs |
 | `field_mapping` | Maps OPAL field names to Onshape custom property names |
 | `default_tier` | Tier level assigned to parts created by pull sync |
@@ -2032,6 +2035,17 @@ Pull sync fetches BOM structure and part metadata from Onshape and creates or up
    - If the hash matches: skips (no changes)
 3. Syncs BOM structure: creates, updates, or removes BOM lines for parent-child relationships
 4. Marks links as **stale** for parts no longer present in the Onshape BOM
+5. If new parts were created, automatically runs a push sync to write part numbers back to Onshape
+
+**Assembly root part:** For assembly BOM syncs, a root assembly Part is created to serve as the top-level BOM parent. All top-level components in the Onshape assembly become BOM children of this root part.
+
+**Standard content filtering:** Standard library parts from Onshape (e.g., fasteners, bearings, and other catalog components) are automatically skipped during pull sync. Only custom parts are imported.
+
+**Name-based deduplication:** When the same physical part appears in multiple Part Studios or sub-assemblies, OPAL deduplicates by part name. Identical part names are mapped to a single OPAL Part, and BOM quantities are accumulated across all references. This prevents duplicate entries for shared components.
+
+**Soft-delete restoration:** If a previously soft-deleted OPAL part reappears in a subsequent Onshape BOM sync, the part's `deleted_at` is cleared and it is restored automatically.
+
+**Part studio mode:** When `element_type` is `"part_studio"`, pull sync fetches the flat parts list from the Onshape parts API instead of the assembly BOM endpoint. Each part is imported with quantity 1 and no BOM lines are created (part studios have no parent-child hierarchy). All other behavior (change detection, link creation, stale marking) works the same.
 
 **How to trigger:**
 
@@ -2098,6 +2112,8 @@ Navigate to **Settings** to find the **ONSHAPE INTEGRATION** panel. This panel a
 - **PUSH button**: Triggers a push sync for all registered documents
 - **Status table**: Shows connection status and polling interval
 - **Registered Documents table**: Lists all documents from `opal.project.yaml` with their name, document ID, element ID, and auto_sync status
+- **Add Document form**: Paste an Onshape document URL to register a new document. The element type (assembly or part studio) is auto-detected from the URL. Documents are added to `opal.project.yaml` and appear in the table immediately.
+- **Remove button**: Each registered document has a remove button that unregisters it (removes from `opal.project.yaml`)
 - **Sync Result**: Shows the result of the last manual sync operation
 - **Recent Sync Log**: Table of recent sync operations with timestamps, direction, trigger, status, and counters
 
@@ -2119,6 +2135,8 @@ The last sync timestamp is shown when available.
 | `GET` | `/api/onshape/sync/logs` | Recent sync logs (`?limit=20&direction=pull\|push`) |
 | `GET` | `/api/onshape/links` | List Onshape-linked parts (`?document_id=...&stale=true\|false`) |
 | `DELETE` | `/api/onshape/links/{link_id}` | Unlink a part from Onshape (does not delete the OPAL part) |
+| `POST` | `/api/onshape/documents` | Register a document from an Onshape URL (auto-detects element type) |
+| `DELETE` | `/api/onshape/documents/{did}/{eid}` | Remove a registered document |
 | `POST` | `/api/onshape/webhook` | Onshape webhook receiver (HMAC-verified if secret configured) |
 
 ### Troubleshooting

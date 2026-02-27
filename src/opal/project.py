@@ -1,7 +1,7 @@
 """Project configuration loading and management."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -32,6 +32,9 @@ class OnshapeDocumentRef(BaseModel):
     document_id: str = Field(description="Onshape document ID")
     workspace_id: str = Field(default="", description="Workspace ID (auto-detected if empty)")
     element_id: str = Field(description="Assembly or part studio element ID")
+    element_type: Literal["assembly", "part_studio"] = Field(
+        default="assembly", description="Type of Onshape element (assembly or part_studio)"
+    )
     auto_sync: bool = Field(default=True, description="Include in automated poll syncs")
 
 
@@ -368,6 +371,7 @@ def save_project_config(config: ProjectConfig) -> None:
                     "document_id": d.document_id,
                     "workspace_id": d.workspace_id,
                     "element_id": d.element_id,
+                    "element_type": d.element_type,
                     "auto_sync": d.auto_sync,
                 }
                 for d in config.onshape.documents

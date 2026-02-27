@@ -1,0 +1,23 @@
+{% import 'opalkit/_macros.html' as ok %}
+
+{# Main result target #}
+<div style="padding: var(--space-sm) 0;">
+    {% if status == 'success' %}
+    {{ ok.status("OK", "ok") }}
+    {% elif status == 'partial' %}
+    {{ ok.status("PARTIAL", "warn") }}
+    {% elif status == 'error' %}
+    {{ ok.status("ERROR", "error") }}
+    {% else %}
+    {{ ok.status(status|upper, "default") }}
+    {% endif %}
+    <span class="mono" style="margin-left: var(--space-sm);">{{ summary or 'Sync complete' }}</span>
+    {% if error_message %}
+    <div style="margin-top: var(--space-xs); color: var(--color-error);">{{ error_message }}</div>
+    {% endif %}
+</div>
+
+{# OOB swap to refresh the sync log table #}
+<div id="onshape-sync-log" hx-swap-oob="innerHTML">
+    {% include "settings/onshape_sync_log.html" %}
+</div>

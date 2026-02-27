@@ -124,16 +124,14 @@
         <span>ONSHAPE INTEGRATION</span>
         <div class="panel-header-actions">
             <button class="btn"
-                    hx-post="/api/onshape/sync/pull"
-                    hx-headers='{"X-User-Id": "{{ current_user_id }}"}'
+                    hx-post="/settings/onshape/sync/pull"
                     hx-target="#onshape-sync-result"
                     hx-indicator="#onshape-pull-spinner">
                 PULL
                 <span id="onshape-pull-spinner" class="htmx-indicator" style="margin-left: 4px;">...</span>
             </button>
             <button class="btn"
-                    hx-post="/api/onshape/sync/push"
-                    hx-headers='{"X-User-Id": "{{ current_user_id }}"}'
+                    hx-post="/settings/onshape/sync/push"
                     hx-target="#onshape-sync-result"
                     hx-indicator="#onshape-push-spinner">
                 PUSH
@@ -147,35 +145,12 @@
             {{ ok.detail_row("POLL INTERVAL", (onshape_poll_interval ~ " min") if onshape_poll_interval else ok.status("DISABLED", "default"), mono=true) }}
         </table>
 
-        {% if onshape_documents %}
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">REGISTERED DOCUMENTS</div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        {{ ok.th("NAME") }}
-                        {{ ok.th("DOCUMENT ID", width="220px") }}
-                        {{ ok.th("ELEMENT ID", width="220px") }}
-                        {{ ok.th("AUTO SYNC", width="80px") }}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for doc in onshape_documents %}
-                    <tr>
-                        <td>{{ doc.name }}</td>
-                        <td class="mono">{{ doc.document_id }}</td>
-                        <td class="mono">{{ doc.element_id }}</td>
-                        <td>{{ ok.status("ON", "ok") if doc.auto_sync else ok.status("OFF", "default") }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% set onshape_doc_error = None %}
+            {% set onshape_doc_success = None %}
+            {% include "settings/onshape_documents.html" %}
         </div>
-        {% else %}
-        <div style="margin-top: var(--space-lg);">
-            {{ ok.empty("No Onshape documents configured. Add documents to opal.project.yaml under 'onshape.documents'.") }}
-        </div>
-        {% endif %}
 
         <div id="onshape-sync-result" style="margin-top: var(--space-md);"></div>
 
