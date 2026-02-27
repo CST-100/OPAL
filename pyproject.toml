@@ -1,6 +1,6 @@
 [project]
 name = "opal"
-version = "1.0.0"
+version = "1.1.0"
 description = "Operations, Procedures, Assets, Logistics - ERP for small teams and hardware projects"
 readme = "README.md"
 requires-python = ">=3.11"
