@@ -48,10 +48,13 @@ def test_filter_issues_by_type(client):
 
 def test_filter_issues_by_status(client):
     """Test filtering issues by status."""
-    # Create and update one to resolved
-    issue1 = client.post("/api/issues", json={"title": "Open Issue"}).json()
-    issue2 = client.post("/api/issues", json={"title": "Resolved Issue"}).json()
-    client.patch(f"/api/issues/{issue2['id']}", json={"status": "resolved"})
+    # Create and update one to disposition_approved (with required disposition_type)
+    client.post("/api/issues", json={"title": "Open Issue"})
+    issue2 = client.post("/api/issues", json={"title": "Approved Issue"}).json()
+    client.patch(
+        f"/api/issues/{issue2['id']}",
+        json={"status": "disposition_approved", "disposition_type": "use_as_is"},
+    )
 
     response = client.get("/api/issues?status=open")
     assert response.status_code == 200
@@ -85,7 +88,7 @@ def test_update_issue(client):
         f"/api/issues/{issue_id}",
         json={
             "title": "Updated Title",
-            "status": "in_progress",
+            "status": "investigating",
             "priority": "critical",
         },
     )
@@ -93,7 +96,7 @@ def test_update_issue(client):
 
     data = response.json()
     assert data["title"] == "Updated Title"
-    assert data["status"] == "in_progress"
+    assert data["status"] == "investigating"
     assert data["priority"] == "critical"
 
 
@@ -162,8 +165,9 @@ def test_get_issue_statuses(client):
 
     statuses = response.json()
     assert "open" in statuses
-    assert "in_progress" in statuses
-    assert "resolved" in statuses
+    assert "investigating" in statuses
+    assert "disposition_pending" in statuses
+    assert "disposition_approved" in statuses
     assert "closed" in statuses
 
 
@@ -177,3 +181,81 @@ def test_get_issue_priorities(client):
     assert "medium" in priorities
     assert "high" in priorities
     assert "critical" in priorities
+
+
+def test_create_issue_comment(client):
+    """Test adding a comment to an issue."""
+    issue = client.post("/api/issues", json={"title": "Comment Test"}).json()
+
+    response = client.post(
+        f"/api/issues/{issue['id']}/comments",
+        json={"body": "This is a test comment"},
+    )
+    assert response.status_code == 201
+
+    data = response.json()
+    assert data["body"] == "This is a test comment"
+    assert data["issue_id"] == issue["id"]
+
+
+def test_list_issue_comments(client):
+    """Test listing comments on an issue in chronological order."""
+    issue = client.post("/api/issues", json={"title": "Comments List Test"}).json()
+
+    client.post(f"/api/issues/{issue['id']}/comments", json={"body": "First comment"})
+    client.post(f"/api/issues/{issue['id']}/comments", json={"body": "Second comment"})
+
+    response = client.get(f"/api/issues/{issue['id']}/comments")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["body"] == "First comment"
+    assert data[1]["body"] == "Second comment"
+
+
+def test_update_issue_disposition(client):
+    """Test setting disposition fields on an issue."""
+    issue = client.post("/api/issues", json={"title": "Disposition Test"}).json()
+
+    response = client.patch(
+        f"/api/issues/{issue['id']}",
+        json={
+            "root_cause": "Material defect",
+            "corrective_action": "Replace batch",
+            "disposition_type": "rework",
+            "disposition_notes": "Rework per procedure",
+        },
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["root_cause"] == "Material defect"
+    assert data["corrective_action"] == "Replace batch"
+    assert data["disposition_type"] == "rework"
+    assert data["disposition_notes"] == "Rework per procedure"
+
+
+def test_disposition_approval_requires_type(client):
+    """Test that approving disposition requires disposition_type to be set."""
+    issue = client.post("/api/issues", json={"title": "Approval Test"}).json()
+
+    # Try to approve without disposition_type — should fail
+    response = client.patch(
+        f"/api/issues/{issue['id']}",
+        json={"status": "disposition_approved"},
+    )
+    assert response.status_code == 400
+    assert "disposition_type" in response.json()["detail"]
+
+    # Set disposition_type first, then approve — should succeed
+    client.patch(
+        f"/api/issues/{issue['id']}",
+        json={"disposition_type": "scrap"},
+    )
+    response = client.patch(
+        f"/api/issues/{issue['id']}",
+        json={"status": "disposition_approved"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "disposition_approved"

@@ -21,8 +21,9 @@ class IssueStatus(str, Enum):
     """Issue status."""
 
     OPEN = "open"
-    IN_PROGRESS = "in_progress"
-    RESOLVED = "resolved"
+    INVESTIGATING = "investigating"
+    DISPOSITION_PENDING = "disposition_pending"
+    DISPOSITION_APPROVED = "disposition_approved"
     CLOSED = "closed"
 
 
@@ -33,6 +34,16 @@ class IssuePriority(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+class DispositionType(str, Enum):
+    """Disposition type for issue resolution."""
+
+    USE_AS_IS = "use_as_is"
+    REWORK = "rework"
+    SCRAP = "scrap"
+    RETURN_TO_VENDOR = "return_to_vendor"
+    OTHER = "other"
 
 
 class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
@@ -52,11 +63,17 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         String(20), nullable=False, default=IssueType.TASK
     )
     status: Mapped[IssueStatus] = mapped_column(
-        String(20), nullable=False, default=IssueStatus.OPEN
+        String(30), nullable=False, default=IssueStatus.OPEN
     )
     priority: Mapped[IssuePriority] = mapped_column(
         String(20), nullable=False, default=IssuePriority.MEDIUM
     )
+
+    # Disposition fields
+    root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    corrective_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    disposition_type: Mapped[DispositionType | None] = mapped_column(String(30), nullable=True)
+    disposition_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Optional links - an issue can link to any of these (or none)
     part_id: Mapped[int | None] = mapped_column(
@@ -74,6 +91,12 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         index=True,
         comment="For NC issues created during step execution",
     )
+    assigned_to_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    disposition_approved_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Relationships
     part: Mapped["Part | None"] = relationship("Part", back_populates="issues")
@@ -86,6 +109,19 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
     risk: Mapped["Risk | None"] = relationship("Risk", back_populates="linked_issue")
     references: Mapped[list["IssueReference"]] = relationship(
         "IssueReference", back_populates="issue", cascade="all, delete-orphan"
+    )
+    assigned_to: Mapped["User | None"] = relationship(
+        "User", foreign_keys=[assigned_to_id]
+    )
+    disposition_approved_by: Mapped["User | None"] = relationship(
+        "User", foreign_keys=[disposition_approved_by_id]
+    )
+    comments: Mapped[list["IssueComment"]] = relationship(
+        "IssueComment", back_populates="issue", cascade="all, delete-orphan",
+        order_by="IssueComment.created_at"
+    )
+    attachments: Mapped[list["Attachment"]] = relationship(
+        "Attachment", back_populates="issue"
     )
 
     def __repr__(self) -> str:

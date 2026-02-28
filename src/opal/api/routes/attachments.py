@@ -12,6 +12,7 @@ from opal.config import get_active_settings
 from opal.core.audit import log_create, log_delete
 from opal.db.models.attachment import Attachment
 from opal.db.models.execution import ProcedureInstance, StepExecution
+from opal.db.models.issue import Issue
 
 router = APIRouter(prefix="/attachments", tags=["attachments"])
 
@@ -26,6 +27,7 @@ class AttachmentResponse(BaseModel):
     size_bytes: int
     procedure_instance_id: int | None
     step_execution_id: int | None
+    issue_id: int | None = None
     created_at: str
 
     model_config = {"from_attributes": True}
@@ -40,6 +42,7 @@ def _attachment_to_response(att: Attachment) -> AttachmentResponse:
         size_bytes=att.size_bytes,
         procedure_instance_id=att.procedure_instance_id,
         step_execution_id=att.step_execution_id,
+        issue_id=att.issue_id,
         created_at=att.created_at.isoformat(),
     )
 
@@ -51,10 +54,11 @@ async def upload_attachment(
     file: UploadFile,
     procedure_instance_id: int | None = None,
     step_execution_id: int | None = None,
+    issue_id: int | None = None,
 ) -> AttachmentResponse:
     """Upload a file attachment.
 
-    Can be linked to a procedure instance and/or step execution.
+    Can be linked to a procedure instance, step execution, and/or issue.
     """
     settings = get_active_settings()
 
@@ -84,6 +88,11 @@ async def upload_attachment(
         if not step_exec:
             raise HTTPException(status_code=404, detail=f"Step execution {step_execution_id} not found")
 
+    if issue_id:
+        issue = db.query(Issue).filter(Issue.id == issue_id, Issue.deleted_at.is_(None)).first()
+        if not issue:
+            raise HTTPException(status_code=404, detail=f"Issue {issue_id} not found")
+
     # Sanitize filename and generate stored name
     original_name = file.filename or "unnamed"
     # Strip path separators and limit length
@@ -104,6 +113,7 @@ async def upload_attachment(
         size_bytes=len(content),
         procedure_instance_id=procedure_instance_id,
         step_execution_id=step_execution_id,
+        issue_id=issue_id,
     )
     db.add(attachment)
     db.flush()
@@ -142,14 +152,17 @@ async def list_attachments(
     db: DbSession,
     procedure_instance_id: int | None = Query(None),
     step_execution_id: int | None = Query(None),
+    issue_id: int | None = Query(None),
 ) -> list[AttachmentResponse]:
-    """List attachments, optionally filtered by instance or step."""
+    """List attachments, optionally filtered by instance, step, or issue."""
     query = db.query(Attachment)
 
     if procedure_instance_id is not None:
         query = query.filter(Attachment.procedure_instance_id == procedure_instance_id)
     if step_execution_id is not None:
         query = query.filter(Attachment.step_execution_id == step_execution_id)
+    if issue_id is not None:
+        query = query.filter(Attachment.issue_id == issue_id)
 
     attachments = query.order_by(Attachment.created_at.desc()).limit(200).all()
     return [_attachment_to_response(a) for a in attachments]

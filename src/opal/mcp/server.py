@@ -229,7 +229,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "status": {
                         "type": "string",
-                        "description": "Filter by status: open, in_progress, resolved, closed",
+                        "description": "Filter by status: open, investigating, disposition_pending, disposition_approved, closed",
                     },
                     "issue_type": {
                         "type": "string",
@@ -1007,7 +1007,7 @@ async def _get_project_info(db, args: dict) -> list[TextContent]:
     procedure_count = db.query(MasterProcedure).filter(MasterProcedure.deleted_at.is_(None)).count()
     open_issues = db.query(Issue).filter(
         Issue.deleted_at.is_(None),
-        Issue.status.in_(["open", "in_progress"]),
+        Issue.status.in_(["open", "investigating"]),
     ).count()
     active_risks = db.query(Risk).filter(
         Risk.deleted_at.is_(None),

@@ -16,6 +16,7 @@ from opal.db.models import (  # noqa: F401
     Dataset,
     InventoryRecord,
     Issue,
+    IssueComment,
     Kit,
     MasterProcedure,
     OnshapeLink,

@@ -376,8 +376,9 @@ class IssueMetrics(BaseModel):
 
     total_issues: int
     open: int
-    in_progress: int
-    resolved: int
+    investigating: int
+    disposition_pending: int
+    disposition_approved: int
     closed: int
     by_type: dict[str, int]
     by_priority: dict[str, int]
@@ -401,8 +402,9 @@ async def get_issue_metrics(
 
     total = len(issues)
     open_count = sum(1 for i in issues if _get_issue_status(i) == "open")
-    in_progress = sum(1 for i in issues if _get_issue_status(i) == "in_progress")
-    resolved = sum(1 for i in issues if _get_issue_status(i) == "resolved")
+    investigating = sum(1 for i in issues if _get_issue_status(i) == "investigating")
+    disposition_pending = sum(1 for i in issues if _get_issue_status(i) == "disposition_pending")
+    disposition_approved = sum(1 for i in issues if _get_issue_status(i) == "disposition_approved")
     closed = sum(1 for i in issues if _get_issue_status(i) == "closed")
 
     by_type: dict[str, int] = {}
@@ -418,8 +420,9 @@ async def get_issue_metrics(
     return IssueMetrics(
         total_issues=total,
         open=open_count,
-        in_progress=in_progress,
-        resolved=resolved,
+        investigating=investigating,
+        disposition_pending=disposition_pending,
+        disposition_approved=disposition_approved,
         closed=closed,
         by_type=by_type,
         by_priority=by_priority,

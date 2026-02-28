@@ -18,12 +18,15 @@ class Attachment(Base, IdMixin, TimestampMixin):
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
-    # Optional links - attachment can belong to instance, step, or neither
+    # Optional links - attachment can belong to instance, step, issue, or neither
     procedure_instance_id: Mapped[int | None] = mapped_column(
         ForeignKey("procedure_instance.id", ondelete="CASCADE"), nullable=True, index=True
     )
     step_execution_id: Mapped[int | None] = mapped_column(
         ForeignKey("step_execution.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    issue_id: Mapped[int | None] = mapped_column(
+        ForeignKey("issue.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
     # Relationships
@@ -32,6 +35,9 @@ class Attachment(Base, IdMixin, TimestampMixin):
     )
     step_execution: Mapped["StepExecution | None"] = relationship(
         "StepExecution", back_populates="attachments"
+    )
+    issue: Mapped["Issue | None"] = relationship(
+        "Issue", back_populates="attachments"
     )
 
     def __repr__(self) -> str:

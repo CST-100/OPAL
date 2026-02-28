@@ -80,8 +80,9 @@ class IssuesScreen(Screen):
             Horizontal(
                 Button("All", id="filter-all", variant="primary"),
                 Button("Open", id="filter-open"),
-                Button("In Progress", id="filter-in_progress"),
-                Button("Resolved", id="filter-resolved"),
+                Button("Investigating", id="filter-investigating"),
+                Button("Disp Pending", id="filter-disposition_pending"),
+                Button("Disp Approved", id="filter-disposition_approved"),
                 Button("Closed", id="filter-closed"),
                 classes="filter-bar",
             ),
