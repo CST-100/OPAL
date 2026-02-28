@@ -1072,6 +1072,36 @@ async def add_output(
     db.add(output)
     db.flush()
     log_create(db, output, user_id)
+
+    # Auto-populate kit from output part's BOM (single-level, direct children only)
+    from opal.db.models.part import BOMLine
+
+    bom_lines = (
+        db.query(BOMLine)
+        .filter(BOMLine.assembly_id == data.part_id)
+        .all()
+    )
+    for bom_line in bom_lines:
+        kit_qty = Decimal(str(bom_line.quantity)) * output.quantity_produced
+        existing_kit = (
+            db.query(Kit)
+            .filter(Kit.procedure_id == procedure_id, Kit.part_id == bom_line.component_id)
+            .first()
+        )
+        if existing_kit:
+            old_values = get_model_dict(existing_kit)
+            existing_kit.quantity_required += kit_qty
+            log_update(db, existing_kit, old_values, user_id)
+        else:
+            kit_item = Kit(
+                procedure_id=procedure_id,
+                part_id=bom_line.component_id,
+                quantity_required=kit_qty,
+            )
+            db.add(kit_item)
+            db.flush()
+            log_create(db, kit_item, user_id)
+
     db.commit()
     db.refresh(output)
 

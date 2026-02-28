@@ -317,3 +317,97 @@ def test_cannot_add_duplicate_kit_item(client):
         json={"part_id": part_id, "quantity_required": 2},
     )
     assert response.status_code == 400
+
+
+# --- Output BOM→Kit auto-population tests ---
+
+
+def _create_assembly_with_bom(client, component_quantities: list[tuple[str, int]]):
+    """Helper: create an assembly part with BOM lines. Returns (assembly_id, {name: part_id})."""
+    assembly = client.post("/api/parts", json={"name": "Assembly"}).json()
+    assembly_id = assembly["id"]
+    parts = {}
+    for name, qty in component_quantities:
+        comp = client.post("/api/parts", json={"name": name}).json()
+        parts[name] = comp["id"]
+        client.post(
+            f"/api/bom/assemblies/{assembly_id}",
+            json={"component_id": comp["id"], "quantity": qty},
+        )
+    return assembly_id, parts
+
+
+def test_add_output_auto_populates_kit_from_bom(client):
+    """Adding an output part with a BOM should auto-populate kit items."""
+    assembly_id, parts = _create_assembly_with_bom(
+        client, [("Resistor", 4), ("Capacitor", 2)]
+    )
+    proc = client.post("/api/procedures", json={"name": "Build Proc"}).json()
+    proc_id = proc["id"]
+
+    # Add assembly as output (quantity_produced defaults to 1)
+    resp = client.post(
+        f"/api/procedures/{proc_id}/outputs",
+        json={"part_id": assembly_id},
+    )
+    assert resp.status_code == 201
+
+    # Kit should now contain both BOM components
+    kit = client.get(f"/api/procedures/{proc_id}/kit").json()
+    kit_by_part = {item["part_id"]: item["quantity_required"] for item in kit}
+    assert kit_by_part[parts["Resistor"]] == 4.0
+    assert kit_by_part[parts["Capacitor"]] == 2.0
+
+
+def test_add_output_accumulates_kit_qty_for_existing_items(client):
+    """If a BOM component is already in the kit, its quantity should accumulate."""
+    assembly_id, parts = _create_assembly_with_bom(client, [("Bolt", 3)])
+    proc = client.post("/api/procedures", json={"name": "Accumulate Proc"}).json()
+    proc_id = proc["id"]
+
+    # Manually add Bolt to kit with qty 5
+    client.post(
+        f"/api/procedures/{proc_id}/kit",
+        json={"part_id": parts["Bolt"], "quantity_required": 5},
+    )
+
+    # Add output → should add 3 more
+    client.post(
+        f"/api/procedures/{proc_id}/outputs",
+        json={"part_id": assembly_id},
+    )
+
+    kit = client.get(f"/api/procedures/{proc_id}/kit").json()
+    kit_by_part = {item["part_id"]: item["quantity_required"] for item in kit}
+    assert kit_by_part[parts["Bolt"]] == 8.0  # 5 + 3
+
+
+def test_add_output_no_bom_no_kit_changes(client):
+    """Adding an output part with no BOM should not create any kit items."""
+    part = client.post("/api/parts", json={"name": "Simple Part"}).json()
+    proc = client.post("/api/procedures", json={"name": "No BOM Proc"}).json()
+    proc_id = proc["id"]
+
+    client.post(
+        f"/api/procedures/{proc_id}/outputs",
+        json={"part_id": part["id"]},
+    )
+
+    kit = client.get(f"/api/procedures/{proc_id}/kit").json()
+    assert len(kit) == 0
+
+
+def test_add_output_multiplies_bom_qty_by_output_qty(client):
+    """Kit quantities should be bom_qty * output quantity_produced."""
+    assembly_id, parts = _create_assembly_with_bom(client, [("Screw", 2)])
+    proc = client.post("/api/procedures", json={"name": "Multiply Proc"}).json()
+    proc_id = proc["id"]
+
+    client.post(
+        f"/api/procedures/{proc_id}/outputs",
+        json={"part_id": assembly_id, "quantity_produced": 3},
+    )
+
+    kit = client.get(f"/api/procedures/{proc_id}/kit").json()
+    kit_by_part = {item["part_id"]: item["quantity_required"] for item in kit}
+    assert kit_by_part[parts["Screw"]] == 6.0  # 2 * 3
