@@ -4,93 +4,226 @@
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
 {{ ok.crumb("ISSUES", "/issues") }}
-{{ ok.crumb(issue.id) }}
+{{ ok.crumb(issue.issue_number or issue.id) }}
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px;">
+<div class="panel" style="max-width: 1100px;">
     <div class="panel-header">
-        <span>ISSUE #{{ issue.id }}</span>
+        <span>ISSUE {{ issue.issue_number or issue.id }}</span>
+        <span id="save-flash" style="display: none; color: var(--green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>
         <div class="panel-header-actions">
             {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
             {{ ok.status(type_val | upper | replace('_', ' '), "error" if type_val == 'non_conformance' else ("warn" if type_val == 'bug' else ("info" if type_val == 'improvement' else "draft"))) }}
         </div>
     </div>
     <div class="panel-body">
-        <h2 style="margin-bottom: var(--space-md);">{{ issue.title }}</h2>
+        <div style="display: flex; gap: var(--space-lg);">
+            <!-- LEFT COLUMN (60%) -->
+            <div style="flex: 3; min-width: 0;">
+                <!-- Title (inline edit) -->
+                <div style="margin-bottom: var(--space-md);">
+                    <h2 id="issue-title-display" style="cursor: pointer; margin: 0;" onclick="startEditTitle()" title="Click to edit">{{ issue.title }}</h2>
+                    <div id="issue-title-edit" style="display: none;">
+                        <input type="text" id="title-input" class="form-input" value="{{ issue.title }}" style="font-size: 1.2rem; font-weight: bold; width: 100%;" onkeydown="if(event.key==='Enter') saveTitle(); if(event.key==='Escape') cancelEditTitle();" onblur="saveTitle()">
+                    </div>
+                </div>
 
-        <table class="data-table" style="margin-bottom: var(--space-md);">
-            <tr>
-                <th style="width: 120px;">STATUS</th>
-                <td>
-                    <select id="status-select" class="form-select" style="width: auto;" onchange="updateIssue('status', this.value)">
-                        {% for s in statuses %}
-                        {% set status_val = issue.status.value if issue.status.value is defined else issue.status %}
-                        <option value="{{ s }}" {% if status_val == s %}selected{% endif %}>{{ s | upper | replace('_', ' ') }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <th>PRIORITY</th>
-                <td>
-                    <select id="priority-select" class="form-select" style="width: auto;" onchange="updateIssue('priority', this.value)">
-                        {% for p in priorities %}
-                        {% set priority_val = issue.priority.value if issue.priority.value is defined else issue.priority %}
-                        <option value="{{ p }}" {% if priority_val == p %}selected{% endif %}>{{ p | upper }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <th>TYPE</th>
-                <td>
-                    <select id="type-select" class="form-select" style="width: auto;" onchange="updateIssue('issue_type', this.value)">
-                        {% for t in types %}
-                        {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
-                        <option value="{{ t }}" {% if type_val == t %}selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
-                        {% endfor %}
-                    </select>
-                </td>
-            </tr>
-            <tr>
-                <th>CREATED</th>
-                <td>{{ ok.timestamp(issue.created_at) }}</td>
-            </tr>
-            <tr>
-                <th>UPDATED</th>
-                <td>{{ ok.timestamp(issue.updated_at) }}</td>
-            </tr>
-            {% if issue.part_id %}
-            <tr>
-                <th>LINKED PART</th>
-                <td><a href="/parts/{{ issue.part_id }}">Part #{{ issue.part_id }}</a></td>
-            </tr>
-            {% endif %}
-            {% if issue.procedure_id %}
-            <tr>
-                <th>LINKED PROC</th>
-                <td><a href="/procedures/{{ issue.procedure_id }}">Procedure #{{ issue.procedure_id }}</a></td>
-            </tr>
-            {% endif %}
-            {% if issue.procedure_instance_id %}
-            <tr>
-                <th>LINKED EXEC</th>
-                <td><a href="/executions/{{ issue.procedure_instance_id }}">Execution #{{ issue.procedure_instance_id }}</a></td>
-            </tr>
-            {% endif %}
-        </table>
+                <!-- Description (inline edit) -->
+                <div style="margin-bottom: var(--space-lg);">
+                    <div class="form-label">DESCRIPTION</div>
+                    <div id="desc-display" style="padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color); cursor: pointer; min-height: 40px; white-space: pre-wrap;" onclick="startEditDesc()" title="Click to edit">{{ issue.description or '(none)' }}</div>
+                    <div id="desc-edit" style="display: none;">
+                        <textarea id="desc-input" class="form-textarea" rows="4" style="width: 100%;" onkeydown="if(event.key==='Escape') cancelEditDesc();">{{ issue.description or '' }}</textarea>
+                        <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-xs);">
+                            {{ ok.btn("SAVE", variant="primary", attrs='onclick="saveDesc()"') }}
+                            {{ ok.btn("CANCEL", attrs='onclick="cancelEditDesc()"') }}
+                        </div>
+                    </div>
+                </div>
 
-        {% if issue.description %}
-        <div class="form-label">DESCRIPTION</div>
-        <div style="padding: var(--space-md); background: var(--bg-tertiary); border: 1px solid var(--border-color); margin-bottom: var(--space-md);">
-            {{ issue.description }}
-        </div>
-        {% endif %}
+                <!-- Disposition section -->
+                {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">DISPOSITION</div>
 
-        <div style="display: flex; gap: var(--space-sm);">
-            {{ ok.btn("BACK", href="/issues") }}
-            {{ ok.btn("DELETE", variant="danger", attrs='onclick="deleteIssue()"') }}
+                    <div style="display: flex; gap: var(--space-md); margin-bottom: var(--space-sm);">
+                        <div style="flex: 1;">
+                            <div class="form-label">TYPE</div>
+                            <select id="disposition-type-select" class="form-select" style="width: 100%;" onchange="updateIssue('disposition_type', this.value || null)">
+                                <option value="">(none)</option>
+                                {% for dt in disposition_types %}
+                                {% set current_dt = issue.disposition_type.value if issue.disposition_type and issue.disposition_type.value is defined else (issue.disposition_type or '') %}
+                                <option value="{{ dt }}" {% if current_dt == dt %}selected{% endif %}>{{ dt | upper | replace('_', ' ') }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="form-label">APPROVED BY</div>
+                            <select id="disposition-approved-by-select" class="form-select" style="width: 100%;" onchange="updateIssue('disposition_approved_by_id', parseInt(this.value) || null)">
+                                <option value="">(none)</option>
+                                {% for u in users %}
+                                <option value="{{ u.id }}" {% if issue.disposition_approved_by_id == u.id %}selected{% endif %}>{{ u.name or u.email }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: var(--space-sm);">
+                        <div class="form-label">ROOT CAUSE</div>
+                        <textarea id="root-cause-input" class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('root_cause', this.value || null)">{{ issue.root_cause or '' }}</textarea>
+                    </div>
+
+                    <div style="margin-bottom: var(--space-sm);">
+                        <div class="form-label">CORRECTIVE ACTION</div>
+                        <textarea id="corrective-action-input" class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('corrective_action', this.value || null)">{{ issue.corrective_action or '' }}</textarea>
+                    </div>
+
+                    <div>
+                        <div class="form-label">DISPOSITION NOTES</div>
+                        <textarea id="disposition-notes-input" class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('disposition_notes', this.value || null)">{{ issue.disposition_notes or '' }}</textarea>
+                    </div>
+                </div>
+
+                <!-- Comments section -->
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">ACTIVITY LOG</div>
+
+                    <div id="comments-list">
+                        {% if comments %}
+                        {% for comment in comments %}
+                        <div style="padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-xs);">
+                                <span style="font-weight: bold;">{{ comment.user.name if comment.user else 'System' }}</span>
+                                <span class="text-secondary" style="font-family: var(--font-mono); font-size: 0.85em;">{{ ok.timestamp(comment.created_at) }}</span>
+                            </div>
+                            <div style="white-space: pre-wrap;">{{ comment.body }}</div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="text-muted" style="padding: var(--space-sm) 0;">No comments yet.</div>
+                        {% endif %}
+                    </div>
+
+                    <div style="margin-top: var(--space-md);">
+                        <textarea id="new-comment" class="form-textarea" rows="3" placeholder="Add a comment..." style="width: 100%;"></textarea>
+                        <div style="margin-top: var(--space-xs);">
+                            {{ ok.btn("POST COMMENT", variant="primary", attrs='onclick="postComment()"') }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attachments section -->
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">ATTACHMENTS</div>
+
+                    {% if attachments %}
+                    <table class="data-table" style="margin-bottom: var(--space-sm);">
+                        {% for att in attachments %}
+                        <tr>
+                            <td style="font-family: var(--font-mono);">{{ att.original_filename }}</td>
+                            <td class="text-secondary">{{ att.mime_type }}</td>
+                            <td style="text-align: right;">
+                                <a href="/api/attachments/{{ att.id }}/download">Download</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </table>
+                    {% else %}
+                    <div class="text-muted" style="padding: var(--space-sm) 0;">No attachments.</div>
+                    {% endif %}
+                </div>
+
+                <div style="display: flex; gap: var(--space-sm);">
+                    {{ ok.btn("BACK", href="/issues") }}
+                    {{ ok.btn("DELETE", variant="danger", attrs='onclick="deleteIssue()"') }}
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN (40%) -->
+            <div style="flex: 2; min-width: 200px;">
+                <table class="data-table">
+                    <tr>
+                        <th style="width: 110px;">STATUS</th>
+                        <td>
+                            <select id="status-select" class="form-select" style="width: 100%;" onchange="updateIssue('status', this.value)">
+                                {% for s in statuses %}
+                                {% set status_val = issue.status.value if issue.status.value is defined else issue.status %}
+                                <option value="{{ s }}" {% if status_val == s %}selected{% endif %}>{{ s | upper | replace('_', ' ') }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>PRIORITY</th>
+                        <td>
+                            <select id="priority-select" class="form-select" style="width: 100%;" onchange="updateIssue('priority', this.value)">
+                                {% for p in priorities %}
+                                {% set priority_val = issue.priority.value if issue.priority.value is defined else issue.priority %}
+                                <option value="{{ p }}" {% if priority_val == p %}selected{% endif %}>{{ p | upper }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>TYPE</th>
+                        <td>
+                            <select id="type-select" class="form-select" style="width: 100%;" onchange="updateIssue('issue_type', this.value)">
+                                {% for t in types %}
+                                {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+                                <option value="{{ t }}" {% if type_val == t %}selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>ASSIGNED TO</th>
+                        <td>
+                            <select id="assigned-to-select" class="form-select" style="width: 100%;" onchange="updateIssue('assigned_to_id', parseInt(this.value) || null)">
+                                <option value="">(unassigned)</option>
+                                {% for u in users %}
+                                <option value="{{ u.id }}" {% if issue.assigned_to_id == u.id %}selected{% endif %}>{{ u.name or u.email }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>CREATED</th>
+                        <td>{{ ok.timestamp(issue.created_at) }}</td>
+                    </tr>
+                    <tr>
+                        <th>UPDATED</th>
+                        <td>{{ ok.timestamp(issue.updated_at) }}</td>
+                    </tr>
+                </table>
+
+                <!-- Links -->
+                {% if issue.part_id or issue.procedure_id or issue.procedure_instance_id %}
+                <div style="margin-top: var(--space-md); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">LINKS</div>
+                    <table class="data-table">
+                        {% if issue.part_id %}
+                        <tr>
+                            <th style="width: 80px;">PART</th>
+                            <td><a href="/parts/{{ issue.part_id }}">{{ issue.part.name if issue.part else ('Part #' ~ issue.part_id) }}</a></td>
+                        </tr>
+                        {% endif %}
+                        {% if issue.procedure_id %}
+                        <tr>
+                            <th>TEMPLATE</th>
+                            <td><a href="/procedures/{{ issue.procedure_id }}">{{ issue.procedure.name if issue.procedure else ('Procedure #' ~ issue.procedure_id) }}</a></td>
+                        </tr>
+                        {% endif %}
+                        {% if issue.procedure_instance_id %}
+                        <tr>
+                            <th>EXECUTION</th>
+                            <td><a href="/executions/{{ issue.procedure_instance_id }}">Execution #{{ issue.procedure_instance_id }}</a></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -115,7 +248,9 @@ async function updateIssue(field, value) {
             headers: getHeaders(),
             body: JSON.stringify(data),
         });
-        if (!response.ok) {
+        if (response.ok) {
+            showSaveFlash();
+        } else {
             const error = await response.json();
             alert(formatApiError(error.detail, 'Failed to update issue'));
             window.location.reload();
@@ -126,6 +261,84 @@ async function updateIssue(field, value) {
     }
 }
 
+function showSaveFlash() {
+    const el = document.getElementById('save-flash');
+    el.textContent = 'SAVED';
+    el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 1500);
+}
+
+// Inline title editing
+function startEditTitle() {
+    document.getElementById('issue-title-display').style.display = 'none';
+    document.getElementById('issue-title-edit').style.display = 'block';
+    const input = document.getElementById('title-input');
+    input.focus();
+    input.select();
+}
+
+function cancelEditTitle() {
+    document.getElementById('issue-title-display').style.display = '';
+    document.getElementById('issue-title-edit').style.display = 'none';
+    document.getElementById('title-input').value = document.getElementById('issue-title-display').textContent.trim();
+}
+
+async function saveTitle() {
+    const input = document.getElementById('title-input');
+    const newTitle = input.value.trim();
+    if (!newTitle) { cancelEditTitle(); return; }
+
+    document.getElementById('issue-title-display').textContent = newTitle;
+    document.getElementById('issue-title-display').style.display = '';
+    document.getElementById('issue-title-edit').style.display = 'none';
+    await updateIssue('title', newTitle);
+}
+
+// Inline description editing
+function startEditDesc() {
+    document.getElementById('desc-display').style.display = 'none';
+    document.getElementById('desc-edit').style.display = 'block';
+    document.getElementById('desc-input').focus();
+}
+
+function cancelEditDesc() {
+    document.getElementById('desc-display').style.display = '';
+    document.getElementById('desc-edit').style.display = 'none';
+}
+
+async function saveDesc() {
+    const input = document.getElementById('desc-input');
+    const newDesc = input.value;
+    document.getElementById('desc-display').textContent = newDesc || '(none)';
+    document.getElementById('desc-display').style.display = '';
+    document.getElementById('desc-edit').style.display = 'none';
+    await updateIssue('description', newDesc);
+}
+
+// Comments
+async function postComment() {
+    const textarea = document.getElementById('new-comment');
+    const body = textarea.value.trim();
+    if (!body) return;
+
+    try {
+        const response = await fetch(`/api/issues/${issueId}/comments`, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ body: body }),
+        });
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const error = await response.json();
+            alert(formatApiError(error.detail, 'Failed to post comment'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+// Delete
 async function deleteIssue() {
     if (!confirm('Are you sure you want to delete this issue?')) return;
 

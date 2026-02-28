@@ -2,13 +2,13 @@
 {% if issues %}
 {% for issue in issues %}
 <tr>
-    <td class="id-cell"><a href="/issues/{{ issue.id }}">{{ issue.id }}</a></td>
+    <td class="id-cell"><a href="/issues/{{ issue.id }}">{{ issue.issue_number or issue.id }}</a></td>
     <td>
         {{ ok.status(issue.issue_type | upper | replace('_', ' '), "error" if issue.issue_type == 'non_conformance' else ("warn" if issue.issue_type == 'bug' else ("info" if issue.issue_type == 'improvement' else "draft"))) }}
     </td>
     <td><a href="/issues/{{ issue.id }}">{{ issue.title }}</a></td>
     <td>
-        {{ ok.status(issue.status | upper | replace('_', ' '), "ok" if issue.status in ['closed', 'resolved'] else ("info" if issue.status == 'in_progress' else "warn")) }}
+        {{ ok.status(issue.status | upper | replace('_', ' '), "ok" if issue.status in ['closed', 'disposition_approved'] else ("info" if issue.status == 'investigating' else "warn")) }}
     </td>
     <td>
         <span class="{% if issue.priority == 'critical' %}text-red{% elif issue.priority == 'high' %}text-yellow{% else %}text-secondary{% endif %}">

@@ -42,6 +42,16 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label" for="assigned-to">ASSIGN TO</label>
+                <select id="assigned-to" name="assigned_to_id" class="form-select">
+                    <option value="">(unassigned)</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}">{{ u.name or u.email }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">LINK TO (optional)</label>
                 <div style="display: flex; gap: var(--space-md);">
                     <select id="part-id" name="part_id" class="form-select" style="flex: 1;">
@@ -84,6 +94,7 @@ async function createIssue(event) {
         priority: form.priority.value,
         part_id: form.part_id.value ? parseInt(form.part_id.value) : null,
         procedure_id: form.procedure_id.value ? parseInt(form.procedure_id.value) : null,
+        assigned_to_id: form.assigned_to_id.value ? parseInt(form.assigned_to_id.value) : null,
     };
 
     const headers = {

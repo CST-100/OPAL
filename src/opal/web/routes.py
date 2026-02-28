@@ -295,7 +295,7 @@ async def index(request: Request, db: DbSession) -> HTMLResponse:
     context["procedures_count"] = db.query(MasterProcedure).filter(MasterProcedure.deleted_at.is_(None)).count()
     context["open_issues_count"] = db.query(Issue).filter(
         Issue.deleted_at.is_(None),
-        Issue.status.in_(["open", "in_progress"])
+        Issue.status.in_(["open", "investigating", "disposition_pending"])
     ).count()
     context["in_progress_count"] = db.query(ProcedureInstance).filter(
         ProcedureInstance.status == "in_progress"
@@ -1693,6 +1693,14 @@ async def executions_detail(request: Request, db: DbSession, instance_id: int) -
     )
     context["can_finalize"] = inst_status == 'completed' and has_wip
 
+    # Linked issues
+    from opal.db.models.issue import Issue
+    linked_issues = db.query(Issue).filter(
+        Issue.procedure_instance_id == instance.id,
+        Issue.deleted_at.is_(None),
+    ).all()
+    context["linked_issues"] = linked_issues
+
     return templates.TemplateResponse("executions/detail.html", context)
 
 
@@ -1739,6 +1747,7 @@ async def issues_table(
     issues_data = [
         {
             "id": i.id,
+            "issue_number": i.issue_number,
             "title": i.title,
             "issue_type": get_val(i, 'issue_type'),
             "status": get_val(i, 'status'),
@@ -1763,11 +1772,14 @@ async def issues_new(request: Request, db: DbSession) -> HTMLResponse:
     context["types"] = [t.value for t in IssueType]
     context["priorities"] = [p.value for p in IssuePriority]
 
-    # Get parts and procedures for linking
+    # Get parts, procedures, and users for linking
     parts = db.query(Part).filter(Part.deleted_at.is_(None)).order_by(Part.name).all()
     procedures = db.query(MasterProcedure).filter(MasterProcedure.deleted_at.is_(None)).order_by(MasterProcedure.name).all()
+    from opal.db.models.user import User
+    users = db.query(User).filter(User.is_active == True).order_by(User.name).all()  # noqa: E712
     context["parts"] = parts
     context["procedures"] = procedures
+    context["users"] = users
 
     return templates.TemplateResponse("issues/new.html", context)
 
@@ -1788,6 +1800,25 @@ async def issues_detail(request: Request, db: DbSession, issue_id: int) -> HTMLR
     context["types"] = [t.value for t in IssueType]
     context["statuses"] = [s.value for s in IssueStatus]
     context["priorities"] = [p.value for p in IssuePriority]
+
+    from opal.db.models.issue import DispositionType
+    from opal.db.models.issue_comment import IssueComment
+    from opal.db.models.attachment import Attachment
+    from opal.db.models.user import User
+
+    comments = (
+        db.query(IssueComment)
+        .filter(IssueComment.issue_id == issue.id)
+        .order_by(IssueComment.created_at)
+        .all()
+    )
+    attachments = db.query(Attachment).filter(Attachment.issue_id == issue.id).all()
+    users = db.query(User).filter(User.is_active == True).order_by(User.name).all()  # noqa: E712
+
+    context["comments"] = comments
+    context["attachments"] = attachments
+    context["users"] = users
+    context["disposition_types"] = [d.value for d in DispositionType]
 
     return templates.TemplateResponse("issues/detail.html", context)
 
