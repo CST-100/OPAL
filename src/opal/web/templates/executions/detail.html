@@ -3,18 +3,30 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
-{{ ok.crumb("eWO", "/executions") }}
-{{ ok.crumb("#" ~ instance.id) }}
+{{ ok.crumb("EXECUTIONS", "/executions") }}
+{{ ok.crumb(instance.work_order_number or ("#" ~ instance.id)) }}
 {% endblock %}
 
 {% block content %}
 {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
 
+{% if linked_issues %}
+<div style="background: var(--accent-red); color: #000; padding: var(--space-sm) var(--space-md);
+            font-family: var(--font-mono); font-weight: bold; margin-bottom: var(--space-md);">
+    {{ linked_issues|length }} ISSUE{{ 's' if linked_issues|length > 1 }} LINKED —
+    {% for issue in linked_issues %}
+    <a href="/issues/{{ issue.id }}" style="color: #000; text-decoration: underline;">
+        {{ issue.issue_number }}: {{ issue.title }}
+    </a>{{ ', ' if not loop.last }}
+    {% endfor %}
+</div>
+{% endif %}
+
 <!-- Header row: info + collaboration + progress -->
 <div class="grid grid-2">
     <div class="panel">
         <div class="panel-header">
-            <span>eWO #{{ instance.id }}</span>
+            <span>{{ instance.work_order_number or "EXECUTION #" ~ instance.id }}</span>
             <div class="panel-header-actions">
                 {{ ok.status(inst_status | upper | replace('_', ' ')) }}
             </div>
@@ -80,7 +92,7 @@
             {% set completed = steps | selectattr('status', 'in', ['completed', 'signed_off', 'skipped']) | list | length %}
             {% set total = steps | length %}
             <div style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border-color);">
-                <div style="font-size: 1.25rem; font-weight: bold; color: var(--accent-blue);">
+                <div style="font-size: 1.25rem; font-weight: bold; color: var(--accent-orange);">
                     {{ completed }} / {{ total }} STEPS
                 </div>
                 <div style="background: var(--bg-tertiary); height: 14px; border: 1px solid var(--border-color); margin-top: var(--space-xs);">
@@ -143,7 +155,7 @@
             {% set vs = version_steps_map.get(step.order, {}) %}
             {% set schema = vs.get('required_data_schema') %}
             {% set has_schema = schema and schema.get('fields') %}
-            <details class="step-details" id="step-{{ step.order }}" open>
+            <details class="step-details" id="step-{{ step.order }}"{% if step.status not in ['completed', 'signed_off', 'skipped'] %} open{% endif %}>
                 <summary class="step-summary">
                     <span class="step-number mono">{{ step.step_number }}</span>
                     <span class="step-title">{{ step.title }}</span>
@@ -293,7 +305,7 @@
             {% set vs = version_steps_map.get(op.order, {}) %}
             {% set schema = vs.get('required_data_schema') %}
             {% set has_schema = schema and schema.get('fields') %}
-            <details class="step-details" id="step-{{ op.order }}" open>
+            <details class="step-details" id="step-{{ op.order }}"{% if op.status not in ['completed', 'signed_off', 'skipped'] %} open{% endif %}>
                 <summary class="step-summary" style="padding-left: var(--space-md);">
                     <span class="step-title">{{ op.title }}</span>
                     {% if op.status in ['completed', 'signed_off'] and op.execution and op.execution.completed_by_user %}

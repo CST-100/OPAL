@@ -3,15 +3,15 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
-{{ ok.crumb("eWO") }}
+{{ ok.crumb("EXECUTIONS") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel">
     <div class="panel-header">
-        <span>EXECUTION WORK ORDERS (eWO)</span>
+        <span>EXECUTIONS</span>
         <div class="panel-header-actions">
-            {{ ok.btn("+ START eWO", href="/executions/new", variant="primary") }}
+            {{ ok.btn("+ NEW EXECUTION", href="/executions/new", variant="primary") }}
         </div>
     </div>
     <div class="panel-body">

@@ -13,8 +13,11 @@
     </td>
     <td>
         <a href="/parts/{{ rec.part_id }}">{{ rec.part.name }}</a>
-        {% if rec.part.external_pn %}
-        <br><span class="text-muted" style="font-size: 0.85em;">{{ rec.part.external_pn }}</span>
+        {% if rec.part.internal_pn or rec.part.external_pn %}
+        <br>
+        {% if rec.part.internal_pn %}<span class="mono" style="font-size: 0.85em;">{{ rec.part.internal_pn }}</span>{% endif %}
+        {% if rec.part.internal_pn and rec.part.external_pn %} / {% endif %}
+        {% if rec.part.external_pn %}<span class="text-muted" style="font-size: 0.85em;">{{ rec.part.external_pn }}</span>{% endif %}
         {% endif %}
     </td>
     <td>{{ ok.mono(rec.location) }}</td>

@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("tWO", "/procedures") }}
+{{ ok.crumb("TEMPLATES", "/procedures") }}
 {{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
 {{ ok.crumb("v" ~ version.version_number) }}
 {% endblock %}
@@ -207,7 +207,7 @@
 
         {% if versions and versions | length > 1 %}
         <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-md); align-items: center;">
-            {{ ok.btn("BACK TO tWO", href="/procedures/" ~ procedure.id) }}
+            {{ ok.btn("BACK TO TEMPLATE", href="/procedures/" ~ procedure.id) }}
             <span class="text-muted mono" style="font-size: 0.75rem;">COMPARE WITH:</span>
             {% for v in versions %}
             {% if v.id != version.id %}
@@ -217,7 +217,7 @@
         </div>
         {% else %}
         <div style="margin-top: var(--space-lg);">
-            {{ ok.btn("BACK TO tWO", href="/procedures/" ~ procedure.id) }}
+            {{ ok.btn("BACK TO TEMPLATE", href="/procedures/" ~ procedure.id) }}
         </div>
         {% endif %}
     </div>

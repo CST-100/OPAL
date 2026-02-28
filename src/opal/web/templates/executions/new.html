@@ -3,14 +3,14 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME", "/") }}
-{{ ok.crumb("eWO", "/executions") }}
+{{ ok.crumb("EXECUTIONS", "/executions") }}
 {{ ok.crumb("NEW") }}
 {% endblock %}
 
 {% block content %}
 <div class="panel" style="max-width: 600px;">
     <div class="panel-header">
-        <span>START NEW eWO</span>
+        <span>NEW EXECUTION</span>
     </div>
     <div class="panel-body">
         <form id="new-execution-form" onsubmit="startExecution(event)">

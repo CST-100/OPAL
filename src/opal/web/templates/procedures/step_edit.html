@@ -3,7 +3,7 @@
 
 {% block breadcrumbs %}
 {{ ok.crumb("HOME") }}
-{{ ok.crumb("tWO", "/procedures") }}
+{{ ok.crumb("TEMPLATES", "/procedures") }}
 {{ ok.crumb(procedure.name, "/procedures/" ~ procedure.id) }}
 {{ ok.crumb("STEP " ~ step.step_number) }}
 {% endblock %}

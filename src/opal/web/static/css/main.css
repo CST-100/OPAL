@@ -25,7 +25,7 @@
     --status-ok: var(--accent-green);
     --status-warn: var(--accent-yellow);
     --status-error: var(--accent-red);
-    --status-info: var(--accent-blue);
+    --status-info: var(--accent-orange);
 
     /* Fonts */
     --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
@@ -651,7 +651,7 @@ select option {
 }
 
 .cmd-type-search {
-    color: var(--accent-blue);
+    color: var(--accent-orange);
 }
 
 /* Audit detail rows */
@@ -1299,8 +1299,8 @@ select option {
 }
 
 .badge-info {
-    color: var(--accent-blue);
-    border-color: var(--accent-blue);
+    color: var(--accent-orange);
+    border-color: var(--accent-orange);
 }
 
 .badge-warn {
@@ -1390,8 +1390,8 @@ select option {
 }
 
 .ewo-sidebar-status--in_progress {
-    background: var(--accent-blue);
-    border-color: var(--accent-blue);
+    background: var(--accent-orange);
+    border-color: var(--accent-orange);
 }
 
 .ewo-sidebar-status--awaiting_signoff {
