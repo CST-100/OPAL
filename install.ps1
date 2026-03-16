@@ -1,11 +1,9 @@
-# OPAL installer for Windows — downloads the latest release binary.
+# OPAL installer for Windows — installs opal-erp Python package via uv, pipx, or pip.
 # Usage: irm https://raw.githubusercontent.com/CST-100/OPAL/master/install.ps1 | iex
 $ErrorActionPreference = "Stop"
 
-$Repo = "CST-100/OPAL"
-$ApiUrl = "https://api.github.com/repos/$Repo/releases/latest"
-$InstallDir = Join-Path $env:LOCALAPPDATA "OPAL"
-$InstallPath = Join-Path $InstallDir "opal.exe"
+$Package = "opal-erp"
+$MinPython = "3.11"
 
 # --- Output helpers ---
 
@@ -28,94 +26,101 @@ function Write-Err {
     exit 1
 }
 
-# --- Platform detection ---
+# --- Python version check ---
 
-function Get-Platform {
-    $Arch = $env:PROCESSOR_ARCHITECTURE
-    switch ($Arch) {
-        "AMD64"  { return "x86_64" }
-        "x86"    { Write-Err "32-bit Windows is not supported" }
-        "ARM64"  { Write-Err "ARM64 Windows is not currently supported" }
-        default  { Write-Err "Unsupported architecture: $Arch" }
+function Test-Python {
+    foreach ($candidate in @("python3", "python")) {
+        try {
+            $output = & $candidate --version 2>&1
+            if ($output -match "Python (\d+)\.(\d+)") {
+                $major = [int]$Matches[1]
+                $minor = [int]$Matches[2]
+                if ($major -ge 3 -and $minor -ge 11) {
+                    Write-Info "Found $output ($candidate)"
+                    return $candidate
+                }
+            }
+        } catch {
+            continue
+        }
     }
+    Write-Err "Python ${MinPython}+ is required but not found. Install from https://www.python.org/downloads/"
 }
 
-# --- Release lookup ---
+# --- Installer detection ---
 
-function Find-DownloadUrl {
-    param([string]$AssetPattern)
+function Get-Installer {
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Info "Using uv"
+        return "uv"
+    }
+    if (Get-Command pipx -ErrorAction SilentlyContinue) {
+        Write-Info "Using pipx"
+        return "pipx"
+    }
+    if (Get-Command pip -ErrorAction SilentlyContinue) {
+        Write-Info "Using pip"
+        return "pip"
+    }
 
-    Write-Info "Fetching latest release from GitHub..."
-
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
+    # No installer found — try to install uv
+    Write-Info "No package installer found. Installing uv..."
     try {
-        $Release = Invoke-RestMethod -Uri $ApiUrl -Headers @{ Accept = "application/vnd.github.v3+json" }
+        irm https://astral.sh/uv/install.ps1 | iex
     } catch {
-        Write-Err "Failed to fetch release info from GitHub: $_"
+        Write-Err "Failed to install uv. Please install uv, pipx, or pip manually."
     }
 
-    $script:Tag = $Release.tag_name
-    if (-not $Tag) {
-        Write-Err "Could not determine latest release tag"
-    }
-    Write-Info "Latest release: $Tag"
+    # Refresh PATH
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
 
-    $Asset = $Release.assets | Where-Object { $_.name -like "*$AssetPattern*" } | Select-Object -First 1
-    if (-not $Asset) {
-        Write-Err "No release asset found matching '$AssetPattern'"
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Info "uv installed successfully"
+        return "uv"
     }
 
-    return $Asset.browser_download_url
+    Write-Err "Failed to install uv. Please install uv, pipx, or pip manually."
 }
 
-# --- Install ---
+# --- Install package ---
 
-function Install-Binary {
-    param([string]$Url, [string]$AssetName)
+function Install-Package {
+    param([string]$Installer)
 
-    Write-Info "Downloading ${AssetName}..."
+    Write-Info "Installing ${Package}..."
 
-    if (-not (Test-Path $InstallDir)) {
-        New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+    switch ($Installer) {
+        "uv" {
+            try {
+                uv tool install $Package
+            } catch {
+                uv tool upgrade $Package
+            }
+        }
+        "pipx" {
+            try {
+                pipx install $Package
+            } catch {
+                pipx upgrade $Package
+            }
+        }
+        "pip" {
+            pip install --user $Package
+        }
     }
-
-    $TmpFile = Join-Path $env:TEMP "opal-install-$([System.IO.Path]::GetRandomFileName()).exe"
-
-    try {
-        Invoke-WebRequest -Uri $Url -OutFile $TmpFile -UseBasicParsing
-    } catch {
-        if (Test-Path $TmpFile) { Remove-Item $TmpFile -Force }
-        Write-Err "Download failed: $_"
-    }
-
-    # Sanity check: file should be at least 1 KB
-    $Size = (Get-Item $TmpFile).Length
-    if ($Size -lt 1024) {
-        Remove-Item $TmpFile -Force
-        Write-Err "Downloaded file is too small ($Size bytes) -- something went wrong"
-    }
-
-    Move-Item -Path $TmpFile -Destination $InstallPath -Force
-
-    Write-Info "Installed to $InstallPath"
 }
 
 # --- PATH check ---
 
-function Update-PathAdvice {
-    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if ($UserPath -and $UserPath.Split(";") -contains $InstallDir) {
+function Test-OpalPath {
+    if (Get-Command opal -ErrorAction SilentlyContinue) {
+        Write-Info "opal is on PATH"
         return
     }
 
-    Write-Warn "$InstallDir is not in your PATH"
+    Write-Warn "opal command not found on PATH"
     Write-Host ""
-    Write-Host "  Run this to add it permanently:"
-    Write-Host ""
-    Write-Host "    [Environment]::SetEnvironmentVariable('Path', `"$InstallDir;`" + [Environment]::GetEnvironmentVariable('Path', 'User'), 'User')" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "  Then restart your terminal."
+    Write-Host "  Restart your terminal, or check that the install directory is in your PATH."
     Write-Host ""
 }
 
@@ -126,20 +131,21 @@ function Install-Opal {
     Write-Host "OPAL Installer" -ForegroundColor White
     Write-Host ""
 
-    $Arch = Get-Platform
-    Write-Info "Detected platform: windows $Arch"
-
-    $AssetName = "opal-windows-${Arch}.exe"
-    $DownloadUrl = Find-DownloadUrl -AssetPattern $AssetName
-
-    Install-Binary -Url $DownloadUrl -AssetName $AssetName
-    Update-PathAdvice
+    $python = Test-Python
+    $installer = Get-Installer
+    Install-Package -Installer $installer
+    Test-OpalPath
 
     Write-Host ""
-    Write-Host "OPAL $Tag installed successfully." -ForegroundColor White
-    Write-Host "  Run " -NoNewline
-    Write-Host "opal" -ForegroundColor Green -NoNewline
-    Write-Host " to start."
+    Write-Host "OPAL installed successfully." -ForegroundColor White
+    Write-Host "  Get started:"
+    Write-Host ""
+    Write-Host "    opal init            " -ForegroundColor Green -NoNewline
+    Write-Host "# initialize database"
+    Write-Host "    opal serve           " -ForegroundColor Green -NoNewline
+    Write-Host "# start server (foreground)"
+    Write-Host "    opal serve --daemon  " -ForegroundColor Green -NoNewline
+    Write-Host "# start server (background)"
     Write-Host ""
 }
 

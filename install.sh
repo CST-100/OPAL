@@ -1,12 +1,10 @@
 #!/bin/sh
-# OPAL installer — downloads the latest release binary for macOS/Linux.
-# Usage: curl -LsSf https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | sh
+# OPAL installer — installs opal-erp Python package via uv, pipx, or pip.
+# Usage: curl -fsSL https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | bash
 set -eu
 
-REPO="CST-100/OPAL"
-API_URL="https://api.github.com/repos/${REPO}/releases/latest"
-INSTALL_DIR="${HOME}/.local/bin"
-INSTALL_PATH="${INSTALL_DIR}/opal"
+PACKAGE="opal-erp"
+MIN_PYTHON="3.11"
 
 # --- Output helpers ---
 
@@ -37,125 +35,121 @@ err() {
     exit 1
 }
 
-# --- Download abstraction ---
+# --- Python version check ---
 
-HAS_CURL=false
-HAS_WGET=false
+check_python() {
+    PYTHON=""
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            version="$("$candidate" --version 2>&1 | sed 's/Python //')"
+            major="$(echo "$version" | cut -d. -f1)"
+            minor="$(echo "$version" | cut -d. -f2)"
+            if [ "$major" -ge 3 ] && [ "$minor" -ge 11 ]; then
+                PYTHON="$candidate"
+                info "Found Python $version ($candidate)"
+                return
+            fi
+        fi
+    done
 
-detect_downloader() {
-    if command -v curl >/dev/null 2>&1; then
-        HAS_CURL=true
-    fi
-    if command -v wget >/dev/null 2>&1; then
-        HAS_WGET=true
-    fi
-    if [ "$HAS_CURL" = false ] && [ "$HAS_WGET" = false ]; then
-        err "curl or wget is required but neither was found"
+    if [ -z "$PYTHON" ]; then
+        err "Python ${MIN_PYTHON}+ is required but not found. Install Python first: https://www.python.org/downloads/"
     fi
 }
 
-download() {
-    # download URL OUTFILE
-    if [ "$HAS_CURL" = true ]; then
-        curl -fLsS -o "$2" "$1"
+# --- Installer detection ---
+
+detect_installer() {
+    if command -v uv >/dev/null 2>&1; then
+        INSTALLER="uv"
+        info "Using uv"
+        return
+    fi
+
+    if command -v pipx >/dev/null 2>&1; then
+        INSTALLER="pipx"
+        info "Using pipx"
+        return
+    fi
+
+    if command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
+        INSTALLER="pip"
+        info "Using pip"
+        return
+    fi
+
+    # No installer found — offer to install uv
+    info "No package installer found. Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    # Source the uv env
+    if [ -f "$HOME/.local/bin/env" ]; then
+        . "$HOME/.local/bin/env"
+    fi
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if command -v uv >/dev/null 2>&1; then
+        INSTALLER="uv"
+        info "uv installed successfully"
     else
-        wget -q -O "$2" "$1"
+        err "Failed to install uv. Please install uv, pipx, or pip manually."
     fi
 }
 
-download_text() {
-    # download_text URL -> stdout
-    if [ "$HAS_CURL" = true ]; then
-        curl -fLsS "$1"
-    else
-        wget -q -O- "$1"
-    fi
-}
+# --- Install package ---
 
-# --- Platform detection ---
+install_package() {
+    info "Installing ${PACKAGE}..."
 
-detect_platform() {
-    OS="$(uname -s)"
-    ARCH="$(uname -m)"
-
-    case "$OS" in
-        Darwin)  PLATFORM="macos"  ;;
-        Linux)   PLATFORM="linux"  ;;
-        *)       err "Unsupported operating system: $OS" ;;
+    case "$INSTALLER" in
+        uv)
+            uv tool install "$PACKAGE" || uv tool upgrade "$PACKAGE"
+            ;;
+        pipx)
+            pipx install "$PACKAGE" || pipx upgrade "$PACKAGE"
+            ;;
+        pip)
+            PIP_CMD="pip3"
+            if ! command -v pip3 >/dev/null 2>&1; then
+                PIP_CMD="pip"
+            fi
+            "$PIP_CMD" install --user "$PACKAGE"
+            ;;
     esac
-
-    case "$ARCH" in
-        x86_64|amd64)   ARCH="x86_64" ;;
-        arm64|aarch64)  ARCH="arm64"  ;;
-        *)              err "Unsupported architecture: $ARCH" ;;
-    esac
-
-    ASSET_NAME="opal-${PLATFORM}-${ARCH}"
-    info "Detected platform: ${PLATFORM} ${ARCH}"
-}
-
-# --- Release lookup ---
-
-find_download_url() {
-    info "Fetching latest release from GitHub..."
-
-    RELEASE_JSON="$(download_text "$API_URL")" || err "Failed to fetch release info from GitHub"
-
-    TAG="$(printf '%s' "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
-    if [ -z "$TAG" ]; then
-        err "Could not determine latest release tag"
-    fi
-    info "Latest release: ${TAG}"
-
-    DOWNLOAD_URL="$(printf '%s' "$RELEASE_JSON" | grep '"browser_download_url"' | grep "$ASSET_NAME" | head -1 | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
-    if [ -z "$DOWNLOAD_URL" ]; then
-        err "No release asset found matching '${ASSET_NAME}'"
-    fi
-}
-
-# --- Install ---
-
-install_binary() {
-    info "Downloading ${ASSET_NAME}..."
-
-    mkdir -p "$INSTALL_DIR"
-
-    TMP_FILE="$(mktemp)"
-    trap 'rm -f "$TMP_FILE"' EXIT
-
-    download "$DOWNLOAD_URL" "$TMP_FILE" || err "Download failed"
-
-    # Sanity check: file should be at least 1 KB
-    FILE_SIZE="$(wc -c < "$TMP_FILE" | tr -d ' ')"
-    if [ "$FILE_SIZE" -lt 1024 ]; then
-        err "Downloaded file is too small (${FILE_SIZE} bytes) — something went wrong"
-    fi
-
-    mv -f "$TMP_FILE" "$INSTALL_PATH"
-    chmod +x "$INSTALL_PATH"
-
-    info "Installed to ${INSTALL_PATH}"
 }
 
 # --- PATH check ---
 
 check_path() {
-    case ":${PATH}:" in
-        *":${INSTALL_DIR}:"*) return ;;
-    esac
+    if command -v opal >/dev/null 2>&1; then
+        info "opal is on PATH"
+        return
+    fi
 
-    warn "${INSTALL_DIR} is not in your PATH"
+    warn "opal command not found on PATH"
 
     SHELL_NAME="$(basename "${SHELL:-/bin/sh}")"
-    case "$SHELL_NAME" in
-        fish)
-            printf "\n  Run this to add it:\n\n    fish_add_path %s\n\n" "$INSTALL_DIR"
+    case "$INSTALLER" in
+        uv)
+            printf "\n  uv should have added its bin directory to PATH.\n"
+            printf "  Try restarting your shell, or add this to your shell config:\n\n"
+            printf "    export PATH=\"\$HOME/.local/bin:\$PATH\"\n\n"
             ;;
-        zsh)
-            printf "\n  Add this to ~/.zshrc:\n\n    export PATH=\"%s:\$PATH\"\n\n" "$INSTALL_DIR"
+        pipx)
+            printf "\n  Run: pipx ensurepath\n\n"
             ;;
-        *)
-            printf "\n  Add this to ~/.bashrc (or ~/.profile):\n\n    export PATH=\"%s:\$PATH\"\n\n" "$INSTALL_DIR"
+        pip)
+            case "$SHELL_NAME" in
+                fish)
+                    printf "\n  Run: fish_add_path ~/.local/bin\n\n"
+                    ;;
+                zsh)
+                    printf "\n  Add to ~/.zshrc:\n\n    export PATH=\"\$HOME/.local/bin:\$PATH\"\n\n"
+                    ;;
+                *)
+                    printf "\n  Add to ~/.bashrc:\n\n    export PATH=\"\$HOME/.local/bin:\$PATH\"\n\n"
+                    ;;
+            esac
             ;;
     esac
 }
@@ -165,14 +159,17 @@ check_path() {
 main() {
     printf "\n${BOLD}OPAL Installer${RESET}\n\n"
 
-    detect_downloader
-    detect_platform
-    find_download_url
-    install_binary
+    check_python
+    detect_installer
+    install_package
     check_path
 
-    printf "\n${BOLD}OPAL %s installed successfully.${RESET}\n" "$TAG"
-    printf "  Run ${GREEN}opal${RESET} to start.\n\n"
+    printf "\n${BOLD}OPAL installed successfully.${RESET}\n"
+    printf "  Get started:\n\n"
+    printf "    ${GREEN}opal init${RESET}           # initialize database\n"
+    printf "    ${GREEN}opal serve${RESET}          # start server (foreground)\n"
+    printf "    ${GREEN}opal serve --daemon${RESET}  # start server (background)\n"
+    printf "\n"
 }
 
 main

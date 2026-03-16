@@ -1,5 +1,5 @@
 [project]
-name = "opal"
+name = "opal-erp"
 version = "0.4.5"
 description = "Operations, Procedures, Assets, Logistics - ERP for small teams and hardware projects"
 readme = "README.md"
@@ -7,6 +7,18 @@ requires-python = ">=3.11"
 license = "MIT"
 authors = [
     { name = "OPAL Team" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business",
 ]
 dependencies = [
     "fastapi>=0.115.0",
@@ -21,6 +33,7 @@ dependencies = [
     "httpx>=0.28.0",
     "segno>=1.6.0",
     "packaging>=24.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -33,17 +46,17 @@ dev = [
 tui = [
     "textual>=0.89.0",
 ]
-app = [
-    "textual>=0.89.0",
-    "pyinstaller>=6.0",
-]
 e2e = [
     "playwright>=1.49.0",
 ]
 
 [project.scripts]
 opal = "opal.__main__:main"
-opal-app = "opal.launcher:main"
+
+[project.urls]
+Homepage = "https://github.com/CST-100/OPAL"
+Repository = "https://github.com/CST-100/OPAL"
+Issues = "https://github.com/CST-100/OPAL/issues"
 
 [build-system]
 requires = ["hatchling"]

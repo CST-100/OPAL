@@ -16,9 +16,9 @@
 - **Database**: SQLite (single file at `./data/opal.db`)
 - **Backend**: Python 3.11+ with FastAPI
 - **Frontend Web**: HTMX + Jinja2 templates (no heavy JS framework)
-- **Desktop App**: Textual TUI launcher (`src/opal/launcher.py`) with auto-updater
+- **TUI**: Optional Textual TUI client (`pip install opal-erp[tui]`)
 - **File Storage**: Local filesystem (`./data/attachments/`)
-- **Distribution**: PyInstaller standalone binary (`opal.spec`)
+- **Distribution**: PyPI package (`opal-erp`), installed via `curl | bash` or `pip`/`uv`/`pipx`
 
 ### Directory Structure
 ```
@@ -29,25 +29,30 @@
       /core         # business logic
       /db           # models, migrations
       /mcp          # Model Context Protocol server
-      /tui          # Textual TUI components
+      /tui          # Textual TUI components (optional)
       /web          # templates, static
-      launcher.py   # Desktop app TUI launcher (entry point for opal-app)
-      launcher.tcss # Launcher styles
-      updater.py    # Auto-updater (GitHub releases)
+      daemon.py     # Background server lifecycle (start/stop/status)
+      config.py     # Settings, data dir, config file helpers
   /tests
   /data             # .gitignored, runtime data
   /migrations       # alembic
-  opal.spec         # PyInstaller build spec
   pyproject.toml
   CLAUDE.md
 ```
 
-### Data Directory (Standalone Binary)
-When running as a standalone binary, data is stored in platform-specific directories instead of `./data/`:
+### Data Directory
+Data is stored in platform-specific directories:
 - **macOS**: `~/Library/Application Support/OPAL/`
 - **Linux**: `$XDG_DATA_HOME/opal/` (default `~/.local/share/opal/`)
 - **Windows**: `%LOCALAPPDATA%\OPAL\`
 - **Override**: Set `OPAL_DATA_DIR` environment variable
+
+The data directory contains:
+- `opal.db` — SQLite database
+- `opal.pid` — daemon PID file
+- `opal.log` — server log file
+- `opal.env` — user configuration overrides
+- `attachments/` — uploaded files
 
 Resolution logic is in `src/opal/config.py:get_default_data_dir()`.
 
@@ -177,7 +182,7 @@ Resolution logic is in `src/opal/config.py:get_default_data_dir()`.
 5. Issues (manual + NC auto-creation)
 6. Risks
 7. Datasets & Graphing
-8. Desktop App (TUI launcher, auto-updater, standalone binary)
+8. Distribution (PyPI package, CLI daemon management, install scripts)
 9. Polish (keyboard shortcuts, search, export)
 
 ## Non-Goals (For Now)
@@ -190,23 +195,39 @@ Resolution logic is in `src/opal/config.py:get_default_data_dir()`.
 ## Commands Reference
 
 ```bash
-# Setup
+# Install
+curl -fsSL https://raw.githubusercontent.com/CST-100/OPAL/master/install.sh | bash
+
+# Setup (development)
 uv sync                    # Install dependencies
 uv run opal init          # Initialize database
 
+# Server
+opal serve                 # Start server foreground (http://localhost:8080)
+opal serve --daemon        # Start server as background daemon
+opal stop                  # Stop background daemon
+opal restart               # Restart background daemon
+opal status                # Show server status, PID, uptime
+opal logs -f               # Tail server log file
+
+# Configuration
+opal config show           # View all settings
+opal config set port 9090  # Change a setting
+opal config get port       # Read a setting
+opal config path           # Show config file location
+
+# Update
+opal update                # Self-update via uv/pipx/pip
+
 # Development
-uv run opal serve         # Start server (http://localhost:8080)
-uv run opal-app           # Launch desktop app (TUI launcher)
-uv run pytest             # Run tests
-uv run opal seed          # Populate demo data
+uv run pytest              # Run tests
+uv run opal seed           # Populate demo data
+opal tui                   # Launch TUI client (requires opal-erp[tui])
 
 # Database
 uv run alembic revision --autogenerate -m "message"  # Generate migration
 uv run alembic upgrade head                           # Apply migrations
 uv run alembic downgrade -1                          # Rollback one migration
-
-# Build standalone binary
-pyinstaller opal.spec     # Output: dist/opal (or dist/opal.exe on Windows)
 ```
 
 ## Important Context for AI Assistants

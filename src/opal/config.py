@@ -54,12 +54,27 @@ def _default_upload_dir() -> Path:
     return get_default_data_dir() / "attachments"
 
 
+def get_pid_file() -> Path:
+    """Get the path to the PID file."""
+    return get_default_data_dir() / "opal.pid"
+
+
+def get_log_file() -> Path:
+    """Get the path to the log file."""
+    return get_default_data_dir() / "opal.log"
+
+
+def get_config_file() -> Path:
+    """Get the path to the config env file."""
+    return get_default_data_dir() / "opal.env"
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
         env_prefix="OPAL_",
-        env_file=".env",
+        env_file=(".env", str(get_default_data_dir() / "opal.env")),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -190,3 +205,49 @@ def get_active_settings() -> Settings:
 def get_active_project() -> "ProjectConfig | None":
     """Get the currently active project configuration."""
     return _active_project
+
+
+def config_show() -> dict[str, str]:
+    """Return all current settings as a dict of strings."""
+    settings = get_active_settings()
+    result = {}
+    for field_name in Settings.model_fields:
+        value = getattr(settings, field_name)
+        result[field_name] = str(value)
+    return result
+
+
+def config_get(key: str) -> str | None:
+    """Get a single setting value by name."""
+    settings = get_active_settings()
+    key_lower = key.lower()
+    if key_lower in Settings.model_fields:
+        return str(getattr(settings, key_lower))
+    return None
+
+
+def config_set(key: str, value: str) -> None:
+    """Write a setting to the config env file ({data_dir}/opal.env)."""
+    config_file = get_config_file()
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    env_key = f"OPAL_{key.upper()}"
+
+    # Read existing lines
+    lines: list[str] = []
+    if config_file.exists():
+        lines = config_file.read_text().splitlines()
+
+    # Update or append
+    found = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(f"{env_key}=") or stripped.startswith(f"{env_key} ="):
+            lines[i] = f"{env_key}={value}"
+            found = True
+            break
+
+    if not found:
+        lines.append(f"{env_key}={value}")
+
+    config_file.write_text("\n".join(lines) + "\n")
