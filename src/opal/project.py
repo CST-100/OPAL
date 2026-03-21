@@ -104,7 +104,7 @@ class ProjectConfig(BaseModel):
     def database_path(self) -> Path:
         """Get the database path for this project."""
         if self.project_dir:
-            return self.project_dir / "opal.db"
+            return self.project_dir / "data" / "opal.db"
         return Path("./data/opal.db")
 
     @property
@@ -116,7 +116,7 @@ class ProjectConfig(BaseModel):
     def attachments_dir(self) -> Path:
         """Get the attachments directory for this project."""
         if self.project_dir:
-            return self.project_dir / "attachments"
+            return self.project_dir / "data" / "attachments"
         return Path("./data/attachments")
 
     def get_tier(self, level: int) -> TierConfig | None:
