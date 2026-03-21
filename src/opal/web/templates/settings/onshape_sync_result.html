@@ -13,7 +13,7 @@
     {% endif %}
     <span class="mono" style="margin-left: var(--space-sm);">{{ summary or 'Sync complete' }}</span>
     {% if error_message %}
-    <div style="margin-top: var(--space-xs); color: var(--color-error);">{{ error_message }}</div>
+    <div style="margin-top: var(--space-xs); color: var(--status-error);">{{ error_message }}</div>
     {% endif %}
 </div>
 

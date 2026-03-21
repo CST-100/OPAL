@@ -104,33 +104,33 @@
 </div>
 
 <!-- Sidebar + Main ops layout -->
-<div class="ewo-layout" style="margin-top: var(--space-md);">
+<div class="exec-layout" style="margin-top: var(--space-md);">
     <!-- Sidebar -->
-    <div class="ewo-sidebar">
-        <div class="ewo-sidebar-header">OPERATIONS</div>
+    <div class="exec-sidebar">
+        <div class="exec-sidebar-header">OPERATIONS</div>
         {% for op_data in ops %}
         {% set op = op_data.step %}
-        <a href="#op-{{ op.order }}" class="ewo-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
+        <a href="#op-{{ op.order }}" class="exec-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
             <span class="mono">OP {{ op.step_number }}</span>
-            <span class="ewo-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-            <span class="ewo-sidebar-status ewo-sidebar-status--{{ op.status }}"></span>
+            <span class="exec-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+            <span class="exec-sidebar-status exec-sidebar-status--{{ op.status }}"></span>
         </a>
         {% endfor %}
         {% if contingency_ops %}
-        <div class="ewo-sidebar-divider"></div>
+        <div class="exec-sidebar-divider"></div>
         {% for op_data in contingency_ops %}
         {% set op = op_data.step %}
-        <a href="#op-{{ op.order }}" class="ewo-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
+        <a href="#op-{{ op.order }}" class="exec-sidebar-item{% if op.status == 'in_progress' %} active{% endif %}">
             <span class="mono">OP {{ op.step_number }}</span>
-            <span class="ewo-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
-            <span class="ewo-sidebar-status ewo-sidebar-status--{{ op.status }}"></span>
+            <span class="exec-sidebar-progress">{{ op_data.completed_steps }}/{{ op_data.total_steps }}</span>
+            <span class="exec-sidebar-status exec-sidebar-status--{{ op.status }}"></span>
         </a>
         {% endfor %}
         {% endif %}
     </div>
 
     <!-- Main content -->
-    <div class="ewo-main">
+    <div class="exec-main">
         {% for op_data in ops + contingency_ops %}
         {% set op = op_data.step %}
         <div class="op-block{% if op.is_contingency %} op-contingency{% endif %}" id="op-{{ op.order }}">

@@ -115,13 +115,13 @@ function updateScoreDisplay() {
     const impact = parseInt(document.getElementById('impact-select').value);
     const score = prob * impact;
     let severity = 'LOW';
-    let color = 'var(--success)';
+    let color = 'var(--status-ok)';
     if (score > 12) {
         severity = 'HIGH';
-        color = 'var(--error)';
+        color = 'var(--status-error)';
     } else if (score > 5) {
         severity = 'MEDIUM';
-        color = 'var(--warning)';
+        color = 'var(--status-warn)';
     }
     document.getElementById('score-value').innerHTML = `<span style="color: ${color}">${score} (${severity})</span>`;
 }

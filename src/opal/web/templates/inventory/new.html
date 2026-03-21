@@ -164,8 +164,8 @@ async function submitInventoryForm() {
             const data = await response.json();
             const resultDiv = document.getElementById('result-message');
             resultDiv.style.display = 'block';
-            resultDiv.style.background = 'var(--color-success-bg)';
-            resultDiv.style.borderColor = 'var(--color-success)';
+            resultDiv.style.background = 'var(--bg-tertiary)';
+            resultDiv.style.borderColor = 'var(--status-ok)';
 
             if (data.total_created === 1) {
                 // Single item - redirect to OPAL detail

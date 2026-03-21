@@ -125,7 +125,7 @@
 
         <!-- Source Link -->
         {% if source_po %}
-        <div style="background: var(--color-bg-secondary); padding: var(--space-md); border-radius: var(--radius-md); margin-bottom: var(--space-xl);">
+        <div style="background: var(--bg-secondary); padding: var(--space-md); margin-bottom: var(--space-xl);">
             <strong>Source:</strong>
             <a href="/purchases/{{ source_po.id }}" class="mono">PO-{{ source_po.number }}</a>
             <span class="text-muted">Line #{{ record.source_purchase_line_id }}</span>
@@ -136,13 +136,13 @@
         <h3 style="margin-bottom: var(--space-md);">TRACEABILITY HISTORY</h3>
         <div class="timeline">
             {% for event in history %}
-            <div class="timeline-item" style="display: flex; gap: var(--space-md); padding: var(--space-md); border-left: 3px solid var(--color-border); margin-left: var(--space-md); margin-bottom: var(--space-sm);">
+            <div class="timeline-item" style="display: flex; gap: var(--space-md); padding: var(--space-md); border-left: 3px solid var(--border-color); margin-left: var(--space-md); margin-bottom: var(--space-sm);">
                 <div style="min-width: 160px;">
                     {{ ok.timestamp(event.timestamp) }}
                 </div>
                 <div>
                     {% if event.event == 'created' %}
-                    <strong style="color: var(--color-success);">RECEIVED</strong>
+                    <strong style="color: var(--status-ok);">RECEIVED</strong>
                     <br>
                     <span class="text-muted">
                         Quantity: {{ event.details.quantity }}
@@ -157,9 +157,9 @@
 
                     {% elif event.event == 'consumed' %}
                     {% if event.details.usage_type == 'scrap' %}
-                    <strong style="color: var(--color-error);">SCRAPPED</strong>
+                    <strong style="color: var(--status-error);">SCRAPPED</strong>
                     {% else %}
-                    <strong style="color: var(--color-warning);">CONSUMED</strong>
+                    <strong style="color: var(--status-warn);">CONSUMED</strong>
                     {% endif %}
                     <br>
                     <span class="text-muted">
@@ -176,7 +176,7 @@
                     </span>
 
                     {% elif event.event == 'transferred' %}
-                    <strong style="color: var(--color-info);">TRANSFERRED</strong>
+                    <strong style="color: var(--status-info);">TRANSFERRED</strong>
                     <br>
                     <span class="text-muted">{{ event.details }}</span>
 
@@ -337,7 +337,7 @@
     display: block;
     font-size: 0.75em;
     text-transform: uppercase;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     margin-bottom: var(--space-xs);
 }
 .detail-value {
@@ -600,7 +600,7 @@ async function loadTestStatus() {
 
         if (status.total_tests === 0 && requiredTemplateCount === 0) {
             summaryEl.textContent = 'No tests recorded';
-            summaryEl.style.color = 'var(--color-text-muted)';
+            summaryEl.style.color = 'var(--text-muted)';
             return;
         }
 

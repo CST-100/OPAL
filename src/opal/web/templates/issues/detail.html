@@ -11,7 +11,7 @@
 <div class="panel" style="max-width: 1100px;">
     <div class="panel-header">
         <span>ISSUE {{ issue.issue_number or issue.id }}</span>
-        <span id="save-flash" style="display: none; color: var(--green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>
+        <span id="save-flash" style="display: none; color: var(--accent-green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>
         <div class="panel-header-actions">
             {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
             {{ ok.status(type_val | upper | replace('_', ' '), "error" if type_val == 'non_conformance' else ("warn" if type_val == 'bug' else ("info" if type_val == 'improvement' else "draft"))) }}

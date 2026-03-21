@@ -1318,15 +1318,15 @@ select option {
     color: var(--status-warn);
 }
 
-/* eWO Layout — Sidebar + Main */
-.ewo-layout {
+/* Execution Layout — Sidebar + Main */
+.exec-layout {
     display: flex;
     gap: 0;
     border: 1px solid var(--border-color);
     background: var(--bg-secondary);
 }
 
-.ewo-sidebar {
+.exec-sidebar {
     width: 250px;
     flex-shrink: 0;
     border-right: 1px solid var(--border-color);
@@ -1336,7 +1336,7 @@ select option {
     overflow-y: auto;
 }
 
-.ewo-sidebar-header {
+.exec-sidebar-header {
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
@@ -1348,7 +1348,7 @@ select option {
     color: var(--text-secondary);
 }
 
-.ewo-sidebar-item {
+.exec-sidebar-item {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -1360,62 +1360,62 @@ select option {
     border-bottom: 1px solid var(--border-color);
 }
 
-.ewo-sidebar-item:hover {
+.exec-sidebar-item:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
-.ewo-sidebar-item.active {
+.exec-sidebar-item.active {
     background: var(--bg-tertiary);
     color: var(--accent-orange);
     border-left: 3px solid var(--accent-orange);
 }
 
-.ewo-sidebar-progress {
+.exec-sidebar-progress {
     margin-left: auto;
     font-size: 0.75rem;
     color: var(--text-muted);
 }
 
-.ewo-sidebar-status {
+.exec-sidebar-status {
     width: 8px;
     height: 8px;
     border: 1px solid var(--text-muted);
 }
 
-.ewo-sidebar-status--completed,
-.ewo-sidebar-status--signed_off {
+.exec-sidebar-status--completed,
+.exec-sidebar-status--signed_off {
     background: var(--accent-green);
     border-color: var(--accent-green);
 }
 
-.ewo-sidebar-status--in_progress {
+.exec-sidebar-status--in_progress {
     background: var(--accent-orange);
     border-color: var(--accent-orange);
 }
 
-.ewo-sidebar-status--awaiting_signoff {
+.exec-sidebar-status--awaiting_signoff {
     background: var(--accent-yellow);
     border-color: var(--accent-yellow);
 }
 
-.ewo-sidebar-status--skipped {
+.exec-sidebar-status--skipped {
     background: var(--text-muted);
     border-color: var(--text-muted);
 }
 
-.ewo-sidebar-status--pending {
+.exec-sidebar-status--pending {
     background: var(--text-muted);
     border-color: var(--text-muted);
     opacity: 0.4;
 }
 
-.ewo-sidebar-divider {
+.exec-sidebar-divider {
     border-top: 2px solid var(--border-light);
     margin: var(--space-xs) 0;
 }
 
-.ewo-main {
+.exec-main {
     flex: 1;
     min-width: 0;
     overflow-y: auto;
