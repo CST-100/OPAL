@@ -81,3 +81,19 @@ def test_user(db_session: Session) -> User:
 def auth_headers(test_user: User) -> dict[str, Any]:
     """Create authentication headers with test user."""
     return {"X-User-Id": str(test_user.id)}
+
+
+@pytest.fixture
+def admin_user(db_session: Session) -> User:
+    """Create an admin test user."""
+    user = User(name="Admin User", email="admin@example.com", is_admin=True)
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_headers(admin_user: User) -> dict[str, Any]:
+    """Create authentication headers with admin user."""
+    return {"X-User-Id": str(admin_user.id)}
