@@ -42,8 +42,47 @@
                     </div>
                 </div>
 
-                <!-- Disposition section -->
+                <!-- Type-specific fields -->
                 {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+                {% if type_val == 'non_conformance' %}
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">NON-CONFORMANCE DETAILS</div>
+                    <div style="margin-bottom: var(--space-sm);">
+                        <div class="form-label">SHOULD BE</div>
+                        <textarea class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('should_be', this.value || null)">{{ issue.should_be or '' }}</textarea>
+                    </div>
+                    <div>
+                        <div class="form-label">IS</div>
+                        <textarea class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('is_condition', this.value || null)">{{ issue.is_condition or '' }}</textarea>
+                    </div>
+                </div>
+                {% elif type_val == 'bug' %}
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">BUG DETAILS</div>
+                    <div style="margin-bottom: var(--space-sm);">
+                        <div class="form-label">STEPS TO REPRODUCE</div>
+                        <textarea class="form-textarea" rows="3" style="width: 100%;" onblur="updateIssue('steps_to_reproduce', this.value || null)">{{ issue.steps_to_reproduce or '' }}</textarea>
+                    </div>
+                    <div style="margin-bottom: var(--space-sm);">
+                        <div class="form-label">EXPECTED BEHAVIOR</div>
+                        <textarea class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('expected_behavior', this.value || null)">{{ issue.expected_behavior or '' }}</textarea>
+                    </div>
+                    <div>
+                        <div class="form-label">ACTUAL BEHAVIOR</div>
+                        <textarea class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('actual_behavior', this.value || null)">{{ issue.actual_behavior or '' }}</textarea>
+                    </div>
+                </div>
+                {% elif type_val == 'improvement' %}
+                <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
+                    <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">IMPROVEMENT DETAILS</div>
+                    <div>
+                        <div class="form-label">EXPECTED BENEFIT</div>
+                        <textarea class="form-textarea" rows="2" style="width: 100%;" onblur="updateIssue('expected_benefit', this.value || null)">{{ issue.expected_benefit or '' }}</textarea>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Disposition section -->
                 <div style="margin-bottom: var(--space-lg); border: 1px solid var(--border-color); padding: var(--space-md);">
                     <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">DISPOSITION</div>
 

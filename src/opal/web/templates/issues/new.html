@@ -17,15 +17,10 @@
                 <input type="text" id="title" name="title" class="form-input" required>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-textarea" rows="4"></textarea>
-            </div>
-
             <div style="display: flex; gap: var(--space-md);">
                 <div class="form-group" style="flex: 1;">
                     <label class="form-label" for="issue-type">TYPE</label>
-                    <select id="issue-type" name="issue_type" class="form-select">
+                    <select id="issue-type" name="issue_type" class="form-select" onchange="toggleTypeFields()">
                         {% for t in types %}
                         <option value="{{ t }}" {% if t == 'task' %}selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
                         {% endfor %}
@@ -38,6 +33,50 @@
                         <option value="{{ p }}" {% if p == 'medium' %}selected{% endif %}>{{ p | upper }}</option>
                         {% endfor %}
                     </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">DESCRIPTION</label>
+                <textarea id="description" name="description" class="form-textarea" rows="4"></textarea>
+            </div>
+
+            <!-- NC fields -->
+            <div id="nc-fields" style="display: none; border: 1px solid var(--border-color); padding: var(--space-md); margin-bottom: var(--space-md);">
+                <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">NON-CONFORMANCE DETAILS</div>
+                <div class="form-group">
+                    <label class="form-label" for="should-be">SHOULD BE</label>
+                    <textarea id="should-be" name="should_be" class="form-textarea" rows="2" placeholder="Expected condition or specification..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="is-condition">IS</label>
+                    <textarea id="is-condition" name="is_condition" class="form-textarea" rows="2" placeholder="Actual observed condition..."></textarea>
+                </div>
+            </div>
+
+            <!-- Bug fields -->
+            <div id="bug-fields" style="display: none; border: 1px solid var(--border-color); padding: var(--space-md); margin-bottom: var(--space-md);">
+                <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">BUG DETAILS</div>
+                <div class="form-group">
+                    <label class="form-label" for="steps-to-reproduce">STEPS TO REPRODUCE</label>
+                    <textarea id="steps-to-reproduce" name="steps_to_reproduce" class="form-textarea" rows="3" placeholder="1. ..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="expected-behavior">EXPECTED BEHAVIOR</label>
+                    <textarea id="expected-behavior" name="expected_behavior" class="form-textarea" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="actual-behavior">ACTUAL BEHAVIOR</label>
+                    <textarea id="actual-behavior" name="actual_behavior" class="form-textarea" rows="2"></textarea>
+                </div>
+            </div>
+
+            <!-- Improvement fields -->
+            <div id="improvement-fields" style="display: none; border: 1px solid var(--border-color); padding: var(--space-md); margin-bottom: var(--space-md);">
+                <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">IMPROVEMENT DETAILS</div>
+                <div class="form-group">
+                    <label class="form-label" for="expected-benefit">EXPECTED BENEFIT</label>
+                    <textarea id="expected-benefit" name="expected_benefit" class="form-textarea" rows="2" placeholder="What value does this improvement provide?"></textarea>
                 </div>
             </div>
 
@@ -80,6 +119,15 @@
 </div>
 
 <script>
+function toggleTypeFields() {
+    const type = document.getElementById('issue-type').value;
+    document.getElementById('nc-fields').style.display = type === 'non_conformance' ? '' : 'none';
+    document.getElementById('bug-fields').style.display = type === 'bug' ? '' : 'none';
+    document.getElementById('improvement-fields').style.display = type === 'improvement' ? '' : 'none';
+}
+
+toggleTypeFields();
+
 async function createIssue(event) {
     event.preventDefault();
 
@@ -87,15 +135,29 @@ async function createIssue(event) {
     const errorDiv = document.getElementById('form-error');
     errorDiv.style.display = 'none';
 
+    const type = form.issue_type.value;
+
     const data = {
         title: form.title.value,
         description: form.description.value || null,
-        issue_type: form.issue_type.value,
+        issue_type: type,
         priority: form.priority.value,
         part_id: form.part_id.value ? parseInt(form.part_id.value) : null,
         procedure_id: form.procedure_id.value ? parseInt(form.procedure_id.value) : null,
         assigned_to_id: form.assigned_to_id.value ? parseInt(form.assigned_to_id.value) : null,
     };
+
+    // Type-specific fields
+    if (type === 'non_conformance') {
+        data.should_be = form.should_be.value || null;
+        data.is_condition = form.is_condition.value || null;
+    } else if (type === 'bug') {
+        data.steps_to_reproduce = form.steps_to_reproduce.value || null;
+        data.expected_behavior = form.expected_behavior.value || null;
+        data.actual_behavior = form.actual_behavior.value || null;
+    } else if (type === 'improvement') {
+        data.expected_benefit = form.expected_benefit.value || null;
+    }
 
     const headers = {
         'Content-Type': 'application/json',

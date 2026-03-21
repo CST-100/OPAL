@@ -116,33 +116,22 @@ def cmd_migrate(args: argparse.Namespace) -> None:
 
 
 def cmd_seed(args: argparse.Namespace) -> None:
-    """Populate database with demo data."""
-    # Configure project first
+    """Populate database with Project Kestrel demo data."""
     _setup_project(args)
 
     from opal.db.base import SessionLocal
-    from opal.db.models import User
+    from opal.db.models import Part
+    from opal.seed import seed_database
 
     db = SessionLocal()
     try:
-        # Check if already seeded
-        if db.query(User).first():
+        if db.query(Part).first():
             print("Database already has data. Skipping seed.")
             return
 
-        # Create demo users
-        users = [
-            User(name="Alice", email="alice@example.com", is_admin=True),
-            User(name="Bob", email="bob@example.com"),
-            User(name="Charlie", email="charlie@example.com"),
-        ]
-        db.add_all(users)
-        db.commit()
-
-        print(f"Created {len(users)} demo users")
-
-        # TODO: Add more seed data for parts, procedures, etc.
-
+        print("Seeding Project Kestrel data...")
+        seed_database(db)
+        print("Done.")
     finally:
         db.close()
 

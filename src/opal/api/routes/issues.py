@@ -43,6 +43,12 @@ class IssueResponse(BaseModel):
     procedure_id: int | None = None
     procedure_instance_id: int | None = None
     step_execution_id: int | None = None
+    should_be: str | None = None
+    is_condition: str | None = None
+    steps_to_reproduce: str | None = None
+    expected_behavior: str | None = None
+    actual_behavior: str | None = None
+    expected_benefit: str | None = None
     root_cause: str | None = None
     corrective_action: str | None = None
     disposition_type: str | None = None
@@ -71,6 +77,12 @@ class IssueCreate(BaseModel):
     description: str | None = None
     issue_type: str = "task"
     priority: str = "medium"
+    should_be: str | None = None
+    is_condition: str | None = None
+    steps_to_reproduce: str | None = None
+    expected_behavior: str | None = None
+    actual_behavior: str | None = None
+    expected_benefit: str | None = None
     part_id: int | None = None
     procedure_id: int | None = None
     procedure_instance_id: int | None = None
@@ -85,6 +97,12 @@ class IssueUpdate(BaseModel):
     issue_type: str | None = None
     status: str | None = None
     priority: str | None = None
+    should_be: str | None = None
+    is_condition: str | None = None
+    steps_to_reproduce: str | None = None
+    expected_behavior: str | None = None
+    actual_behavior: str | None = None
+    expected_benefit: str | None = None
     part_id: int | None = None
     procedure_id: int | None = None
     procedure_instance_id: int | None = None
@@ -128,6 +146,12 @@ def _issue_to_response(issue: Issue) -> IssueResponse:
         procedure_id=issue.procedure_id,
         procedure_instance_id=issue.procedure_instance_id,
         step_execution_id=issue.step_execution_id,
+        should_be=issue.should_be,
+        is_condition=issue.is_condition,
+        steps_to_reproduce=issue.steps_to_reproduce,
+        expected_behavior=issue.expected_behavior,
+        actual_behavior=issue.actual_behavior,
+        expected_benefit=issue.expected_benefit,
         root_cause=issue.root_cause,
         corrective_action=issue.corrective_action,
         disposition_type=_get_enum_val(issue, "disposition_type") if issue.disposition_type else None,
@@ -244,6 +268,12 @@ async def create_issue(
         issue_type=issue_type,
         status=IssueStatus.OPEN,
         priority=priority,
+        should_be=data.should_be,
+        is_condition=data.is_condition,
+        steps_to_reproduce=data.steps_to_reproduce,
+        expected_behavior=data.expected_behavior,
+        actual_behavior=data.actual_behavior,
+        expected_benefit=data.expected_benefit,
         part_id=data.part_id,
         procedure_id=data.procedure_id,
         procedure_instance_id=data.procedure_instance_id,
@@ -324,6 +354,18 @@ async def update_issue(
             issue.priority = IssuePriority(data.priority)
         except ValueError as err:
             raise HTTPException(status_code=400, detail=f"Invalid priority: {data.priority}") from err
+    if data.should_be is not None:
+        issue.should_be = data.should_be
+    if data.is_condition is not None:
+        issue.is_condition = data.is_condition
+    if data.steps_to_reproduce is not None:
+        issue.steps_to_reproduce = data.steps_to_reproduce
+    if data.expected_behavior is not None:
+        issue.expected_behavior = data.expected_behavior
+    if data.actual_behavior is not None:
+        issue.actual_behavior = data.actual_behavior
+    if data.expected_benefit is not None:
+        issue.expected_benefit = data.expected_benefit
     if data.part_id is not None:
         issue.part_id = data.part_id
     if data.procedure_id is not None:

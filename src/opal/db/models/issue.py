@@ -69,6 +69,14 @@ class Issue(Base, IdMixin, TimestampMixin, SoftDeleteMixin):
         String(20), nullable=False, default=IssuePriority.MEDIUM
     )
 
+    # Type-specific fields
+    should_be: Mapped[str | None] = mapped_column(Text, nullable=True, comment="NC: expected condition")
+    is_condition: Mapped[str | None] = mapped_column(Text, nullable=True, comment="NC: actual condition")
+    steps_to_reproduce: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Bug: repro steps")
+    expected_behavior: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Bug: expected")
+    actual_behavior: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Bug: actual")
+    expected_benefit: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Improvement: benefit")
+
     # Disposition fields
     root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
     corrective_action: Mapped[str | None] = mapped_column(Text, nullable=True)
