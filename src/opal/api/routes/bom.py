@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from opal.api.deps import CurrentUserId, DbSession
-from opal.core.audit import get_model_dict, log_create, log_update
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.db.models import BOMLine, Part
 
 router = APIRouter()
@@ -275,5 +275,6 @@ async def remove_component_from_assembly(
             detail=f"BOM line {line_id} not found",
         )
 
+    log_delete(db, line, user_id)
     db.delete(line)
     db.commit()

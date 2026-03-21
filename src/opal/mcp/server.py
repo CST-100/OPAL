@@ -10,6 +10,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from opal.config import get_active_project, get_active_settings
+from opal.core.designators import generate_issue_number
 from opal.db.base import SessionLocal
 from opal.db.models import (
     BOMLine,
@@ -919,6 +920,7 @@ async def _create_issue(db, args: dict) -> list[TextContent]:
     priority = args.get("priority", "medium")
 
     issue = Issue(
+        issue_number=generate_issue_number(db),
         title=args["title"],
         description=args.get("description"),
         issue_type=IssueType(issue_type),

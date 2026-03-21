@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from opal.api.deps import CurrentUserId, DbSession
 from opal.core.audit import log_create, log_update, get_model_dict
-from opal.core.designators import generate_opal_number, generate_serial_number, generate_work_order_number
+from opal.core.designators import generate_issue_number, generate_opal_number, generate_serial_number, generate_work_order_number
 from opal.core.events import (
     emit_instance_completed,
     emit_instance_started,
@@ -982,6 +982,7 @@ async def log_non_conformance(
         priority = IssuePriority.MEDIUM
 
     issue = Issue(
+        issue_number=generate_issue_number(db),
         title=data.title,
         description=data.description,
         issue_type=IssueType.NON_CONFORMANCE,

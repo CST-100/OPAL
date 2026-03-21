@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from opal.api.deps import CurrentUserId, DbSession
 from opal.config import get_active_project
-from opal.core.audit import get_model_dict, log_create, log_update
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.db.models import Part, PartRequirement
 
 router = APIRouter()
@@ -265,5 +265,6 @@ async def unassign_requirement(
             detail=f"Part requirement {requirement_id} not found",
         )
 
+    log_delete(db, pr, user_id)
     db.delete(pr)
     db.commit()

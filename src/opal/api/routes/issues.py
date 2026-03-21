@@ -410,6 +410,8 @@ async def create_issue_comment(
         body=data.body,
     )
     db.add(comment)
+    db.flush()
+    log_create(db, comment, user_id)
     db.commit()
     db.refresh(comment)
 

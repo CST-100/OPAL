@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 
 from opal.api.deps import CurrentUserId, DbSession, PaginationParams
-from opal.core.audit import log_create, log_update, get_model_dict
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.core.inventory import generate_opal_number
 from opal.db.models import InventoryRecord, Part, StockTestResult, StockTransfer, TestTemplate
 from opal.db.models.inventory import ConsumptionType, InventoryConsumption, InventoryProduction, SourceType, TestResult, TransferStatus, UsageType
@@ -123,9 +123,12 @@ def inventory_to_response(record: InventoryRecord) -> InventoryResponse:
     calibration_status = None
     if record.part.is_tooling and record.calibration_due_at:
         now = datetime.now(timezone.utc)
-        if record.calibration_due_at <= now:
+        cal_due = record.calibration_due_at
+        if cal_due.tzinfo is None:
+            cal_due = cal_due.replace(tzinfo=timezone.utc)
+        if cal_due <= now:
             calibration_status = "overdue"
-        elif (record.calibration_due_at - now).days <= 30:
+        elif (cal_due - now).days <= 30:
             calibration_status = "due_soon"
         else:
             calibration_status = "ok"
@@ -331,7 +334,7 @@ async def get_opal_history(
     history: list[OpalHistoryEntry] = []
 
     # Creation event
-    source_details: dict = {"source_type": record.source_type.value if record.source_type else "unknown"}
+    source_details: dict = {"source_type": (record.source_type.value if hasattr(record.source_type, 'value') else record.source_type) if record.source_type else "unknown"}
     if record.source_purchase_line_id:
         source_details["purchase_line_id"] = record.source_purchase_line_id
         if record.source_purchase_line:
@@ -479,6 +482,203 @@ async def create_inventory(
     return InventoryCreateResponse(
         items=[inventory_to_response(r) for r in created_records],
         total_created=len(created_records),
+    )
+
+
+# ============ Stock Transfers ============
+# NOTE: These routes MUST be registered before /{inventory_id} to avoid
+# FastAPI matching "transfers" / "transfer" as an inventory_id parameter.
+
+
+class TransferCreate(BaseModel):
+    """Schema for creating a stock transfer."""
+
+    source_inventory_id: int
+    target_location: str
+    quantity: Decimal
+    target_lot_number: str | None = None
+    notes: str | None = None
+
+
+class TransferResponse(BaseModel):
+    """Schema for transfer response."""
+
+    id: int
+    part_id: int
+    part_name: str
+    quantity: Decimal
+    source_location: str
+    target_location: str
+    source_lot_number: str | None
+    target_lot_number: str | None
+    status: str
+    notes: str | None
+    transferred_by_id: int | None
+    transferred_at: str | None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+@router.post("/transfer", response_model=TransferResponse, status_code=201)
+async def transfer_stock(
+    data: TransferCreate,
+    db: DbSession,
+    user_id: CurrentUserId,
+) -> TransferResponse:
+    """Transfer stock from one location to another.
+
+    This deducts from the source inventory and adds to the target location.
+    If the target location doesn't exist for this part/lot combo, it's created.
+    """
+    # Get source inventory
+    source = db.query(InventoryRecord).filter(InventoryRecord.id == data.source_inventory_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source inventory record not found")
+
+    # Validate quantity
+    if data.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Transfer quantity must be positive")
+
+    if float(source.quantity) < float(data.quantity):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient quantity at source (have {source.quantity}, need {data.quantity})"
+        )
+
+    # Check if transferring to same location
+    target_lot = data.target_lot_number or source.lot_number
+    if source.location == data.target_location and source.lot_number == target_lot:
+        raise HTTPException(status_code=400, detail="Cannot transfer to same location with same lot number")
+
+    # Find or create target inventory record
+    target = (
+        db.query(InventoryRecord)
+        .filter(
+            InventoryRecord.part_id == source.part_id,
+            InventoryRecord.location == data.target_location,
+            InventoryRecord.lot_number == target_lot,
+        )
+        .first()
+    )
+
+    if target:
+        target.quantity = Decimal(str(target.quantity)) + data.quantity
+    else:
+        target = InventoryRecord(
+            part_id=source.part_id,
+            quantity=data.quantity,
+            location=data.target_location,
+            lot_number=target_lot,
+        )
+        db.add(target)
+        db.flush()
+
+    # Deduct from source
+    source.quantity = Decimal(str(source.quantity)) - data.quantity
+
+    # Create transfer record
+    transfer = StockTransfer(
+        source_inventory_id=source.id,
+        target_inventory_id=target.id,
+        part_id=source.part_id,
+        quantity=data.quantity,
+        source_location=source.location,
+        target_location=data.target_location,
+        source_lot_number=source.lot_number,
+        target_lot_number=target_lot,
+        status=TransferStatus.COMPLETED,
+        notes=data.notes,
+        transferred_by_id=user_id,
+        transferred_at=datetime.now(timezone.utc),
+    )
+    db.add(transfer)
+    db.flush()
+    log_create(db, transfer, user_id)
+    db.commit()
+    db.refresh(transfer)
+
+    return TransferResponse(
+        id=transfer.id,
+        part_id=transfer.part_id,
+        part_name=source.part.name,
+        quantity=transfer.quantity,
+        source_location=transfer.source_location,
+        target_location=transfer.target_location,
+        source_lot_number=transfer.source_lot_number,
+        target_lot_number=transfer.target_lot_number,
+        status=transfer.status.value if hasattr(transfer.status, 'value') else transfer.status,
+        notes=transfer.notes,
+        transferred_by_id=transfer.transferred_by_id,
+        transferred_at=transfer.transferred_at.isoformat() if transfer.transferred_at else None,
+        created_at=transfer.created_at.isoformat(),
+    )
+
+
+@router.get("/transfers", response_model=list[TransferResponse])
+async def list_transfers(
+    db: DbSession,
+    part_id: int | None = Query(None),
+    location: str | None = Query(None, description="Filter by source or target location"),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[TransferResponse]:
+    """List stock transfers with optional filters."""
+    query = db.query(StockTransfer).join(Part, StockTransfer.part_id == Part.id)
+
+    if part_id:
+        query = query.filter(StockTransfer.part_id == part_id)
+    if location:
+        query = query.filter(
+            (StockTransfer.source_location == location) |
+            (StockTransfer.target_location == location)
+        )
+
+    transfers = query.order_by(StockTransfer.created_at.desc()).limit(limit).all()
+
+    return [
+        TransferResponse(
+            id=t.id,
+            part_id=t.part_id,
+            part_name=t.part.name,
+            quantity=t.quantity,
+            source_location=t.source_location,
+            target_location=t.target_location,
+            source_lot_number=t.source_lot_number,
+            target_lot_number=t.target_lot_number,
+            status=t.status.value if hasattr(t.status, 'value') else t.status,
+            notes=t.notes,
+            transferred_by_id=t.transferred_by_id,
+            transferred_at=t.transferred_at.isoformat() if t.transferred_at else None,
+            created_at=t.created_at.isoformat(),
+        )
+        for t in transfers
+    ]
+
+
+@router.get("/transfers/{transfer_id}", response_model=TransferResponse)
+async def get_transfer(
+    transfer_id: int,
+    db: DbSession,
+) -> TransferResponse:
+    """Get a specific stock transfer."""
+    transfer = db.query(StockTransfer).filter(StockTransfer.id == transfer_id).first()
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+
+    return TransferResponse(
+        id=transfer.id,
+        part_id=transfer.part_id,
+        part_name=transfer.part.name,
+        quantity=transfer.quantity,
+        source_location=transfer.source_location,
+        target_location=transfer.target_location,
+        source_lot_number=transfer.source_lot_number,
+        target_lot_number=transfer.target_lot_number,
+        status=transfer.status.value if hasattr(transfer.status, 'value') else transfer.status,
+        notes=transfer.notes,
+        transferred_by_id=transfer.transferred_by_id,
+        transferred_at=transfer.transferred_at.isoformat() if transfer.transferred_at else None,
+        created_at=transfer.created_at.isoformat(),
     )
 
 
@@ -733,6 +933,7 @@ async def delete_inventory(
             detail=f"Inventory record {inventory_id} not found",
         )
 
+    log_delete(db, record, user_id)
     db.delete(record)
     db.commit()
 
@@ -860,6 +1061,7 @@ async def create_test_template(
         sort_order=data.sort_order,
     )
     db.add(template)
+    db.flush()
     log_create(db, template, user_id)
     db.commit()
     db.refresh(template)
@@ -895,6 +1097,7 @@ async def delete_test_template(
     if not template:
         raise HTTPException(status_code=404, detail="Test template not found")
 
+    log_delete(db, template, user_id)
     db.delete(template)
     db.commit()
 
@@ -971,6 +1174,7 @@ async def create_test_result(
         tested_by_id=user_id,
     )
     db.add(test_result)
+    db.flush()
     log_create(db, test_result, user_id)
     db.commit()
     db.refresh(test_result)
@@ -1064,6 +1268,7 @@ async def delete_test_result(
     if not test_result:
         raise HTTPException(status_code=404, detail="Test result not found")
 
+    log_delete(db, test_result, user_id)
     db.delete(test_result)
     db.commit()
 
@@ -1126,195 +1331,3 @@ async def get_test_status(
     }
 
 
-# ============ Stock Transfers ============
-
-
-class TransferCreate(BaseModel):
-    """Schema for creating a stock transfer."""
-
-    source_inventory_id: int
-    target_location: str
-    quantity: Decimal
-    target_lot_number: str | None = None
-    notes: str | None = None
-
-
-class TransferResponse(BaseModel):
-    """Schema for transfer response."""
-
-    id: int
-    part_id: int
-    part_name: str
-    quantity: Decimal
-    source_location: str
-    target_location: str
-    source_lot_number: str | None
-    target_lot_number: str | None
-    status: str
-    notes: str | None
-    transferred_by_id: int | None
-    transferred_at: str | None
-    created_at: str
-
-    model_config = {"from_attributes": True}
-
-
-@router.post("/transfer", response_model=TransferResponse, status_code=201)
-async def transfer_stock(
-    data: TransferCreate,
-    db: DbSession,
-    user_id: CurrentUserId,
-) -> TransferResponse:
-    """Transfer stock from one location to another.
-
-    This deducts from the source inventory and adds to the target location.
-    If the target location doesn't exist for this part/lot combo, it's created.
-    """
-    # Get source inventory
-    source = db.query(InventoryRecord).filter(InventoryRecord.id == data.source_inventory_id).first()
-    if not source:
-        raise HTTPException(status_code=404, detail="Source inventory record not found")
-
-    # Validate quantity
-    if data.quantity <= 0:
-        raise HTTPException(status_code=400, detail="Transfer quantity must be positive")
-
-    if float(source.quantity) < float(data.quantity):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Insufficient quantity at source (have {source.quantity}, need {data.quantity})"
-        )
-
-    # Check if transferring to same location
-    target_lot = data.target_lot_number or source.lot_number
-    if source.location == data.target_location and source.lot_number == target_lot:
-        raise HTTPException(status_code=400, detail="Cannot transfer to same location with same lot number")
-
-    # Find or create target inventory record
-    target = (
-        db.query(InventoryRecord)
-        .filter(
-            InventoryRecord.part_id == source.part_id,
-            InventoryRecord.location == data.target_location,
-            InventoryRecord.lot_number == target_lot,
-        )
-        .first()
-    )
-
-    if target:
-        target.quantity = Decimal(str(target.quantity)) + data.quantity
-    else:
-        target = InventoryRecord(
-            part_id=source.part_id,
-            quantity=data.quantity,
-            location=data.target_location,
-            lot_number=target_lot,
-        )
-        db.add(target)
-        db.flush()
-
-    # Deduct from source
-    source.quantity = Decimal(str(source.quantity)) - data.quantity
-
-    # Create transfer record
-    transfer = StockTransfer(
-        source_inventory_id=source.id,
-        target_inventory_id=target.id,
-        part_id=source.part_id,
-        quantity=data.quantity,
-        source_location=source.location,
-        target_location=data.target_location,
-        source_lot_number=source.lot_number,
-        target_lot_number=target_lot,
-        status=TransferStatus.COMPLETED,
-        notes=data.notes,
-        transferred_by_id=user_id,
-        transferred_at=datetime.now(timezone.utc),
-    )
-    db.add(transfer)
-    log_create(db, transfer, user_id)
-    db.commit()
-    db.refresh(transfer)
-
-    return TransferResponse(
-        id=transfer.id,
-        part_id=transfer.part_id,
-        part_name=source.part.name,
-        quantity=transfer.quantity,
-        source_location=transfer.source_location,
-        target_location=transfer.target_location,
-        source_lot_number=transfer.source_lot_number,
-        target_lot_number=transfer.target_lot_number,
-        status=transfer.status.value if hasattr(transfer.status, 'value') else transfer.status,
-        notes=transfer.notes,
-        transferred_by_id=transfer.transferred_by_id,
-        transferred_at=transfer.transferred_at.isoformat() if transfer.transferred_at else None,
-        created_at=transfer.created_at.isoformat(),
-    )
-
-
-@router.get("/transfers", response_model=list[TransferResponse])
-async def list_transfers(
-    db: DbSession,
-    part_id: int | None = Query(None),
-    location: str | None = Query(None, description="Filter by source or target location"),
-    limit: int = Query(50, ge=1, le=200),
-) -> list[TransferResponse]:
-    """List stock transfers with optional filters."""
-    query = db.query(StockTransfer).join(Part, StockTransfer.part_id == Part.id)
-
-    if part_id:
-        query = query.filter(StockTransfer.part_id == part_id)
-    if location:
-        query = query.filter(
-            (StockTransfer.source_location == location) |
-            (StockTransfer.target_location == location)
-        )
-
-    transfers = query.order_by(StockTransfer.created_at.desc()).limit(limit).all()
-
-    return [
-        TransferResponse(
-            id=t.id,
-            part_id=t.part_id,
-            part_name=t.part.name,
-            quantity=t.quantity,
-            source_location=t.source_location,
-            target_location=t.target_location,
-            source_lot_number=t.source_lot_number,
-            target_lot_number=t.target_lot_number,
-            status=t.status.value if hasattr(t.status, 'value') else t.status,
-            notes=t.notes,
-            transferred_by_id=t.transferred_by_id,
-            transferred_at=t.transferred_at.isoformat() if t.transferred_at else None,
-            created_at=t.created_at.isoformat(),
-        )
-        for t in transfers
-    ]
-
-
-@router.get("/transfers/{transfer_id}", response_model=TransferResponse)
-async def get_transfer(
-    transfer_id: int,
-    db: DbSession,
-) -> TransferResponse:
-    """Get a specific stock transfer."""
-    transfer = db.query(StockTransfer).filter(StockTransfer.id == transfer_id).first()
-    if not transfer:
-        raise HTTPException(status_code=404, detail="Transfer not found")
-
-    return TransferResponse(
-        id=transfer.id,
-        part_id=transfer.part_id,
-        part_name=transfer.part.name,
-        quantity=transfer.quantity,
-        source_location=transfer.source_location,
-        target_location=transfer.target_location,
-        source_lot_number=transfer.source_lot_number,
-        target_lot_number=transfer.target_lot_number,
-        status=transfer.status.value if hasattr(transfer.status, 'value') else transfer.status,
-        notes=transfer.notes,
-        transferred_by_id=transfer.transferred_by_id,
-        transferred_at=transfer.transferred_at.isoformat() if transfer.transferred_at else None,
-        created_at=transfer.created_at.isoformat(),
-    )
