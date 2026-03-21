@@ -1,33 +1,124 @@
 """Risks screen - view and manage risks."""
 
+from typing import Any
+
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, DataTable, Label, Static
+from textual.widgets import Button, DataTable, Input, Label, Select, Static, TextArea
 
 from opal.tui.api_client import get_client
+from opal.tui.widgets.form import FormGroup, FormModal
 
 
-RISK_COLORS = {
-    "low": "green",
-    "medium": "yellow",
-    "high": "orange",
-    "critical": "red",
-}
+class RiskFormModal(FormModal):
+    """Modal form for creating/editing a risk."""
+
+    def __init__(self, risk: dict[str, Any] | None = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.risk = risk
+
+    @property
+    def form_title(self) -> str:
+        return "Edit Risk" if self.risk else "New Risk"
+
+    def build_form(self) -> ComposeResult:
+        title_val = self.risk.get("title", "") if self.risk else ""
+        desc_val = self.risk.get("description", "") if self.risk else ""
+        mitigation_val = self.risk.get("mitigation_plan", "") if self.risk else ""
+
+        yield FormGroup(
+            "Title",
+            Input(value=title_val, id="field-title", placeholder="Risk title"),
+            required=True,
+        )
+
+        prob_options = [(str(i), str(i)) for i in range(1, 6)]
+        current_prob = str(self.risk.get("probability", 3)) if self.risk else "3"
+        yield FormGroup(
+            "Probability (1-5)",
+            Select(prob_options, id="field-probability", value=current_prob),
+            required=True,
+        )
+
+        impact_options = [(str(i), str(i)) for i in range(1, 6)]
+        current_impact = str(self.risk.get("impact", 3)) if self.risk else "3"
+        yield FormGroup(
+            "Impact (1-5)",
+            Select(impact_options, id="field-impact", value=current_impact),
+            required=True,
+        )
+
+        if self.risk:
+            status_options = [
+                ("Identified", "identified"),
+                ("Analyzing", "analyzing"),
+                ("Mitigating", "mitigating"),
+                ("Monitoring", "monitoring"),
+                ("Accepted", "accepted"),
+                ("Closed", "closed"),
+            ]
+            yield FormGroup(
+                "Status",
+                Select(
+                    status_options,
+                    id="field-status",
+                    value=self.risk.get("status", "identified"),
+                ),
+            )
+
+        yield FormGroup(
+            "Description",
+            TextArea(text=desc_val, id="field-description"),
+        )
+
+        yield FormGroup(
+            "Mitigation Plan",
+            TextArea(text=mitigation_val, id="field-mitigation"),
+        )
+
+    def get_form_data(self) -> dict[str, Any] | None:
+        title = self.query_one("#field-title", Input).value.strip()
+        if not title:
+            self.show_error("Title is required")
+            return None
+
+        probability = self.query_one("#field-probability", Select).value
+        impact = self.query_one("#field-impact", Select).value
+        description = self.query_one("#field-description", TextArea).text.strip()
+        mitigation = self.query_one("#field-mitigation", TextArea).text.strip()
+
+        data: dict[str, Any] = {
+            "title": title,
+            "probability": int(probability) if probability != Select.BLANK else 3,
+            "impact": int(impact) if impact != Select.BLANK else 3,
+            "description": description,
+            "mitigation_plan": mitigation,
+        }
+
+        if self.risk:
+            try:
+                status = self.query_one("#field-status", Select).value
+                if status != Select.BLANK:
+                    data["status"] = status
+            except Exception:
+                pass
+
+        return data
 
 
 class RiskDetail(Static):
     """Risk detail panel."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.risk_data: dict | None = None
+        self.risk_data: dict[str, Any] | None = None
 
     def compose(self) -> ComposeResult:
         yield Label("Risk Details", classes="section-title")
         yield Container(id="risk-detail-content")
 
-    def show_risk(self, risk: dict) -> None:
+    def show_risk(self, risk: dict[str, Any]) -> None:
         """Display risk details."""
         self.risk_data = risk
         content = self.query_one("#risk-detail-content", Container)
@@ -47,7 +138,9 @@ class RiskDetail(Static):
 
         content.mount(Label(f"Probability: {probability}/5", classes="detail-row"))
         content.mount(Label(f"Impact: {impact}/5", classes="detail-row"))
-        content.mount(Label(f"Score: {score} ({level.upper()})", classes=f"detail-row risk-{level}"))
+        content.mount(
+            Label(f"Score: {score} ({level.upper()})", classes=f"detail-row risk-{level}")
+        )
 
         # Description
         description = risk.get("description", "")
@@ -64,6 +157,12 @@ class RiskDetail(Static):
         # Owner
         if risk.get("owner_id"):
             content.mount(Label(f"Owner: User #{risk['owner_id']}", classes="detail-row"))
+
+        # Linked issue
+        if risk.get("linked_issue_id"):
+            content.mount(
+                Label(f"Linked Issue: #{risk['linked_issue_id']}", classes="detail-row")
+            )
 
         # Timestamps
         created = risk.get("created_at", "")[:16] if risk.get("created_at") else "-"
@@ -84,7 +183,7 @@ class RiskMatrix(Static):
         yield Label("Risk Matrix", classes="section-title")
         yield Container(id="matrix-content")
 
-    def show_matrix(self, matrix_data: dict) -> None:
+    def show_matrix(self, matrix_data: dict[str, Any]) -> None:
         """Display risk matrix."""
         content = self.query_one("#matrix-content", Container)
         content.remove_children()
@@ -105,8 +204,13 @@ class RiskMatrix(Static):
 
         # Legend
         summary = matrix_data.get("summary", {})
-        legend = f"Low:{summary.get('low', 0)} Med:{summary.get('medium', 0)} High:{summary.get('high', 0)} Crit:{summary.get('critical', 0)}"
-        content.mount(Label(legend, classes="matrix-legend"))
+        legend_parts = [
+            f"Low:{summary.get('low', 0)}",
+            f"Med:{summary.get('medium', 0)}",
+            f"High:{summary.get('high', 0)}",
+            f"Crit:{summary.get('critical', 0)}",
+        ]
+        content.mount(Label(" ".join(legend_parts), classes="matrix-legend"))
 
 
 class RisksScreen(Screen):
@@ -115,11 +219,12 @@ class RisksScreen(Screen):
     BINDINGS = [
         ("r", "refresh", "Refresh"),
         ("n", "new_risk", "New Risk"),
+        ("ctrl+e", "edit_risk", "Edit"),
         ("m", "toggle_matrix", "Matrix"),
         ("escape", "go_back", "Back"),
     ]
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.show_matrix = False
 
@@ -129,7 +234,9 @@ class RisksScreen(Screen):
             Horizontal(
                 Button("All", id="filter-all", variant="primary"),
                 Button("Identified", id="filter-identified"),
+                Button("Analyzing", id="filter-analyzing"),
                 Button("Mitigating", id="filter-mitigating"),
+                Button("Monitoring", id="filter-monitoring"),
                 Button("Accepted", id="filter-accepted"),
                 Button("Closed", id="filter-closed"),
                 classes="filter-bar",
@@ -169,7 +276,47 @@ class RisksScreen(Screen):
 
     async def action_new_risk(self) -> None:
         """Show new risk dialog."""
-        self.notify("Risk creation not yet implemented in TUI")
+        self.app.push_screen(RiskFormModal(), callback=self._on_risk_created)
+
+    def _on_risk_created(self, data: dict[str, Any] | None) -> None:
+        """Handle risk creation result."""
+        if data is None:
+            return
+        client = get_client(self.app.api_url)
+        try:
+            risk = client.create_risk(data)
+            self.notify(f"Created risk: {risk.get('title', '')}")
+            self.run_worker(self.load_risks())
+            self.run_worker(self.load_matrix())
+        except Exception as e:
+            self.notify(f"Error creating risk: {e}", severity="error")
+
+    async def action_edit_risk(self) -> None:
+        """Edit the selected risk."""
+        detail = self.query_one("#risk-detail", RiskDetail)
+        if not detail.risk_data:
+            self.notify("Select a risk first", severity="warning")
+            return
+        self.app.push_screen(
+            RiskFormModal(risk=detail.risk_data),
+            callback=self._on_risk_edited,
+        )
+
+    def _on_risk_edited(self, data: dict[str, Any] | None) -> None:
+        """Handle risk edit result."""
+        if data is None:
+            return
+        detail = self.query_one("#risk-detail", RiskDetail)
+        if not detail.risk_data:
+            return
+        client = get_client(self.app.api_url)
+        try:
+            client.update_risk(detail.risk_data["id"], data)
+            self.notify("Risk updated")
+            self.run_worker(self.load_risks())
+            self.run_worker(self.load_matrix())
+        except Exception as e:
+            self.notify(f"Error updating risk: {e}", severity="error")
 
     def action_toggle_matrix(self) -> None:
         """Toggle risk matrix visibility."""

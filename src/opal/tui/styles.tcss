@@ -363,3 +363,71 @@ DataTable > .datatable--cursor {
     height: auto;
     max-height: 20;
 }
+
+/* Detail panel ID selectors */
+#inventory-detail, #purchase-detail, #supplier-detail, #wc-detail {
+    width: 40%;
+    height: 100%;
+    border: solid $secondary;
+    padding: 1;
+}
+
+/* Activity entries */
+.activity-entry {
+    padding: 0 1;
+    color: $text;
+}
+
+.activity-timestamp {
+    color: $text-muted;
+}
+
+/* Inventory status */
+.status-available {
+    color: $success;
+}
+
+.status-consumed {
+    color: $text-muted;
+}
+
+.status-quarantined {
+    color: $warning;
+}
+
+.status-scrapped {
+    color: $error;
+}
+
+/* PO statuses */
+.status-draft {
+    color: $text-muted;
+}
+
+.status-ordered {
+    color: $primary;
+}
+
+.status-partial {
+    color: $warning;
+}
+
+.status-received {
+    color: $success;
+}
+
+/* Search results */
+#search-input {
+    margin: 1;
+}
+
+#search-results {
+    height: 1fr;
+    padding: 0 1;
+}
+
+#search-results DataTable {
+    height: auto;
+    max-height: 12;
+    margin-bottom: 1;
+}

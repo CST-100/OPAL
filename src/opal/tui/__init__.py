@@ -1,4 +1,5 @@
-"""TUI (Terminal User Interface) module.
+"""TUI (Terminal User Interface) module."""
 
-Deferred to Phase 8.
-"""
+from opal.tui.app import run_tui
+
+__all__ = ["run_tui"]

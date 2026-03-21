@@ -1,7 +1,9 @@
 """Dashboard screen - overview of OPAL status."""
 
+from typing import Any
+
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Label, Static
 
@@ -11,14 +13,18 @@ from opal.tui.api_client import get_client
 class StatCard(Static):
     """A card displaying a statistic."""
 
-    def __init__(self, title: str, value: str = "-", *args, **kwargs):
+    def __init__(self, title: str, value: str = "-", *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.title = title
         self._value = value
 
     def compose(self) -> ComposeResult:
         yield Label(self.title, classes="stat-title")
-        yield Label(self._value, classes="stat-value", id=f"stat-{self.title.lower().replace(' ', '-')}")
+        yield Label(
+            self._value,
+            classes="stat-value",
+            id=f"stat-{self.title.lower().replace(' ', '-')}",
+        )
 
     def update_value(self, value: str) -> None:
         """Update the displayed value."""
@@ -32,7 +38,29 @@ class RecentActivity(Static):
 
     def compose(self) -> ComposeResult:
         yield Label("Recent Activity", classes="section-title")
-        yield Container(id="activity-list")
+        yield VerticalScroll(id="activity-list")
+
+    def show_activity(self, items: list[dict[str, Any]]) -> None:
+        """Display recent activity entries."""
+        container = self.query_one("#activity-list", VerticalScroll)
+        container.remove_children()
+
+        if not items:
+            container.mount(Label("No recent activity", classes="hint"))
+            return
+
+        for item in items[:20]:
+            action = item.get("action", "?")
+            entity = item.get("entity_type", "?")
+            entity_id = item.get("entity_id", "")
+            user = item.get("user_name", f"User #{item.get('user_id', '?')}")
+            ts = item.get("created_at", "")[:16] if item.get("created_at") else ""
+            container.mount(
+                Label(
+                    f"[{ts}] {user} {action} {entity} #{entity_id}",
+                    classes="activity-entry",
+                )
+            )
 
 
 class DashboardScreen(Screen):
@@ -90,8 +118,16 @@ class DashboardScreen(Screen):
             health = client.health_check()
             status_container = self.query_one("#status-container", Container)
             status_container.remove_children()
-            status_container.mount(Label(f"API: {health.get('status', 'unknown')}", classes="status-ok"))
-            status_container.mount(Label(f"Database: OK", classes="status-ok"))
+            status_container.mount(
+                Label(f"API: {health.get('status', 'unknown')}", classes="status-ok")
+            )
+            status_container.mount(Label("Database: OK", classes="status-ok"))
+
+            user = client.get_current_user()
+            if user:
+                status_container.mount(
+                    Label(f"User: {user.get('name', 'Unknown')}", classes="status-ok")
+                )
 
             # Parts count
             parts = client.list_parts(page_size=1)
@@ -117,4 +153,4 @@ class DashboardScreen(Screen):
             self.notify(f"Error loading stats: {e}", severity="error")
             status_container = self.query_one("#status-container", Container)
             status_container.remove_children()
-            status_container.mount(Label(f"API: offline", classes="status-error"))
+            status_container.mount(Label("API: offline", classes="status-error"))
