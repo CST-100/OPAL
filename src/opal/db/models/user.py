@@ -20,6 +20,7 @@ class User(Base, IdMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
     needs_profile_setup: Mapped[bool] = mapped_column(default=False, nullable=False)
+    needs_onboarding: Mapped[bool] = mapped_column(default=True, nullable=False)
 
     # Presence tracking
     last_seen_at: Mapped[datetime | None] = mapped_column(

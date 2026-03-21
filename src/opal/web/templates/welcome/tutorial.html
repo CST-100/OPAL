@@ -1,0 +1,156 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("WELCOME") }}
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 0 auto;">
+    <div class="panel">
+        <div class="panel-header">
+            <span>ORIENTATION</span>
+            <span id="step-counter" style="font-family: var(--font-mono); color: var(--text-muted);">1 / 5</span>
+        </div>
+        <div class="panel-body">
+
+            <!-- Step 1: What is OPAL -->
+            <div class="tutorial-step" id="step-1">
+                <h3 style="margin: 0 0 var(--space-md) 0; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent-blue);">WHAT IS OPAL?</h3>
+                <div style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.8;">
+                    <p style="margin-bottom: var(--space-md);">
+                        <strong>OPAL</strong> (Operations, Procedures, Assets, Logistics) is a local-first ERP system for small teams building hardware.
+                    </p>
+                    <table class="data-table" style="margin-bottom: var(--space-md);">
+                        <tr><th style="width: 140px;">DATABASE</th><td>Single SQLite file on your machine — no cloud, no servers</td></tr>
+                        <tr><th>NETWORK</th><td>Accessible to other machines on your local network</td></tr>
+                        <tr><th>AUDIT TRAIL</th><td>Every create, update, and delete is logged with who/when/what</td></tr>
+                        <tr><th>TRACEABILITY</th><td>Every physical item gets a unique OPAL number for full chain-of-custody</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Step 2: Parts & Inventory -->
+            <div class="tutorial-step" id="step-2" style="display: none;">
+                <h3 style="margin: 0 0 var(--space-md) 0; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent-blue);">PARTS &amp; INVENTORY</h3>
+                <div style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.8;">
+                    <table class="data-table" style="margin-bottom: var(--space-md);">
+                        <tr><th style="width: 140px;">PARTS</th><td>Define what you build with — each part has a unique system ID and configurable part number (e.g., KST-F-0001)</td></tr>
+                        <tr><th>OPAL NUMBERS</th><td>Each physical item or batch gets a unique OPAL-XXXXX number for traceability</td></tr>
+                        <tr><th>TIERS</th><td>Classify parts by criticality — e.g., Flight (full traceability), Ground (support equipment), Dev (prototypes)</td></tr>
+                        <tr><th>TRACKING</th><td><strong>Serialized</strong> parts get one OPAL number per unit; <strong>Bulk</strong> parts get one per batch/box</td></tr>
+                        <tr><th>INVENTORY</th><td>Track quantity, location, lot number, expiration date, and calibration status per OPAL number</td></tr>
+                        <tr><th>BOM</th><td>Define bill-of-materials: which components go into an assembly, and in what quantity</td></tr>
+                    </table>
+                    <p style="color: var(--text-muted);">Find parts under <strong>INVENTORY &rarr; PARTS</strong> in the top nav.</p>
+                </div>
+            </div>
+
+            <!-- Step 3: Procedures & Executions -->
+            <div class="tutorial-step" id="step-3" style="display: none;">
+                <h3 style="margin: 0 0 var(--space-md) 0; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent-blue);">PROCEDURES &amp; EXECUTIONS</h3>
+                <div style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.8;">
+                    <table class="data-table" style="margin-bottom: var(--space-md);">
+                        <tr><th style="width: 140px;">TEMPLATES</th><td>Step-by-step work instructions — write once, execute many times. Found under <strong>MANUFACTURING &rarr; PROCEDURES</strong>.</td></tr>
+                        <tr><th>VERSIONING</th><td>Publishing a template creates an immutable snapshot. Editing the template never changes published versions.</td></tr>
+                        <tr><th>EXECUTIONS</th><td>Running a published version. Each execution captures data, tracks time, and consumes inventory. Found under <strong>MANUFACTURING &rarr; EXECUTIONS</strong>.</td></tr>
+                        <tr><th>WORK ORDERS</th><td>Executions get a WO-XXXXX number to group related work.</td></tr>
+                        <tr><th>TYPES</th><td><strong>OP</strong> = operational procedure (no output). <strong>BUILD</strong> = produces an assembly (creates new OPAL-numbered output).</td></tr>
+                        <tr><th>KITTING</th><td>Templates define which parts and quantities are needed. Inventory is consumed during execution.</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Step 4: Issues & Risks -->
+            <div class="tutorial-step" id="step-4" style="display: none;">
+                <h3 style="margin: 0 0 var(--space-md) 0; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent-blue);">ISSUES &amp; RISKS</h3>
+                <div style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.8;">
+                    <table class="data-table" style="margin-bottom: var(--space-md);">
+                        <tr>
+                            <th style="width: 140px;">ISSUE TYPES</th>
+                            <td>
+                                <strong>Non-Conformance</strong> — hardware doesn't meet spec (has should-be / is fields)<br>
+                                <strong>Bug</strong> — software/system defect (has steps to reproduce)<br>
+                                <strong>Task</strong> — general work item<br>
+                                <strong>Improvement</strong> — feature request or enhancement
+                            </td>
+                        </tr>
+                        <tr><th>AUTO-CREATED</th><td>Non-conformances can be logged during procedure execution and automatically create linked issues</td></tr>
+                        <tr><th>LINKING</th><td>Issues link to parts, procedures, and executions for full traceability</td></tr>
+                        <tr><th>RISKS</th><td>Track project risks with probability &times; impact scoring (1-5 each). Score determines severity: low (&le;5), medium (6-12), high (13-25).</td></tr>
+                    </table>
+                    <p style="color: var(--text-muted);">Find issues and risks under <strong>QUALITY</strong> in the top nav.</p>
+                </div>
+            </div>
+
+            <!-- Step 5: Navigation -->
+            <div class="tutorial-step" id="step-5" style="display: none;">
+                <h3 style="margin: 0 0 var(--space-md) 0; font-family: var(--font-mono); letter-spacing: 0.05em; color: var(--accent-blue);">NAVIGATION</h3>
+                <div style="font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.8;">
+                    <table class="data-table" style="margin-bottom: var(--space-md);">
+                        <tr><th style="width: 140px;">TOP NAV</th><td>Three dropdown menus: <strong>INVENTORY</strong> (parts, stock, purchases), <strong>MANUFACTURING</strong> (procedures, executions), <strong>QUALITY</strong> (issues, risks)</td></tr>
+                        <tr><th>CMD PALETTE</th><td><strong>Ctrl+K</strong> — search anything, navigate anywhere, create new items. Fastest way to get around.</td></tr>
+                        <tr><th>SHORTCUTS</th><td>Alt+P (parts), Alt+R (procedures), Alt+E (executions), Alt+I (issues), Alt+K (risks), Alt+H (home)</td></tr>
+                        <tr><th>DOCS</th><td>Full documentation available in-app — find it in the user menu (top right).</td></tr>
+                    </table>
+                    <p style="margin-top: var(--space-md); color: var(--text-muted);">
+                        The UI is dense and explicit by design — data tables over cards, no hidden information, monospace for structured data. Everything is visible, nothing is behind a menu you don't know about.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Navigation buttons -->
+            <div style="display: flex; justify-content: space-between; margin-top: var(--space-xl); padding-top: var(--space-md); border-top: 1px solid var(--border-color);">
+                <div>
+                    <button id="btn-back" class="btn" onclick="prevStep()" style="display: none;">BACK</button>
+                </div>
+                <div style="display: flex; gap: var(--space-sm);">
+                    <a href="#" onclick="skipOnboarding(); return false;" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); align-self: center; margin-right: var(--space-md);">SKIP</a>
+                    <button id="btn-next" class="btn btn-primary" onclick="nextStep()">NEXT</button>
+                    <button id="btn-done" class="btn btn-primary" onclick="finishOnboarding()" style="display: none;">GET STARTED</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const TOTAL_STEPS = 5;
+let currentStep = 1;
+
+function showStep(n) {
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+        document.getElementById('step-' + i).style.display = i === n ? '' : 'none';
+    }
+    document.getElementById('step-counter').textContent = n + ' / ' + TOTAL_STEPS;
+    document.getElementById('btn-back').style.display = n === 1 ? 'none' : '';
+    document.getElementById('btn-next').style.display = n === TOTAL_STEPS ? 'none' : '';
+    document.getElementById('btn-done').style.display = n === TOTAL_STEPS ? '' : 'none';
+}
+
+function nextStep() {
+    if (currentStep < TOTAL_STEPS) { currentStep++; showStep(currentStep); }
+}
+
+function prevStep() {
+    if (currentStep > 1) { currentStep--; showStep(currentStep); }
+}
+
+function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    const userId = localStorage.getItem('opal_user_id');
+    if (userId) headers['X-User-Id'] = userId;
+    return headers;
+}
+
+async function finishOnboarding() {
+    await fetch('/api/welcome/complete', { method: 'POST', headers: getHeaders() });
+    window.location.href = '/';
+}
+
+async function skipOnboarding() {
+    await fetch('/api/welcome/complete', { method: 'POST', headers: getHeaders() });
+    window.location.href = '/';
+}
+</script>
+{% endblock %}

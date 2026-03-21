@@ -185,7 +185,8 @@ async def login_submit(request: Request, db: DbSession, user_id: int = Form(...)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    response = RedirectResponse(url="/", status_code=302)
+    redirect_url = "/welcome" if user.needs_onboarding else "/"
+    response = RedirectResponse(url=redirect_url, status_code=302)
     max_age = 365 * 24 * 3600  # 1 year
     response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
     response.set_cookie("opal_user_name", user.name, max_age=max_age)
@@ -204,12 +205,12 @@ async def login_new_user(
     """Create a new user and log in. First user auto-becomes admin."""
     # First user ever created is auto-admin
     is_first_user = db.query(User).count() == 0
-    user = User(name=name, email=email or None, is_active=True, is_admin=is_first_user)
+    user = User(name=name, email=email or None, is_active=True, is_admin=is_first_user, needs_onboarding=True)
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    response = RedirectResponse(url="/", status_code=302)
+    response = RedirectResponse(url="/welcome", status_code=302)
     max_age = 365 * 24 * 3600
     response.set_cookie("opal_user_id", str(user.id), max_age=max_age)
     response.set_cookie("opal_user_name", user.name, max_age=max_age)
@@ -283,12 +284,34 @@ async def setup_profile_submit(
     return response
 
 
+@router.get("/welcome", response_class=HTMLResponse)
+async def welcome_page(request: Request, db: DbSession) -> HTMLResponse:
+    """Welcome / onboarding page."""
+    context = get_base_context(request, db, "Welcome")
+    current_user = context.get("current_user")
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # First admin on a fresh system → project setup wizard
+    is_fresh = db.query(Part).filter(Part.deleted_at.is_(None)).count() == 0
+    if current_user.is_admin and is_fresh:
+        return templates.TemplateResponse("welcome/setup.html", context)
+
+    # Everyone else → orientation tutorial
+    return templates.TemplateResponse("welcome/tutorial.html", context)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: DbSession) -> HTMLResponse:
     """Home page."""
     from opal.db.models.audit import AuditLog
 
     context = get_base_context(request, db, "OPAL")
+
+    # Redirect new users to onboarding
+    current_user = context.get("current_user")
+    if current_user and current_user.needs_onboarding:
+        return RedirectResponse(url="/welcome", status_code=302)
 
     # Get counts for dashboard
     context["parts_count"] = db.query(Part).filter(Part.deleted_at.is_(None)).count()

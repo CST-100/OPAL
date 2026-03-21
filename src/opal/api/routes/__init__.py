@@ -23,6 +23,7 @@ from opal.api.routes import (
     suppliers,
     undo,
     users,
+    welcome,
     workcenters,
 )
 
@@ -50,3 +51,4 @@ router.include_router(search.router)  # Has its own /search prefix
 router.include_router(attachments.router)  # Has its own /attachments prefix
 router.include_router(undo.router)  # Has its own /undo prefix
 router.include_router(onshape.router)  # Has its own /onshape prefix; endpoints check onshape_enabled
+router.include_router(welcome.router)  # Has its own /welcome prefix

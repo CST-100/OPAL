@@ -437,7 +437,8 @@ async function saveProject(event) {
             successDiv.style.display = 'block';
 
             {% if not existing_config %}
-            // Redirect to home after creation
+            // Complete onboarding and redirect to home after creation
+            await fetch('/api/welcome/complete', { method: 'POST', headers: headers });
             setTimeout(() => {
                 window.location.href = '/';
             }, 1500);
