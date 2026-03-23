@@ -3033,7 +3033,31 @@ async def mobile_execution_detail(request: Request, db: DbSession, instance_id: 
     if not instance:
         return RedirectResponse(url="/m/exec", status_code=302)
 
+    # Build step info from version content (instructions, titles)
+    version = instance.version
+    version_steps = version.content.get("steps", []) if version and version.content else []
+    exec_lookup = {se.step_number: se for se in instance.step_executions}
+
+    steps = []
+    for vs in version_steps:
+        step_exec = exec_lookup.get(vs["order"])
+        status = (step_exec.status.value if step_exec and hasattr(step_exec.status, "value")
+                  else (step_exec.status if step_exec else "pending"))
+        steps.append({
+            "order": vs["order"],
+            "step_number": vs.get("step_number", str(vs["order"])),
+            "title": vs.get("title", ""),
+            "instructions": vs.get("instructions", ""),
+            "requires_signoff": vs.get("requires_signoff", False),
+            "estimated_duration_minutes": vs.get("estimated_duration_minutes"),
+            "status": status,
+            "completed_at": step_exec.completed_at if step_exec else None,
+            "notes": step_exec.notes if step_exec else None,
+            "data_captured": step_exec.data_captured if step_exec else None,
+        })
+
     ctx["instance"] = instance
+    ctx["steps"] = steps
     return templates.TemplateResponse("mobile/execution.html", ctx)
 
 

@@ -9,38 +9,38 @@
 {# ── List view ── #}
 <div class="panel">
     <div class="panel-header">ACTIVE EXECUTIONS</div>
-    <div class="panel-body">
-        {% if instances %}
-        {% for inst in instances %}
-        {% set st = inst.status.value if inst.status.value is defined else inst.status %}
-        <a href="/m/exec/{{ inst.id }}" style="display: block; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary);">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div class="mono" style="font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
-                    <div class="mono" style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
-                </div>
-                <span class="status status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
+    {% if instances %}
+    {% for inst in instances %}
+    {% set st = inst.status.value if inst.status.value is defined else inst.status %}
+    <a href="/m/exec/{{ inst.id }}" style="display: block; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); min-height: 44px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div class="mono" style="font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
+                <div class="mono" style="font-size: 0.75rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
             </div>
-        </a>
-        {% endfor %}
-        {% else %}
-        <div class="mono" style="color: var(--text-muted); padding: var(--space-md) 0;">No active executions.</div>
-        {% endif %}
+            <span class="status status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
+        </div>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="panel-body">
+        <div class="mono" style="color: var(--text-muted);">No active executions.</div>
     </div>
+    {% endif %}
 </div>
+
 {% else %}
 {# ── Detail view ── #}
 {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
 <div class="panel">
     <div class="panel-header">
-        <span>EXECUTION</span>
+        <span>{{ instance.procedure.name if instance.procedure else 'EXECUTION' }}</span>
         <span class="status status-{{ inst_status }}">{{ inst_status | upper | replace('_', ' ') }}</span>
     </div>
     <div class="panel-body">
         <table class="data-table">
-            <tr><th style="width: 90px;">PROCEDURE</th><td>{{ instance.procedure.name if instance.procedure else '' }}</td></tr>
             {% if instance.work_order_number %}
-            <tr><th>WO #</th><td class="mono">{{ instance.work_order_number }}</td></tr>
+            <tr><th style="width: 50px;">WO</th><td class="mono">{{ instance.work_order_number }}</td></tr>
             {% endif %}
         </table>
     </div>
@@ -48,41 +48,53 @@
 
 <div class="panel">
     <div class="panel-header">STEPS</div>
-    <div id="step-list">
-        {% for step in instance.step_executions %}
-        {% set step_status = step.status.value if step.status.value is defined else step.status %}
-        {% set is_current = (step_status == 'in_progress') or
-           (step_status == 'pending' and loop.previtem is not defined) or
-           (step_status == 'pending' and loop.previtem is defined and (loop.previtem.status.value if loop.previtem.status.value is defined else loop.previtem.status) in ('completed', 'skipped', 'signed_off')) %}
-        <div class="step-row{% if is_current %} current{% endif %}" data-step="{{ step.step_number }}" onclick="toggleStep({{ step.step_number }})">
-            <span class="step-num">{{ step.step_number_str }}</span>
-            <span class="step-dot {% if step_status in ('completed', 'signed_off') %}completed{% elif step_status == 'in_progress' %}in-progress{% elif step_status == 'skipped' %}skipped{% endif %}"></span>
-            <span class="step-title">Step {{ step.step_number_str }}</span>
-            <span class="status" style="font-size: 0.55rem;">{{ step_status | upper | replace('_', ' ') }}</span>
-        </div>
-        <div class="step-detail" id="step-detail-{{ step.step_number }}">
-            {% if step.notes %}
-            <div class="step-instructions">{{ step.notes }}</div>
-            {% endif %}
-
-            {% if step_status in ('pending', 'in_progress') %}
-            <div class="btn-row" style="margin-top: var(--space-md);">
-                <button class="btn" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="completeStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">COMPLETE</button>
-                <button class="btn" onclick="skipStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">SKIP</button>
-            </div>
-            <button class="btn btn-full" style="margin-top: var(--space-sm); border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openStepScanner({{ step.step_number }}); event.stopPropagation();">SCAN TO CONSUME</button>
-            <div id="step-scanner-{{ step.step_number }}" class="scanner-inline hidden">
-                <div id="step-scanner-view-{{ step.step_number }}" class="scanner-viewport"></div>
-                <button class="btn btn-sm btn-full" style="margin-top: var(--space-sm);" onclick="closeStepScanner({{ step.step_number }}); event.stopPropagation();">CLOSE SCANNER</button>
-            </div>
-            {% elif step_status == 'completed' %}
-            <div class="mono" style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-sm);">
-                {% if step.completed_at %}Completed: {{ step.completed_at }}{% endif %}
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
+    {% for step in steps %}
+    {% set is_current = (step.status == 'in_progress') or
+       (step.status == 'pending' and loop.previtem is not defined) or
+       (step.status == 'pending' and loop.previtem is defined and loop.previtem.status in ('completed', 'skipped', 'signed_off')) %}
+    <div class="step-row{% if is_current %} current{% endif %}" data-step="{{ step.order }}" onclick="toggleStep({{ step.order }})">
+        <span class="step-num">{{ step.step_number }}</span>
+        <span class="step-dot {% if step.status in ('completed', 'signed_off') %}completed{% elif step.status == 'in_progress' %}in-progress{% elif step.status == 'skipped' %}skipped{% endif %}"></span>
+        <span class="step-title">{{ step.title }}</span>
+        <span class="status" style="font-size: 0.6rem;">{{ step.status | upper | replace('_', ' ') }}</span>
     </div>
+    <div class="step-detail" id="step-detail-{{ step.order }}">
+        {% if step.instructions %}
+        <div class="step-instructions">{{ step.instructions }}</div>
+        {% endif %}
+
+        {% if step.requires_signoff %}
+        <div class="mono" style="font-size: 0.7rem; color: var(--accent-yellow); margin-top: var(--space-xs);">REQUIRES SIGNOFF</div>
+        {% endif %}
+
+        {% if step.estimated_duration_minutes %}
+        <div class="mono" style="font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-xs);">EST. {{ step.estimated_duration_minutes }} MIN</div>
+        {% endif %}
+
+        {% if step.notes %}
+        <div style="margin-top: var(--space-sm); padding: var(--space-sm); border: 1px solid var(--border-color);">
+            <div class="mono" style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-xs);">OPERATOR NOTES</div>
+            <div style="font-size: 0.85rem; white-space: pre-wrap;">{{ step.notes }}</div>
+        </div>
+        {% endif %}
+
+        {% if step.status in ('pending', 'in_progress') %}
+        <div class="btn-row" style="margin-top: var(--space-md);">
+            <button class="btn btn-primary" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="completeStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">COMPLETE</button>
+            <button class="btn" onclick="skipStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">SKIP</button>
+        </div>
+        <button class="btn btn-full" style="margin-top: var(--space-sm); border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openStepScanner({{ step.order }}); event.stopPropagation();">SCAN TO CONSUME</button>
+        <div id="step-scanner-{{ step.order }}" class="scanner-inline hidden">
+            <div id="step-scanner-view-{{ step.order }}" class="scanner-viewport"></div>
+            <button class="btn btn-sm btn-full" style="margin-top: var(--space-sm);" onclick="closeStepScanner({{ step.order }}); event.stopPropagation();">CLOSE SCANNER</button>
+        </div>
+        {% elif step.status == 'completed' and step.completed_at %}
+        <div class="mono" style="font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-sm);">
+            COMPLETED: {{ step.completed_at }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
 </div>
 
 {% if inst_status == 'completed' %}
@@ -138,14 +150,17 @@
         c.classList.remove('hidden');
         var qr = new Html5Qrcode('step-scanner-view-' + n);
         stepScanners[n] = qr;
-        qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: function(w, h) { var s = Math.floor(Math.min(w, h) * 0.6); return { width: Math.max(s, 150), height: Math.max(s, 150) }; }, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] },
-            function(code) {
-                qr.stop().catch(function() {});
-                delete stepScanners[n];
-                c.classList.add('hidden');
-                handleConsumeScan(code, n);
-            }, function() {}
-        ).catch(function(err) { c.innerHTML = '<div style="padding: var(--space-md); color: var(--accent-red); font-family: var(--font-mono); font-size: 0.8rem;">Camera error: ' + err + '</div>'; });
+        qr.start({ facingMode: 'environment' }, {
+            fps: 10,
+            qrbox: function(w, h) { var s = Math.floor(Math.min(w, h) * 0.6); return { width: Math.max(s, 150), height: Math.max(s, 150) }; },
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+        }, function(code) {
+            qr.stop().catch(function() {});
+            delete stepScanners[n];
+            c.classList.add('hidden');
+            handleConsumeScan(code, n);
+        }, function() {}
+        ).catch(function(err) { c.innerHTML = '<div style="padding: var(--space-md); color: var(--accent-red);" class="mono">Camera error: ' + err + '</div>'; });
     }
 
     function closeStepScanner(n) {
