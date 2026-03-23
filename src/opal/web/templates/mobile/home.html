@@ -51,7 +51,14 @@
         html5QrCode = new Html5Qrcode('scanner');
         html5QrCode.start(
             { facingMode: 'environment' },
-            { fps: 10, qrbox: function(w, h) { var s = Math.min(w, h) * 0.7; return { width: s, height: s }; }, aspectRatio: 1.0 },
+            {
+                fps: 10,
+                qrbox: function(w, h) {
+                    var s = Math.floor(Math.min(w, h) * 0.6);
+                    return { width: Math.max(s, 150), height: Math.max(s, 150) };
+                },
+                formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+            },
             function(code) { onScanSuccess(code); },
             function() {}
         ).then(function() {

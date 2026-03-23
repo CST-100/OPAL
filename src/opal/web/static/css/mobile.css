@@ -132,23 +132,23 @@ body.mobile-layout .btn-row .btn {
 
 /* ── Scanner viewport ───────────────────────────── */
 
+/* html5-qrcode manages its own video/canvas sizing internally.
+   Don't constrain with aspect-ratio or overflow:hidden — just set width
+   and let the library figure out height from the camera feed. */
 .scanner-viewport {
     width: 100%;
-    aspect-ratio: 1 / 1;
-    max-height: 50vh;
     background: var(--bg-primary);
     border: 2px solid var(--border-color);
-    position: relative;
-    overflow: hidden;
 }
 
 .scanner-viewport video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width: 100% !important;
+    height: auto !important;
 }
 
 .scanner-inactive {
+    aspect-ratio: 1 / 1;
+    max-height: 40vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -164,9 +164,7 @@ body.mobile-layout .btn-row .btn {
     border: 1px solid var(--border-color);
 }
 
-.scanner-inline .scanner-viewport {
-    max-height: 30vh;
-}
+/* Inline scanners (embedded in steps) are narrower */
 
 /* ── Step list (execution) ──────────────────────── */
 
