@@ -234,7 +234,7 @@ async def get_inventory_qrcode(
     from opal.core.mri import encode_inventory_mri
 
     mri = encode_inventory_mri(record)
-    qr = segno.make(mri)
+    qr = segno.make(mri, micro=False)
     buf = io.BytesIO()
     qr.save(buf, kind="svg", scale=1, border=1, svgclass=None, lineclass=None)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")

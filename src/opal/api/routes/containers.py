@@ -250,7 +250,7 @@ async def get_container_qrcode(container_id: int, db: DbSession) -> Response:
         raise HTTPException(status_code=404, detail="Container not found")
 
     mri = encode_container_mri(c.code)
-    qr = segno.make(mri)
+    qr = segno.make(mri, micro=False)
     buf = io.BytesIO()
     qr.save(buf, kind="svg", scale=1, border=1, svgclass=None, lineclass=None)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
