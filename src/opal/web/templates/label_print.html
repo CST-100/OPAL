@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Label - {{ identifier }}</title>
+    <title>Label - {{ part_number or name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -18,8 +21,8 @@
             border: 2px solid #000;
             padding: 12px;
             display: flex;
-            gap: 12px;
-            align-items: center;
+            gap: 14px;
+            align-items: flex-start;
         }
         .label-qr img {
             width: 120px;
@@ -29,19 +32,25 @@
         .label-info {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
-        .label-id {
-            font-size: 1.25rem;
+        .label-pn {
+            font-size: 1.4rem;
             font-weight: 700;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
         }
         .label-name {
-            font-size: 0.875rem;
+            font-size: 0.85rem;
+            font-weight: 400;
         }
-        .label-location {
+        .label-opal {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .label-detail {
             font-size: 0.75rem;
-            color: #666;
+            color: #555;
         }
         @media print {
             body { min-height: auto; }
@@ -56,10 +65,18 @@
             <img src="/api/{{ entity_type }}/{{ entity_id }}/qrcode" alt="QR">
         </div>
         <div class="label-info">
-            <div class="label-id">{{ identifier }}</div>
+            {% if part_number %}
+            <div class="label-pn">{{ part_number }}</div>
+            {% endif %}
             <div class="label-name">{{ name }}</div>
+            {% if opal_number %}
+            <div class="label-opal">{{ opal_number }}</div>
+            {% endif %}
+            {% if lot_number %}
+            <div class="label-detail">LOT: {{ lot_number }}</div>
+            {% endif %}
             {% if location %}
-            <div class="label-location">{{ location }}</div>
+            <div class="label-detail">{{ location }}</div>
             {% endif %}
         </div>
     </div>

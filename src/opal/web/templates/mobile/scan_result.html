@@ -5,8 +5,8 @@
 <div class="panel">
     <div class="panel-header">SCAN RESULT</div>
     <div class="panel-body" style="text-align: center; padding: var(--space-xl) var(--space-md);">
-        <div style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-md);">NOT FOUND</div>
-        <div style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-red); word-break: break-all;">{{ code }}</div>
+        <div class="mono" style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-md);">NOT FOUND</div>
+        <div class="mono" style="color: var(--accent-red);">No match in the system</div>
     </div>
 </div>
 
@@ -21,13 +21,9 @@
             {% if result.sublabel %}
             <tr>
                 <th style="width: 80px;">DETAIL</th>
-                <td>{{ result.sublabel }}</td>
+                <td class="mono">{{ result.sublabel }}</td>
             </tr>
             {% endif %}
-            <tr>
-                <th>CODE</th>
-                <td style="font-family: var(--font-mono); font-size: 0.8rem; word-break: break-all;">{{ code }}</td>
-            </tr>
         </table>
     </div>
 </div>

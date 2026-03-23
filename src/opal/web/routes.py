@@ -2348,9 +2348,11 @@ async def label_print(
             "request": request,
             "entity_type": "inventory",
             "entity_id": record.id,
-            "identifier": record.opal_number or f"INV-{record.id}",
+            "part_number": record.part.internal_pn or "",
             "name": record.part.name,
+            "opal_number": record.opal_number or "",
             "location": record.location,
+            "lot_number": record.lot_number,
         })
     elif type == "part":
         part = db.query(Part).filter(Part.id == id, Part.deleted_at.is_(None)).first()
@@ -2360,9 +2362,11 @@ async def label_print(
             "request": request,
             "entity_type": "parts",
             "entity_id": part.id,
-            "identifier": part.internal_pn or f"PART-{part.id}",
+            "part_number": part.internal_pn or "",
             "name": part.name,
+            "opal_number": None,
             "location": None,
+            "lot_number": None,
         })
     return HTMLResponse("Invalid type", status_code=400)
 
