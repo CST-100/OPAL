@@ -5,12 +5,14 @@ from fastapi import APIRouter
 from opal.api.routes import (
     attachments,
     bom,
+    containers,
     datasets,
     events,
     execution,
     health,
     inventory,
     issues,
+    locations,
     onshape,
     parts,
     procedures,
@@ -19,6 +21,7 @@ from opal.api.routes import (
     reports,
     requirements,
     risks,
+    scan,
     search,
     suppliers,
     undo,
@@ -51,4 +54,7 @@ router.include_router(search.router)  # Has its own /search prefix
 router.include_router(attachments.router)  # Has its own /attachments prefix
 router.include_router(undo.router)  # Has its own /undo prefix
 router.include_router(onshape.router)  # Has its own /onshape prefix; endpoints check onshape_enabled
+router.include_router(locations.router)  # Has its own /locations prefix
+router.include_router(containers.router)  # Has its own /containers prefix
+router.include_router(scan.router)  # Has its own /scan prefix
 router.include_router(welcome.router)  # Has its own /welcome prefix

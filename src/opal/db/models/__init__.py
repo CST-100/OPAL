@@ -2,6 +2,7 @@
 
 from opal.db.models.attachment import Attachment
 from opal.db.models.audit import AuditLog
+from opal.db.models.container import Container, ContainerItem
 from opal.db.models.dataset import DataPoint, Dataset
 from opal.db.models.designator import DesignatorSequence
 from opal.db.models.execution import ProcedureInstance, StepExecution
@@ -15,6 +16,7 @@ from opal.db.models.inventory import (
     TestTemplate,
 )
 from opal.db.models.issue import Issue
+from opal.db.models.location import Location
 from opal.db.models.issue_comment import IssueComment
 from opal.db.models.onshape_link import OnshapeLink, OnshapeSyncLog
 from opal.db.models.part import BOMLine, Part, PartRequirement
@@ -38,6 +40,8 @@ __all__ = [
     "Attachment",
     "AuditLog",
     "BOMLine",
+    "Container",
+    "ContainerItem",
     "DataPoint",
     "Dataset",
     "DesignatorSequence",
@@ -48,6 +52,7 @@ __all__ = [
     "IssueComment",
     "IssueReference",
     "Kit",
+    "Location",
     "MasterProcedure",
     "OnshapeLink",
     "OnshapeSyncLog",

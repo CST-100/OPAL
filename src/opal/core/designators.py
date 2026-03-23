@@ -18,10 +18,11 @@ OPAL = "OPAL"
 WORK_ORDER = "WO"
 ISSUE = "IT"
 RISK = "RISK"
+CONTAINER = "KIT"
 SERIAL = "SN"
 
 # Known simple prefixes (serial numbers use compound prefix SN-{PN})
-_SIMPLE_PREFIXES = (OPAL, WORK_ORDER, ISSUE, RISK)
+_SIMPLE_PREFIXES = (OPAL, WORK_ORDER, ISSUE, RISK, CONTAINER)
 
 
 def generate_designator(db: Session, designator_type: str, digits: int = 5) -> str:
@@ -116,6 +117,15 @@ def generate_risk_number(db: Session) -> str:
         The next available risk number.
     """
     return generate_designator(db, RISK)
+
+
+def generate_container_code(db: Session) -> str:
+    """Generate the next container code.
+
+    Format: KIT-XXXXX (5 digits, zero-padded)
+    Example: KIT-00001, KIT-00042
+    """
+    return generate_designator(db, CONTAINER)
 
 
 def generate_serial_number(db: Session, part) -> str:

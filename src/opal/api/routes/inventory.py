@@ -231,8 +231,10 @@ async def get_inventory_qrcode(
     if not record:
         raise HTTPException(status_code=404, detail=f"Inventory record {inventory_id} not found")
 
-    url = f"{request.base_url}inventory/opal/{record.opal_number}"
-    qr = segno.make(url)
+    from opal.core.mri import encode_inventory_mri
+
+    mri = encode_inventory_mri(record)
+    qr = segno.make(mri)
     buf = io.BytesIO()
     qr.save(buf, kind="svg", scale=4, border=1)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")

@@ -285,8 +285,10 @@ async def get_part_qrcode(
     if not part:
         raise HTTPException(status_code=404, detail=f"Part {part_id} not found")
 
-    url = f"{request.base_url}parts/{part.id}"
-    qr = segno.make(url)
+    from opal.core.mri import encode_part_mri
+
+    mri = encode_part_mri(part)
+    qr = segno.make(mri)
     buf = _io.BytesIO()
     qr.save(buf, kind="svg", scale=4, border=1)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
