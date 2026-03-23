@@ -5,12 +5,37 @@
 {% endblock %}
 
 {% block content %}
+{% if instance is not defined or instance is none %}
+{# ── List view ── #}
+<div class="m-panel">
+    <div class="m-panel-header">Active Executions</div>
+    <div class="m-panel-body">
+        {% if instances %}
+        {% for inst in instances %}
+        {% set st = inst.status.value if inst.status.value is defined else inst.status %}
+        <a href="/m/exec/{{ inst.id }}" style="display: block; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-family: var(--font-mono); font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
+                    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
+                </div>
+                <span class="m-status m-status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
+            </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div style="font-family: var(--font-mono); color: var(--text-muted); padding: var(--space-md) 0;">No active executions.</div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+{# ── Detail view ── #}
 <div class="m-panel">
     <div class="m-panel-header">Execution</div>
     <div class="m-panel-body">
         <div class="m-data-row">
             <span class="m-data-label">Procedure</span>
-            <span class="m-data-value">{{ instance.procedure_name }}</span>
+            <span class="m-data-value">{{ instance.procedure.name if instance.procedure else '' }}</span>
         </div>
         {% if instance.work_order_number %}
         <div class="m-data-row">
@@ -21,7 +46,8 @@
         <div class="m-data-row">
             <span class="m-data-label">Status</span>
             <span class="m-data-value">
-                <span class="m-status m-status-{{ instance.status }}">{{ instance.status | upper }}</span>
+                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+                <span class="m-status m-status-{{ inst_status }}">{{ inst_status | upper | replace('_', ' ') }}</span>
             </span>
         </div>
     </div>
@@ -31,7 +57,7 @@
     <div class="m-panel-header">Steps</div>
     <div id="step-list">
         {% for step in instance.step_executions %}
-        {% set step_status = step.status %}
+        {% set step_status = step.status.value if step.status.value is defined else step.status %}
         {% set is_current = (step_status == 'pending' or step_status == 'in_progress') and loop.first or
            (step_status == 'in_progress') or
            (step_status == 'pending' and not loop.previtem is defined) or
@@ -71,13 +97,15 @@
     </div>
 </div>
 
-{% if instance.status == 'completed' %}
+{% set st = instance.status.value if instance.status.value is defined else instance.status %}
+{% if st == 'completed' %}
 <div class="m-panel">
     <div class="m-panel-body m-text-center">
         <span class="m-text-green m-mono" style="font-size: 1.1rem; font-weight: 700;">EXECUTION COMPLETE</span>
     </div>
 </div>
 {% endif %}
+{% endif %}{# end instance defined check #}
 {% endblock %}
 
 {% block scripts %}
