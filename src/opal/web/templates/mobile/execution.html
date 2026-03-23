@@ -7,89 +7,77 @@
 {% block content %}
 {% if instance is not defined or instance is none %}
 {# ── List view ── #}
-<div class="m-panel">
-    <div class="m-panel-header">Active Executions</div>
-    <div class="m-panel-body">
+<div class="panel">
+    <div class="panel-header">ACTIVE EXECUTIONS</div>
+    <div class="panel-body">
         {% if instances %}
         {% for inst in instances %}
         {% set st = inst.status.value if inst.status.value is defined else inst.status %}
         <a href="/m/exec/{{ inst.id }}" style="display: block; padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <div style="font-family: var(--font-mono); font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
-                    <div style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
+                    <div class="mono" style="font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
+                    <div class="mono" style="font-size: 0.8rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
                 </div>
-                <span class="m-status m-status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
+                <span class="status status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
             </div>
         </a>
         {% endfor %}
         {% else %}
-        <div style="font-family: var(--font-mono); color: var(--text-muted); padding: var(--space-md) 0;">No active executions.</div>
+        <div class="mono" style="color: var(--text-muted); padding: var(--space-md) 0;">No active executions.</div>
         {% endif %}
     </div>
 </div>
 {% else %}
 {# ── Detail view ── #}
-<div class="m-panel">
-    <div class="m-panel-header">Execution</div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Procedure</span>
-            <span class="m-data-value">{{ instance.procedure.name if instance.procedure else '' }}</span>
-        </div>
-        {% if instance.work_order_number %}
-        <div class="m-data-row">
-            <span class="m-data-label">WO #</span>
-            <span class="m-data-value">{{ instance.work_order_number }}</span>
-        </div>
-        {% endif %}
-        <div class="m-data-row">
-            <span class="m-data-label">Status</span>
-            <span class="m-data-value">
-                {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
-                <span class="m-status m-status-{{ inst_status }}">{{ inst_status | upper | replace('_', ' ') }}</span>
-            </span>
-        </div>
+{% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+<div class="panel">
+    <div class="panel-header">
+        <span>EXECUTION</span>
+        <span class="status status-{{ inst_status }}">{{ inst_status | upper | replace('_', ' ') }}</span>
+    </div>
+    <div class="panel-body">
+        <table class="data-table">
+            <tr><th style="width: 90px;">PROCEDURE</th><td>{{ instance.procedure.name if instance.procedure else '' }}</td></tr>
+            {% if instance.work_order_number %}
+            <tr><th>WO #</th><td class="mono">{{ instance.work_order_number }}</td></tr>
+            {% endif %}
+        </table>
     </div>
 </div>
 
-<div class="m-panel">
-    <div class="m-panel-header">Steps</div>
+<div class="panel">
+    <div class="panel-header">STEPS</div>
     <div id="step-list">
         {% for step in instance.step_executions %}
         {% set step_status = step.status.value if step.status.value is defined else step.status %}
-        {% set is_current = (step_status == 'pending' or step_status == 'in_progress') and loop.first or
-           (step_status == 'in_progress') or
-           (step_status == 'pending' and not loop.previtem is defined) or
-           (step_status == 'pending' and loop.previtem is defined and (loop.previtem.status == 'completed' or loop.previtem.status == 'skipped' or loop.previtem.status == 'signed_off')) %}
-        <div class="m-step{% if is_current %} m-step-current{% endif %}" data-step="{{ step.step_number }}" data-status="{{ step_status }}" onclick="toggleStep({{ step.step_number }})">
-            <span class="m-step-number">{{ step.step_number_str }}</span>
-            <span class="m-step-indicator {% if step_status == 'completed' or step_status == 'signed_off' %}completed{% elif step_status == 'in_progress' %}in-progress{% elif step_status == 'skipped' %}skipped{% endif %}"></span>
-            <span class="m-step-title">Step {{ step.step_number_str }}</span>
-            <span class="m-status m-status-{{ step_status }}" style="font-size: 0.55rem;">{{ step_status | upper }}</span>
+        {% set is_current = (step_status == 'in_progress') or
+           (step_status == 'pending' and loop.previtem is not defined) or
+           (step_status == 'pending' and loop.previtem is defined and (loop.previtem.status.value if loop.previtem.status.value is defined else loop.previtem.status) in ('completed', 'skipped', 'signed_off')) %}
+        <div class="step-row{% if is_current %} current{% endif %}" data-step="{{ step.step_number }}" onclick="toggleStep({{ step.step_number }})">
+            <span class="step-num">{{ step.step_number_str }}</span>
+            <span class="step-dot {% if step_status in ('completed', 'signed_off') %}completed{% elif step_status == 'in_progress' %}in-progress{% elif step_status == 'skipped' %}skipped{% endif %}"></span>
+            <span class="step-title">Step {{ step.step_number_str }}</span>
+            <span class="status" style="font-size: 0.55rem;">{{ step_status | upper | replace('_', ' ') }}</span>
         </div>
-        <div class="m-step-expanded m-expandable-content" id="step-detail-{{ step.step_number }}">
+        <div class="step-detail" id="step-detail-{{ step.step_number }}">
             {% if step.notes %}
-            <div class="m-step-instructions">{{ step.notes }}</div>
+            <div class="step-instructions">{{ step.notes }}</div>
             {% endif %}
 
-            {% if step_status == 'pending' or step_status == 'in_progress' %}
-            <div class="m-btn-row m-mt-md">
-                <button class="m-btn m-btn-green" onclick="completeStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">COMPLETE</button>
-                <button class="m-btn" onclick="skipStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">SKIP</button>
+            {% if step_status in ('pending', 'in_progress') %}
+            <div class="btn-row" style="margin-top: var(--space-md);">
+                <button class="btn" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="completeStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">COMPLETE</button>
+                <button class="btn" onclick="skipStep({{ instance.id }}, {{ step.step_number }}); event.stopPropagation();">SKIP</button>
             </div>
-            <button class="m-btn m-btn-yellow m-mt-sm" onclick="openStepScanner({{ step.step_number }}); event.stopPropagation();">SCAN TO CONSUME</button>
-            <div id="step-scanner-{{ step.step_number }}" class="m-inline-scanner m-hidden">
+            <button class="btn btn-full" style="margin-top: var(--space-sm); border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openStepScanner({{ step.step_number }}); event.stopPropagation();">SCAN TO CONSUME</button>
+            <div id="step-scanner-{{ step.step_number }}" class="scanner-inline hidden">
                 <div id="step-scanner-view-{{ step.step_number }}" class="scanner-viewport" style="max-height: 30vh;"></div>
-                <button class="m-btn m-btn-sm m-mt-sm" onclick="closeStepScanner({{ step.step_number }}); event.stopPropagation();">CLOSE SCANNER</button>
+                <button class="btn btn-sm btn-full" style="margin-top: var(--space-sm);" onclick="closeStepScanner({{ step.step_number }}); event.stopPropagation();">CLOSE SCANNER</button>
             </div>
             {% elif step_status == 'completed' %}
-            <div class="m-text-muted m-mono m-mt-sm" style="font-size: 0.75rem;">
+            <div class="mono" style="font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-sm);">
                 {% if step.completed_at %}Completed: {{ step.completed_at }}{% endif %}
-            </div>
-            {% elif step_status == 'skipped' %}
-            <div class="m-text-muted m-mono m-mt-sm" style="font-size: 0.75rem;">
-                {% if step.data_captured and step.data_captured.skip_reason %}Reason: {{ step.data_captured.skip_reason }}{% else %}Skipped{% endif %}
             </div>
             {% endif %}
         </div>
@@ -97,154 +85,83 @@
     </div>
 </div>
 
-{% set st = instance.status.value if instance.status.value is defined else instance.status %}
-{% if st == 'completed' %}
-<div class="m-panel">
-    <div class="m-panel-body m-text-center">
-        <span class="m-text-green m-mono" style="font-size: 1.1rem; font-weight: 700;">EXECUTION COMPLETE</span>
+{% if inst_status == 'completed' %}
+<div class="panel">
+    <div class="panel-body" style="text-align: center;">
+        <span class="mono" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">EXECUTION COMPLETE</span>
     </div>
 </div>
 {% endif %}
-{% endif %}{# end instance defined check #}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
     var stepScanners = {};
 
-    function toggleStep(stepNumber) {
-        var el = document.getElementById('step-detail-' + stepNumber);
-        if (el) {
-            el.classList.toggle('expanded');
-        }
+    function toggleStep(n) {
+        var el = document.getElementById('step-detail-' + n);
+        if (el) el.classList.toggle('expanded');
     }
 
-    // Auto-expand current step on load
     (function() {
-        var steps = document.querySelectorAll('.m-step-current');
-        if (steps.length > 0) {
-            var stepNum = steps[0].getAttribute('data-step');
-            var detail = document.getElementById('step-detail-' + stepNum);
-            if (detail) {
-                detail.classList.add('expanded');
-            }
+        var cur = document.querySelector('.step-row.current');
+        if (cur) {
+            var n = cur.getAttribute('data-step');
+            var d = document.getElementById('step-detail-' + n);
+            if (d) d.classList.add('expanded');
         }
     })();
 
-    function completeStep(instanceId, stepNumber) {
-        fetch('/api/procedure-instances/' + instanceId + '/steps/' + stepNumber + '/complete', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({})
-        }).then(function(resp) {
-            if (resp.ok) {
-                window.location.reload();
-            } else {
-                return resp.json().then(function(err) {
-                    alert('Error: ' + (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)));
-                });
-            }
-        }).catch(function(e) {
-            alert('Network error: ' + e.message);
-        });
+    function completeStep(id, step) {
+        fetch('/api/procedure-instances/' + id + '/steps/' + step + '/complete', {
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({})
+        }).then(function(r) {
+            if (r.ok) window.location.reload();
+            else r.json().then(function(e) { alert('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail))); });
+        }).catch(function(e) { alert('Network error: ' + e.message); });
     }
 
-    function skipStep(instanceId, stepNumber) {
+    function skipStep(id, step) {
         var reason = prompt('Skip reason (optional):');
-        if (reason === null) return; // cancelled
-
-        fetch('/api/procedure-instances/' + instanceId + '/steps/' + stepNumber + '/skip', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({ reason: reason || null })
-        }).then(function(resp) {
-            if (resp.ok) {
-                window.location.reload();
-            } else {
-                return resp.json().then(function(err) {
-                    alert('Error: ' + (typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)));
-                });
-            }
-        }).catch(function(e) {
-            alert('Network error: ' + e.message);
-        });
+        if (reason === null) return;
+        fetch('/api/procedure-instances/' + id + '/steps/' + step + '/skip', {
+            method: 'POST', headers: getHeaders(), body: JSON.stringify({ reason: reason || null })
+        }).then(function(r) {
+            if (r.ok) window.location.reload();
+            else r.json().then(function(e) { alert('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail))); });
+        }).catch(function(e) { alert('Network error: ' + e.message); });
     }
 
-    function openStepScanner(stepNumber) {
-        var container = document.getElementById('step-scanner-' + stepNumber);
-        container.classList.remove('m-hidden');
-
-        var viewId = 'step-scanner-view-' + stepNumber;
-        var qrScanner = new Html5Qrcode(viewId);
-        stepScanners[stepNumber] = qrScanner;
-
-        qrScanner.start(
-            { facingMode: 'environment' },
-            {
-                fps: 10,
-                qrbox: function(w, h) {
-                    var size = Math.min(w, h) * 0.7;
-                    return { width: size, height: size };
-                },
-                aspectRatio: 1.0
-            },
-            function(decodedText) {
-                // Stop scanner and process the scan
-                qrScanner.stop().then(function() {
-                    delete stepScanners[stepNumber];
-                    container.classList.add('m-hidden');
-                    handleConsumeScan(decodedText, stepNumber);
-                }).catch(function() {
-                    delete stepScanners[stepNumber];
-                    container.classList.add('m-hidden');
-                    handleConsumeScan(decodedText, stepNumber);
-                });
-            },
-            function() {
-                // scan miss - ignore
-            }
-        ).catch(function(err) {
-            container.innerHTML = '<div class="m-panel-body m-text-red m-mono" style="font-size: 0.8rem;">Camera error: ' + err + '</div>';
-        });
+    function openStepScanner(n) {
+        var c = document.getElementById('step-scanner-' + n);
+        c.classList.remove('hidden');
+        var qr = new Html5Qrcode('step-scanner-view-' + n);
+        stepScanners[n] = qr;
+        qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: function(w, h) { var s = Math.min(w, h) * 0.7; return { width: s, height: s }; }, aspectRatio: 1.0 },
+            function(code) {
+                qr.stop().catch(function() {});
+                delete stepScanners[n];
+                c.classList.add('hidden');
+                handleConsumeScan(code, n);
+            }, function() {}
+        ).catch(function(err) { c.innerHTML = '<div style="padding: var(--space-md); color: var(--accent-red); font-family: var(--font-mono); font-size: 0.8rem;">Camera error: ' + err + '</div>'; });
     }
 
-    function closeStepScanner(stepNumber) {
-        var scanner = stepScanners[stepNumber];
-        if (scanner) {
-            scanner.stop().then(function() {
-                delete stepScanners[stepNumber];
-            }).catch(function() {
-                delete stepScanners[stepNumber];
-            });
-        }
-        var container = document.getElementById('step-scanner-' + stepNumber);
-        container.classList.add('m-hidden');
+    function closeStepScanner(n) {
+        var s = stepScanners[n];
+        if (s) { s.stop().catch(function() {}); delete stepScanners[n]; }
+        document.getElementById('step-scanner-' + n).classList.add('hidden');
     }
 
-    function handleConsumeScan(code, stepNumber) {
-        // Look up the scanned code first
-        fetch('/api/scan/' + encodeURIComponent(code), {
-            headers: getHeaders()
-        }).then(function(resp) {
-            if (!resp.ok) {
-                alert('Code not recognized: ' + code);
-                return;
-            }
-            return resp.json();
-        }).then(function(result) {
-            if (!result) return;
-            if (result.type !== 'inventory') {
-                alert('Scanned item is not an inventory record (type: ' + result.type + ')');
-                return;
-            }
-            if (!result.found) {
-                alert('Inventory record not found for: ' + code);
-                return;
-            }
-            alert('Scanned inventory item: ' + result.label + (result.sublabel ? ' (' + result.sublabel + ')' : '') + '\nRecord ID: ' + result.id);
-        }).catch(function(e) {
-            alert('Scan lookup error: ' + e.message);
-        });
+    function handleConsumeScan(code, step) {
+        fetch('/api/scan/' + encodeURIComponent(code), { headers: getHeaders() })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject('Not recognized'); })
+        .then(function(res) {
+            if (res.type !== 'inventory') { alert('Not an inventory item (type: ' + res.type + ')'); return; }
+            if (!res.found) { alert('Inventory not found: ' + code); return; }
+            alert('Scanned: ' + res.label + (res.sublabel ? ' (' + res.sublabel + ')' : '') + '\nRecord ID: ' + res.id);
+        }).catch(function(e) { alert('Scan error: ' + e); });
     }
 </script>
 {% endblock %}

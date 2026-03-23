@@ -1,224 +1,52 @@
 {% extends "layouts/mobile.html" %}
 
 {% block content %}
-{% if not result.found %}
-<div class="m-panel">
-    <div class="m-panel-header">Scan Result</div>
-    <div class="m-panel-body">
-        <div class="m-not-found">
-            <div class="m-not-found-label">NOT FOUND</div>
-            <div class="m-not-found-code m-mt-md">{{ result.label }}</div>
-            <div class="m-text-muted m-mono" style="font-size: 0.75rem;">
-                The scanned code did not match any entity in the system.
-            </div>
-        </div>
+{% if not result or not result.found %}
+<div class="panel">
+    <div class="panel-header">SCAN RESULT</div>
+    <div class="panel-body" style="text-align: center; padding: var(--space-xl) var(--space-md);">
+        <div style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: var(--space-md);">NOT FOUND</div>
+        <div style="font-family: var(--font-mono); font-size: 1.1rem; color: var(--accent-red); word-break: break-all;">{{ code }}</div>
     </div>
 </div>
-
-{% elif result.type == 'inventory' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">INV</span> Inventory Record
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Part</span>
-            <span class="m-data-value">{{ result.data.part_name | default(result.label) }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">OPAL #</span>
-            <span class="m-data-value">{{ result.data.opal_number | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Quantity</span>
-            <span class="m-data-value m-qty">{{ result.data.quantity | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Location</span>
-            <span class="m-data-value">{{ result.data.location | default('--') }}</span>
-        </div>
-        {% if result.data.lot_number %}
-        <div class="m-data-row">
-            <span class="m-data-label">Lot</span>
-            <span class="m-data-value">{{ result.data.lot_number }}</span>
-        </div>
-        {% endif %}
-    </div>
-</div>
-<div class="m-btn-row m-mb-sm">
-    <a href="/m/inventory/transfer?id={{ result.id }}" class="m-btn m-btn-blue">TRANSFER</a>
-    <a href="/m/inventory/add-to-container?id={{ result.id }}" class="m-btn m-btn-green">ADD TO CONTAINER</a>
-</div>
-
-{% elif result.type == 'part' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">PART</span> Part
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Name</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">PN</span>
-            <span class="m-data-value">{{ result.data.part_number | default(result.sublabel) | default('--') }}</span>
-        </div>
-        {% if result.data.category %}
-        <div class="m-data-row">
-            <span class="m-data-label">Category</span>
-            <span class="m-data-value">{{ result.data.category }}</span>
-        </div>
-        {% endif %}
-    </div>
-</div>
-<a href="/parts/{{ result.id }}" class="m-btn m-mb-sm">VIEW FULL PART PAGE</a>
-
-{% elif result.type == 'location' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">LOC</span> Location
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Code</span>
-            <span class="m-data-value">{{ result.data.code | default(result.sublabel) | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Name</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        {% if result.data.contents_count is defined %}
-        <div class="m-data-row">
-            <span class="m-data-label">Contents</span>
-            <span class="m-data-value">{{ result.data.contents_count }} record{{ 's' if result.data.contents_count != 1 else '' }}</span>
-        </div>
-        {% endif %}
-    </div>
-</div>
-<a href="/inventory?location={{ result.data.code | default(result.sublabel) | default('') | urlencode }}" class="m-btn m-mb-sm">VIEW LOCATION CONTENTS</a>
-
-{% elif result.type == 'container' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">CTR</span> Container
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Code</span>
-            <span class="m-data-value">{{ result.data.code | default(result.sublabel) | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Name</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Status</span>
-            <span class="m-data-value">
-                <span class="m-status m-status-{{ result.data.status | default('active') }}">{{ result.data.status | default('active') | upper }}</span>
-            </span>
-        </div>
-        {% if result.data.item_count is defined %}
-        <div class="m-data-row">
-            <span class="m-data-label">Items</span>
-            <span class="m-data-value">{{ result.data.item_count }}</span>
-        </div>
-        {% endif %}
-    </div>
-</div>
-<a href="/containers/{{ result.id }}" class="m-btn m-mb-sm">VIEW CONTAINER DETAIL</a>
-
-{% elif result.type == 'work_order' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">WO</span> Work Order
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">WO #</span>
-            <span class="m-data-value">{{ result.data.work_order_number | default(result.sublabel) | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Procedure</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Status</span>
-            <span class="m-data-value">
-                <span class="m-status m-status-{{ result.data.status | default('pending') }}">{{ result.data.status | default('pending') | upper }}</span>
-            </span>
-        </div>
-    </div>
-</div>
-<a href="/m/exec/{{ result.id }}" class="m-btn m-mb-sm">VIEW EXECUTION</a>
-
-{% elif result.type == 'issue' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">ISS</span> Issue
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Number</span>
-            <span class="m-data-value">{{ result.data.number | default(result.sublabel) | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Title</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Status</span>
-            <span class="m-data-value">
-                <span class="m-status m-status-{{ result.data.status | default('open') }}">{{ result.data.status | default('open') | upper }}</span>
-            </span>
-        </div>
-    </div>
-</div>
-<a href="/issues/{{ result.id }}" class="m-btn m-mb-sm">VIEW ISSUE</a>
-
-{% elif result.type == 'risk' %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">RISK</span> Risk
-    </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Number</span>
-            <span class="m-data-value">{{ result.data.number | default(result.sublabel) | default('--') }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Title</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        <div class="m-data-row">
-            <span class="m-data-label">Status</span>
-            <span class="m-data-value">
-                <span class="m-status m-status-{{ result.data.status | default('open') }}">{{ result.data.status | default('open') | upper }}</span>
-            </span>
-        </div>
-    </div>
-</div>
-<a href="/risks/{{ result.id }}" class="m-btn m-mb-sm">VIEW RISK</a>
 
 {% else %}
-<div class="m-panel">
-    <div class="m-panel-header">
-        <span class="m-type-badge">{{ result.type | upper }}</span> {{ result.type | title }}
+<div class="panel">
+    <div class="panel-header">
+        <span class="status" style="margin-right: var(--space-sm);">{{ result.type | upper | replace('_', ' ') }}</span>
+        <span>{{ result.label }}</span>
     </div>
-    <div class="m-panel-body">
-        <div class="m-data-row">
-            <span class="m-data-label">Label</span>
-            <span class="m-data-value">{{ result.label }}</span>
-        </div>
-        {% if result.sublabel %}
-        <div class="m-data-row">
-            <span class="m-data-label">Detail</span>
-            <span class="m-data-value">{{ result.sublabel }}</span>
-        </div>
-        {% endif %}
+    <div class="panel-body">
+        <table class="data-table">
+            {% if result.sublabel %}
+            <tr>
+                <th style="width: 80px;">DETAIL</th>
+                <td>{{ result.sublabel }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>CODE</th>
+                <td style="font-family: var(--font-mono); font-size: 0.8rem; word-break: break-all;">{{ code }}</td>
+            </tr>
+        </table>
     </div>
 </div>
+
+{% if result.type == 'inventory' and result.id %}
+<div class="btn-row" style="margin-bottom: var(--space-sm);">
+    <a href="/inventory#{{ result.id }}" class="btn btn-primary btn-full">VIEW DETAILS</a>
+</div>
+{% elif result.type == 'part' and result.id %}
+<a href="/parts/{{ result.id }}" class="btn btn-primary btn-full" style="margin-bottom: var(--space-sm);">VIEW PART</a>
+{% elif result.type == 'work_order' and result.id %}
+<a href="/m/exec/{{ result.id }}" class="btn btn-primary btn-full" style="margin-bottom: var(--space-sm);">VIEW EXECUTION</a>
+{% elif result.type == 'issue' and result.id %}
+<a href="/issues/{{ result.id }}" class="btn btn-primary btn-full" style="margin-bottom: var(--space-sm);">VIEW ISSUE</a>
+{% elif result.type == 'risk' and result.id %}
+<a href="/risks/{{ result.id }}" class="btn btn-primary btn-full" style="margin-bottom: var(--space-sm);">VIEW RISK</a>
 {% endif %}
 
-<a href="/m/" class="m-btn m-mt-sm">SCAN AGAIN</a>
+{% endif %}
+
+<a href="/m/" class="btn btn-full" style="margin-top: var(--space-sm);">SCAN AGAIN</a>
 {% endblock %}

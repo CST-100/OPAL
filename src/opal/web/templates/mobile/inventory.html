@@ -5,88 +5,88 @@
 {% endblock %}
 
 {% block content %}
-<div class="m-panel">
-    <div class="m-panel-header">Inventory Search</div>
-    <div class="m-panel-body">
-        <div class="m-search-bar">
-            <input type="text" id="inv-search" class="m-input" placeholder="Search parts, OPAL numbers..." autocapitalize="off" autocorrect="off">
-            <button class="m-btn m-btn-primary" onclick="searchInventory()">GO</button>
+<div class="panel">
+    <div class="panel-header">Inventory Search</div>
+    <div class="panel-body">
+        <div class="search-row">
+            <input type="text" id="inv-search" class="form-input" placeholder="Search parts, OPAL numbers..." autocapitalize="off" autocorrect="off">
+            <button class="btn btn-primary" onclick="searchInventory()">GO</button>
         </div>
-        <a href="/m/" class="m-btn m-btn-sm m-mt-sm">SCAN TO LOOK UP</a>
+        <a href="/m/" class="btn btn-sm">SCAN TO LOOK UP</a>
     </div>
 </div>
 
 <div id="search-results">
-    <div class="m-empty">Enter a search term or scan a code</div>
+    <div class="panel-body" style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">Enter a search term or scan a code</div>
 </div>
 
-<div class="m-panel m-mt-md">
-    <div class="m-panel-header">Quick Transfer</div>
-    <div class="m-panel-body">
-        <div id="transfer-step-1" class="m-transfer-step active">
-            <div class="m-form-group">
-                <label class="m-label">Step 1: Select item to transfer</label>
-                <div class="m-search-bar">
-                    <input type="text" id="transfer-item-search" class="m-input" placeholder="Search or enter OPAL number" autocapitalize="off">
-                    <button class="m-btn" onclick="searchTransferItem()">FIND</button>
+<div class="m-panel">
+    <div class="panel-header">Quick Transfer</div>
+    <div class="panel-body">
+        <div id="transfer-step-1" class="transfer-step active">
+            <div class="form-group">
+                <label class="form-label">Step 1: Select item to transfer</label>
+                <div class="search-row">
+                    <input type="text" id="transfer-item-search" class="form-input" placeholder="Search or enter OPAL number" autocapitalize="off">
+                    <button class="btn" onclick="searchTransferItem()">FIND</button>
                 </div>
-                <button class="m-btn m-btn-yellow m-btn-sm m-mt-sm" onclick="openTransferScanner()">SCAN ITEM</button>
+                <button class="btn btn-primary btn-sm" onclick="openTransferScanner()">SCAN ITEM</button>
             </div>
             <div id="transfer-item-results" class="m-mt-sm"></div>
-            <div id="transfer-scanner-container" class="m-inline-scanner m-hidden">
+            <div id="transfer-scanner-container" class="scanner-inline hidden">
                 <div id="transfer-scanner-view" class="scanner-viewport" style="max-height: 30vh;"></div>
-                <button class="m-btn m-btn-sm m-mt-sm" onclick="closeTransferScanner()">CLOSE SCANNER</button>
+                <button class="btn btn-sm" onclick="closeTransferScanner()">CLOSE SCANNER</button>
             </div>
         </div>
 
         <div id="transfer-step-2" class="m-transfer-step">
-            <div class="m-panel m-mb-sm" style="border-color: var(--accent-blue);">
-                <div class="m-panel-body">
-                    <div class="m-data-row">
-                        <span class="m-data-label">Item</span>
-                        <span class="m-data-value" id="transfer-item-name">--</span>
+            <div class="m-panel" style="border-color: var(--accent-blue);">
+                <div class="panel-body">
+                    <div class="data-row">
+                        <span class="data-label">Item</span>
+                        <span class="data-value" id="transfer-item-name">--</span>
                     </div>
-                    <div class="m-data-row">
-                        <span class="m-data-label">OPAL #</span>
-                        <span class="m-data-value" id="transfer-item-opal">--</span>
+                    <div class="data-row">
+                        <span class="data-label">OPAL #</span>
+                        <span class="data-value" id="transfer-item-opal">--</span>
                     </div>
-                    <div class="m-data-row">
-                        <span class="m-data-label">Current Qty</span>
-                        <span class="m-data-value" id="transfer-item-qty">--</span>
+                    <div class="data-row">
+                        <span class="data-label">Current Qty</span>
+                        <span class="data-value" id="transfer-item-qty">--</span>
                     </div>
-                    <div class="m-data-row">
-                        <span class="m-data-label">Current Loc</span>
-                        <span class="m-data-value" id="transfer-item-loc">--</span>
+                    <div class="data-row">
+                        <span class="data-label">Current Loc</span>
+                        <span class="data-value" id="transfer-item-loc">--</span>
                     </div>
                 </div>
             </div>
 
-            <div class="m-form-group">
-                <label class="m-label">Quantity to transfer</label>
-                <input type="number" id="transfer-qty" class="m-input" min="0.01" step="any" placeholder="Quantity">
+            <div class="form-group">
+                <label class="form-label">Quantity to transfer</label>
+                <input type="number" id="transfer-qty" class="form-input" min="0.01" step="any" placeholder="Quantity">
             </div>
-            <div class="m-form-group">
-                <label class="m-label">Step 2: Target location</label>
-                <input type="text" id="transfer-location" class="m-input" placeholder="Enter location code" autocapitalize="off">
-                <button class="m-btn m-btn-yellow m-btn-sm m-mt-sm" onclick="openLocationScanner()">SCAN LOCATION</button>
+            <div class="form-group">
+                <label class="form-label">Step 2: Target location</label>
+                <input type="text" id="transfer-location" class="form-input" placeholder="Enter location code" autocapitalize="off">
+                <button class="btn btn-primary btn-sm" onclick="openLocationScanner()">SCAN LOCATION</button>
             </div>
-            <div id="location-scanner-container" class="m-inline-scanner m-hidden">
+            <div id="location-scanner-container" class="scanner-inline hidden">
                 <div id="location-scanner-view" class="scanner-viewport" style="max-height: 30vh;"></div>
-                <button class="m-btn m-btn-sm m-mt-sm" onclick="closeLocationScanner()">CLOSE SCANNER</button>
+                <button class="btn btn-sm" onclick="closeLocationScanner()">CLOSE SCANNER</button>
             </div>
 
-            <div class="m-btn-row m-mt-md">
-                <button class="m-btn" onclick="resetTransfer()">BACK</button>
-                <button class="m-btn m-btn-green" onclick="confirmTransfer()">CONFIRM TRANSFER</button>
+            <div class="btn-row">
+                <button class="btn" onclick="resetTransfer()">BACK</button>
+                <button class="btn btn-primary" onclick="confirmTransfer()">CONFIRM TRANSFER</button>
             </div>
         </div>
 
         <div id="transfer-step-3" class="m-transfer-step">
-            <div class="m-text-center m-mt-md m-mb-md">
-                <div class="m-text-green m-mono" style="font-size: 1.2rem; font-weight: 700;">TRANSFER COMPLETE</div>
-                <div class="m-text-muted m-mono m-mt-sm" id="transfer-summary" style="font-size: 0.8rem;"></div>
+            <div class="m-text-center">
+                <div class="m-text-green mono" style="font-size: 1.2rem; font-weight: 700;">TRANSFER COMPLETE</div>
+                <div class="m-text-muted mono" id="transfer-summary" style="font-size: 0.8rem;"></div>
             </div>
-            <button class="m-btn m-btn-primary" onclick="resetTransfer()">NEW TRANSFER</button>
+            <button class="btn btn-primary" onclick="resetTransfer()">NEW TRANSFER</button>
         </div>
     </div>
 </div>
@@ -112,7 +112,7 @@
         if (!query) return;
 
         var container = document.getElementById('search-results');
-        container.innerHTML = '<div class="m-empty">Searching...</div>';
+        container.innerHTML = '<div class="panel-body" style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">Searching...</div>';
 
         fetch('/api/inventory?page=1&page_size=20', {
             headers: getHeaders()
@@ -132,34 +132,34 @@
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="m-empty">No results for "' + escapeHtml(query) + '"</div>';
+                container.innerHTML = '<div class="panel-body" style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.8rem;">No results for "' + escapeHtml(query) + '"</div>';
                 return;
             }
 
-            var html = '<div class="m-panel"><div class="m-panel-header">Results (' + filtered.length + ')</div>';
+            var html = '<div class="panel"><div class="panel-header">Results (' + filtered.length + ')</div>';
             for (var i = 0; i < filtered.length; i++) {
                 var item = filtered[i];
                 html += '<div class="m-list-item" onclick="showInvDetail(' + item.id + ')" data-inv-id="' + item.id + '">';
                 html += '<span class="m-list-title">' + escapeHtml(item.part_name) + '</span>';
                 html += '<div class="m-list-meta">';
-                html += '<span class="m-mono" style="font-size: 0.75rem; color: var(--text-secondary);">' + escapeHtml(item.opal_number || '--') + '</span>';
-                html += '<span class="m-mono" style="font-size: 0.75rem;">Qty: ' + item.quantity + '</span>';
-                html += '<span class="m-mono" style="font-size: 0.75rem; color: var(--text-muted);">' + escapeHtml(item.location) + '</span>';
+                html += '<span class="mono" style="font-size: 0.75rem; color: var(--text-secondary);">' + escapeHtml(item.opal_number || '--') + '</span>';
+                html += '<span class="mono" style="font-size: 0.75rem;">Qty: ' + item.quantity + '</span>';
+                html += '<span class="mono" style="font-size: 0.75rem; color: var(--text-muted);">' + escapeHtml(item.location) + '</span>';
                 html += '</div>';
                 html += '</div>';
                 html += '<div class="m-expandable-content" id="inv-detail-' + item.id + '">';
-                html += '<div class="m-data-row"><span class="m-data-label">OPAL #</span><span class="m-data-value">' + escapeHtml(item.opal_number || '--') + '</span></div>';
-                html += '<div class="m-data-row"><span class="m-data-label">Quantity</span><span class="m-data-value">' + item.quantity + '</span></div>';
-                html += '<div class="m-data-row"><span class="m-data-label">Location</span><span class="m-data-value">' + escapeHtml(item.location) + '</span></div>';
+                html += '<div class="data-row"><span class="data-label">OPAL #</span><span class="data-value">' + escapeHtml(item.opal_number || '--') + '</span></div>';
+                html += '<div class="data-row"><span class="data-label">Quantity</span><span class="data-value">' + item.quantity + '</span></div>';
+                html += '<div class="data-row"><span class="data-label">Location</span><span class="data-value">' + escapeHtml(item.location) + '</span></div>';
                 if (item.lot_number) {
-                    html += '<div class="m-data-row"><span class="m-data-label">Lot</span><span class="m-data-value">' + escapeHtml(item.lot_number) + '</span></div>';
+                    html += '<div class="data-row"><span class="data-label">Lot</span><span class="data-value">' + escapeHtml(item.lot_number) + '</span></div>';
                 }
                 if (item.part_external_pn) {
-                    html += '<div class="m-data-row"><span class="m-data-label">Ext PN</span><span class="m-data-value">' + escapeHtml(item.part_external_pn) + '</span></div>';
+                    html += '<div class="data-row"><span class="data-label">Ext PN</span><span class="data-value">' + escapeHtml(item.part_external_pn) + '</span></div>';
                 }
-                html += '<div class="m-btn-row m-mt-sm">';
-                html += '<button class="m-btn m-btn-blue m-btn-sm" onclick="selectForTransfer(' + JSON.stringify(item).replace(/"/g, '&quot;') + '); event.stopPropagation();">TRANSFER</button>';
-                html += '<a href="/m/scan?code=OPAL:I:' + encodeURIComponent(item.opal_number || '') + '" class="m-btn m-btn-sm" onclick="event.stopPropagation();">DETAILS</a>';
+                html += '<div class="btn-row">';
+                html += '<button class="btn btn-primary btn-sm" onclick="selectForTransfer(' + JSON.stringify(item).replace(/"/g, '&quot;') + '); event.stopPropagation();">TRANSFER</button>';
+                html += '<a href="/m/scan?code=OPAL:I:' + encodeURIComponent(item.opal_number || '') + '" class="btn btn-sm" onclick="event.stopPropagation();">DETAILS</a>';
                 html += '</div>';
                 html += '</div>';
             }
@@ -212,7 +212,7 @@
         if (!query) return;
 
         var container = document.getElementById('transfer-item-results');
-        container.innerHTML = '<div class="m-text-muted m-mono" style="font-size: 0.75rem; padding: var(--space-sm);">Searching...</div>';
+        container.innerHTML = '<div class="m-text-muted mono" style="font-size: 0.75rem; padding: var(--space-sm);">Searching...</div>';
 
         fetch('/api/inventory?page=1&page_size=10', {
             headers: getHeaders()
@@ -229,7 +229,7 @@
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = '<div class="m-text-muted m-mono" style="font-size: 0.75rem; padding: var(--space-sm);">No results</div>';
+                container.innerHTML = '<div class="m-text-muted mono" style="font-size: 0.75rem; padding: var(--space-sm);">No results</div>';
                 return;
             }
 
@@ -243,7 +243,7 @@
             }
             container.innerHTML = html;
         }).catch(function(e) {
-            container.innerHTML = '<div class="m-text-red m-mono" style="font-size: 0.75rem; padding: var(--space-sm);">Error: ' + escapeHtml(e.message) + '</div>';
+            container.innerHTML = '<div class="m-text-red mono" style="font-size: 0.75rem; padding: var(--space-sm);">Error: ' + escapeHtml(e.message) + '</div>';
         });
     }
 
@@ -330,7 +330,7 @@
             },
             function() {}
         ).catch(function(err) {
-            container.innerHTML = '<div class="m-panel-body m-text-red m-mono" style="font-size: 0.8rem;">Camera error: ' + err + '</div>';
+            container.innerHTML = '<div class="m-panel-body m-text-red mono" style="font-size: 0.8rem;">Camera error: ' + err + '</div>';
         });
     }
 
@@ -399,7 +399,7 @@
             },
             function() {}
         ).catch(function(err) {
-            container.innerHTML = '<div class="m-panel-body m-text-red m-mono" style="font-size: 0.8rem;">Camera error: ' + err + '</div>';
+            container.innerHTML = '<div class="m-panel-body m-text-red mono" style="font-size: 0.8rem;">Camera error: ' + err + '</div>';
         });
     }
 

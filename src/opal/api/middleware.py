@@ -164,6 +164,37 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
             }
 
 
+import re
+
+_MOBILE_UA = re.compile(r"Mobile|Android|iPhone|iPad|iPod", re.IGNORECASE)
+_MOBILE_SKIP = ("/m/", "/api/", "/static/", "/login", "/logout", "/favicon.ico", "/docs", "/setup-profile", "/welcome")
+
+
+class MobileRedirectMiddleware(BaseHTTPMiddleware):
+    """Auto-redirect mobile browsers from desktop routes to /m/."""
+
+    async def dispatch(self, request: Request, call_next: any) -> Response:
+        path = request.url.path
+
+        # Already on mobile routes, API, static, or auth pages — skip
+        if any(path.startswith(p) for p in _MOBILE_SKIP):
+            return await call_next(request)
+
+        ua = request.headers.get("user-agent", "")
+        if _MOBILE_UA.search(ua):
+            # Map desktop path to mobile equivalent
+            if path == "/" or path == "":
+                return RedirectResponse(url="/m/", status_code=302)
+            if path.startswith("/executions") or path.startswith("/procedure-instances"):
+                return RedirectResponse(url="/m/exec", status_code=302)
+            if path.startswith("/inventory") or path.startswith("/parts"):
+                return RedirectResponse(url="/m/inventory", status_code=302)
+            # Default: send to mobile home
+            return RedirectResponse(url="/m/", status_code=302)
+
+        return await call_next(request)
+
+
 def setup_middleware(app: FastAPI) -> None:
     """Configure all middleware for the application."""
     settings = get_active_settings()
@@ -177,6 +208,9 @@ def setup_middleware(app: FastAPI) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Mobile redirect (must be outermost to run first)
+    app.add_middleware(MobileRedirectMiddleware)
 
     # User context middleware
     app.add_middleware(UserContextMiddleware)
