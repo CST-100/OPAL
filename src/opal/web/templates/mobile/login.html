@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login - OPAL Mobile</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        })();
+    </script>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/mobile.css">
+</head>
+<body class="m-body" style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+    <div class="m-login-container">
+        <div class="m-login-brand">
+            <div class="m-login-brand-text">OPAL</div>
+            <div class="m-login-brand-sub">Operations, Procedures, Assets, Logistics</div>
+        </div>
+
+        <div class="m-panel">
+            <div class="m-panel-header">Select User</div>
+            <div class="m-panel-body">
+                {% if users %}
+                <form method="POST" action="/login" id="login-form">
+                    <input type="hidden" name="redirect" value="/m/">
+                    <div class="m-form-group">
+                        <label class="m-label" for="user_id">User</label>
+                        <select name="user_id" id="user_id" class="m-select" required>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.name }}{% if user.is_admin %} [ADMIN]{% endif %}{% if user.email %} ({{ user.email }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="m-btn m-btn-primary">LOG IN</button>
+                </form>
+                {% else %}
+                <div class="m-empty">No users found. Create one below.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="m-login-divider">or</div>
+
+        <div class="m-panel">
+            <div class="m-panel-header">Create New User</div>
+            <div class="m-panel-body">
+                <form method="POST" action="/login/new-user" id="new-user-form">
+                    <input type="hidden" name="redirect" value="/m/">
+                    <div class="m-form-group">
+                        <label class="m-label" for="name">Name *</label>
+                        <input type="text" name="name" id="name" class="m-input" required placeholder="Full Name" autocomplete="name">
+                    </div>
+                    <div class="m-form-group">
+                        <label class="m-label" for="email">Email</label>
+                        <input type="email" name="email" id="email" class="m-input" placeholder="Optional" autocomplete="email">
+                    </div>
+                    <button type="submit" class="m-btn m-btn-primary">CREATE NEW USER</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ title | default("OPAL Mobile") }}</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        })();
+    </script>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/mobile.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="m-body">
+    <header class="m-header">
+        <a href="/m/" class="m-header-brand">OPAL &beta;</a>
+        <span class="m-header-user" id="m-user-name">---</span>
+    </header>
+
+    <div class="m-content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <nav class="m-tabbar">
+        <a href="/m/" class="m-tab{% if request.url.path == '/m/' or request.url.path == '/m' %} active{% endif %}">
+            <span class="m-tab-icon">&#9783;</span>
+            Scan
+        </a>
+        <a href="/m/exec" class="m-tab{% if request.url.path.startswith('/m/exec') %} active{% endif %}">
+            <span class="m-tab-icon">&#9654;</span>
+            Executions
+        </a>
+        <a href="/m/inventory" class="m-tab{% if request.url.path.startswith('/m/inventory') %} active{% endif %}">
+            <span class="m-tab-icon">&#9638;</span>
+            Inventory
+        </a>
+        <a href="/m/more" class="m-tab{% if request.url.path.startswith('/m/more') %} active{% endif %}">
+            <span class="m-tab-icon">&#8943;</span>
+            More
+        </a>
+    </nav>
+
+    <script>
+        // ── Cookie helper ──
+        function getCookie(name) {
+            var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            if (!match) return null;
+            var val = decodeURIComponent(match[2]);
+            if (val.length >= 2 && val[0] === '"' && val[val.length - 1] === '"') {
+                val = val.slice(1, -1);
+            }
+            return val;
+        }
+
+        // ── User identity ──
+        var userId = getCookie('opal_user_id') || localStorage.getItem('opal_user_id') || '';
+        var userName = getCookie('opal_user_name') || localStorage.getItem('opal_user_name') || '';
+
+        // Redirect to login if no user
+        if (!userId && window.location.pathname !== '/m/login') {
+            window.location.href = '/m/login';
+        }
+
+        // Display user name in header
+        var userEl = document.getElementById('m-user-name');
+        if (userEl && userName) {
+            userEl.textContent = userName;
+        }
+
+        // ── Global headers for API calls ──
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'X-User-Id': userId
+            };
+        }
+
+        // ── Theme sync ──
+        (function() {
+            var theme = localStorage.getItem('opal_theme') || 'dark';
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

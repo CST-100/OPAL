@@ -52,8 +52,8 @@ class UserSelectionMiddleware(BaseHTTPMiddleware):
               auto-provision users, set cookies.
     """
 
-    LOCAL_EXEMPT = ("/login", "/logout", "/api/", "/static/", "/docs", "/favicon.ico")
-    EXE_EXEMPT = ("/__exe.dev/", "/login", "/logout", "/setup-profile", "/api/", "/static/", "/docs", "/favicon.ico")
+    LOCAL_EXEMPT = ("/login", "/logout", "/m/login", "/api/", "/static/", "/docs", "/favicon.ico")
+    EXE_EXEMPT = ("/__exe.dev/", "/login", "/logout", "/m/login", "/setup-profile", "/api/", "/static/", "/docs", "/favicon.ico")
 
     async def dispatch(self, request: Request, call_next: any) -> Response:
         settings = get_active_settings()

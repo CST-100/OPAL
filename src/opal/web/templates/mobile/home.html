@@ -1,0 +1,185 @@
+{% extends "layouts/mobile.html" %}
+
+{% block head %}
+<script src="/static/js/html5-qrcode.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="m-panel">
+    <div class="m-panel-header">Scanner</div>
+    <div class="m-panel-body" style="padding: 0;">
+        <div id="scanner" class="scanner-viewport scanner-inactive">
+            <span>TAP START TO SCAN</span>
+        </div>
+    </div>
+</div>
+
+<div style="padding: 0 var(--space-sm);">
+    <button id="scan-toggle" class="m-btn m-btn-primary m-mb-sm" onclick="toggleScanner()">START SCANNER</button>
+</div>
+
+<div class="m-panel">
+    <div class="m-panel-header">Manual Lookup</div>
+    <div class="m-panel-body">
+        <div class="m-search-bar">
+            <input type="text" id="manual-code" class="m-input" placeholder="OPAL:I:KST-F-0002/001" autocapitalize="off" autocorrect="off">
+            <button class="m-btn m-btn-primary" onclick="lookupManual()">LOOK UP</button>
+        </div>
+    </div>
+</div>
+
+<div class="m-panel">
+    <div class="m-panel-header">Recent Scans</div>
+    <div id="recent-scans-list">
+        <div class="m-empty">No recent scans</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var html5QrCode = null;
+    var scannerRunning = false;
+
+    function toggleScanner() {
+        if (scannerRunning) {
+            stopScanner();
+        } else {
+            startScanner();
+        }
+    }
+
+    function startScanner() {
+        var scannerEl = document.getElementById('scanner');
+        scannerEl.classList.remove('scanner-inactive');
+        scannerEl.innerHTML = '';
+
+        html5QrCode = new Html5Qrcode('scanner');
+        html5QrCode.start(
+            { facingMode: 'environment' },
+            {
+                fps: 10,
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    var size = Math.min(viewfinderWidth, viewfinderHeight) * 0.7;
+                    return { width: size, height: size };
+                },
+                aspectRatio: 1.0
+            },
+            function(decodedText) {
+                onScanSuccess(decodedText);
+            },
+            function() {
+                // scan error - ignore, keep scanning
+            }
+        ).then(function() {
+            scannerRunning = true;
+            document.getElementById('scan-toggle').textContent = 'STOP SCANNER';
+        }).catch(function(err) {
+            scannerEl.classList.add('scanner-inactive');
+            scannerEl.innerHTML = '<span>CAMERA ERROR: ' + err + '</span>';
+        });
+    }
+
+    function stopScanner() {
+        if (html5QrCode && scannerRunning) {
+            html5QrCode.stop().then(function() {
+                scannerRunning = false;
+                var scannerEl = document.getElementById('scanner');
+                scannerEl.classList.add('scanner-inactive');
+                scannerEl.innerHTML = '<span>TAP START TO SCAN</span>';
+                document.getElementById('scan-toggle').textContent = 'START SCANNER';
+                html5QrCode = null;
+            }).catch(function() {
+                scannerRunning = false;
+                html5QrCode = null;
+            });
+        }
+    }
+
+    function onScanSuccess(code) {
+        if (scannerRunning && html5QrCode) {
+            html5QrCode.stop().then(function() {
+                scannerRunning = false;
+                html5QrCode = null;
+            }).catch(function() {
+                scannerRunning = false;
+                html5QrCode = null;
+            });
+        }
+        addRecentScan(code);
+        window.location.href = '/m/scan?code=' + encodeURIComponent(code);
+    }
+
+    function lookupManual() {
+        var code = document.getElementById('manual-code').value.trim();
+        if (!code) return;
+        addRecentScan(code);
+        window.location.href = '/m/scan?code=' + encodeURIComponent(code);
+    }
+
+    // Handle enter key in manual input
+    document.getElementById('manual-code').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            lookupManual();
+        }
+    });
+
+    // ── Recent scans (localStorage) ──
+
+    function getRecentScans() {
+        try {
+            var stored = localStorage.getItem('opal_recent_scans');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function addRecentScan(code) {
+        var scans = getRecentScans();
+        // Remove duplicate if exists
+        scans = scans.filter(function(s) { return s.code !== code; });
+        // Add to front
+        scans.unshift({
+            code: code,
+            time: new Date().toISOString()
+        });
+        // Keep max 10
+        if (scans.length > 10) {
+            scans = scans.slice(0, 10);
+        }
+        localStorage.setItem('opal_recent_scans', JSON.stringify(scans));
+    }
+
+    function renderRecentScans() {
+        var scans = getRecentScans();
+        var container = document.getElementById('recent-scans-list');
+
+        if (scans.length === 0) {
+            container.innerHTML = '<div class="m-empty">No recent scans</div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < scans.length; i++) {
+            var scan = scans[i];
+            var timeStr = scan.time.replace('T', ' ').substring(0, 19) + 'Z';
+            html += '<a class="m-recent-item" href="/m/scan?code=' + encodeURIComponent(scan.code) + '">';
+            html += '<span class="m-recent-code">' + escapeHtml(scan.code) + '</span>';
+            html += '<span class="m-recent-time">' + timeStr + '</span>';
+            html += '</a>';
+        }
+        container.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // Render recent scans on load
+    renderRecentScans();
+</script>
+{% endblock %}

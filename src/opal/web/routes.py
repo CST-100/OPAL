@@ -2939,3 +2939,118 @@ async def styleguide(request: Request, db: DbSession) -> HTMLResponse:
     """OPALkit component styleguide page."""
     context = get_base_context(request, db, "Styleguide - OPAL")
     return templates.TemplateResponse("opalkit/styleguide/index.html", context)
+
+
+# ============ MOBILE UI ============
+
+
+def _get_mobile_context(request: Request, db: DbSession) -> dict[str, Any]:
+    """Minimal context for mobile pages."""
+    current_user = None
+    cookie_user_id = request.cookies.get("opal_user_id")
+    if cookie_user_id:
+        try:
+            current_user = db.query(User).filter(
+                User.id == int(cookie_user_id), User.is_active == True,  # noqa: E712
+            ).first()
+        except (ValueError, TypeError):
+            pass
+    return {"request": request, "current_user": current_user}
+
+
+@router.get("/m/login", response_class=HTMLResponse)
+async def mobile_login(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile login page."""
+    users = db.query(User).filter(User.is_active == True).order_by(User.name).all()  # noqa: E712
+    return templates.TemplateResponse("mobile/login.html", {"request": request, "users": users})
+
+
+@router.get("/m", response_class=HTMLResponse)
+@router.get("/m/", response_class=HTMLResponse)
+async def mobile_home(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile scanner home."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+    return templates.TemplateResponse("mobile/home.html", ctx)
+
+
+@router.get("/m/scan", response_class=HTMLResponse)
+async def mobile_scan_result(request: Request, db: DbSession, code: str = "") -> HTMLResponse:
+    """Mobile scan result page."""
+    from opal.core.mri import decode_mri
+
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    result = None
+    if code:
+        mri_result = decode_mri(db, code)
+        if mri_result:
+            result = {
+                "type": mri_result.type,
+                "id": mri_result.id,
+                "label": mri_result.label,
+                "sublabel": mri_result.sublabel,
+                "found": mri_result.id is not None,
+                "code": code,
+            }
+        else:
+            result = {"type": "unknown", "id": None, "label": code, "sublabel": "", "found": False, "code": code}
+
+    ctx["result"] = result
+    ctx["code"] = code
+    return templates.TemplateResponse("mobile/scan_result.html", ctx)
+
+
+@router.get("/m/exec", response_class=HTMLResponse)
+async def mobile_executions_list(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile executions list."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    instances = (
+        db.query(ProcedureInstance)
+        .filter(ProcedureInstance.status.in_(["in_progress", "pending"]))
+        .order_by(ProcedureInstance.id.desc())
+        .limit(20)
+        .all()
+    )
+    ctx["instances"] = instances
+    return templates.TemplateResponse("mobile/execution.html", ctx)
+
+
+@router.get("/m/exec/{instance_id}", response_class=HTMLResponse)
+async def mobile_execution_detail(request: Request, db: DbSession, instance_id: int) -> HTMLResponse:
+    """Mobile execution detail."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
+    if not instance:
+        return RedirectResponse(url="/m/exec", status_code=302)
+
+    ctx["instance"] = instance
+    return templates.TemplateResponse("mobile/execution.html", ctx)
+
+
+@router.get("/m/inventory", response_class=HTMLResponse)
+async def mobile_inventory(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile inventory page."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+    return templates.TemplateResponse("mobile/inventory.html", ctx)
+
+
+@router.get("/m/more", response_class=HTMLResponse)
+async def mobile_more(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile 'more' menu — links to containers, desktop UI, etc."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+    # Reuse inventory template for now; will get its own page later
+    return templates.TemplateResponse("mobile/home.html", ctx)
