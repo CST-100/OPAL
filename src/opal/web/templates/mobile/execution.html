@@ -8,17 +8,17 @@
 {% if instance is not defined or instance is none %}
 {# ── List view ── #}
 <div class="panel">
-    <div class="panel-header">ACTIVE EXECUTIONS</div>
+    <div class="panel-header">EXECUTIONS</div>
     {% if instances %}
     {% for inst in instances %}
     {% set st = inst.status.value if inst.status.value is defined else inst.status %}
     <a href="/m/exec/{{ inst.id }}" style="display: block; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); min-height: 44px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <div class="mono" style="font-weight: 600;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
+            <div style="min-width: 0; flex: 1;">
+                <div class="mono" style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ inst.procedure.name if inst.procedure else 'Procedure #' ~ inst.procedure_id }}</div>
                 <div class="mono" style="font-size: 0.75rem; color: var(--text-muted);">{{ inst.work_order_number or '' }}</div>
             </div>
-            <span class="status status-{{ st }}">{{ st | upper | replace('_', ' ') }}</span>
+            <span class="status status-{{ st }}" style="flex-shrink: 0; margin-left: var(--space-sm);">{{ st | upper | replace('_', ' ') }}</span>
         </div>
     </a>
     {% endfor %}
@@ -32,19 +32,30 @@
 {% else %}
 {# ── Detail view ── #}
 {% set inst_status = instance.status.value if instance.status.value is defined else instance.status %}
+{% set total_steps = steps | length %}
+{% set done_steps = steps | selectattr('status', 'in', ['completed', 'signed_off', 'skipped']) | list | length %}
+
 <div class="panel">
     <div class="panel-header">
-        <span>{{ instance.procedure.name if instance.procedure else 'EXECUTION' }}</span>
+        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ instance.procedure.name if instance.procedure else 'EXECUTION' }}</span>
         <span class="status status-{{ inst_status }}">{{ inst_status | upper | replace('_', ' ') }}</span>
     </div>
     <div class="panel-body">
-        <table class="data-table">
-            {% if instance.work_order_number %}
-            <tr><th style="width: 50px;">WO</th><td class="mono">{{ instance.work_order_number }}</td></tr>
-            {% endif %}
-        </table>
+        {% if instance.work_order_number %}
+        <div class="mono" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: var(--space-sm);">{{ instance.work_order_number }}</div>
+        {% endif %}
+        {# Progress bar #}
+        <div style="display: flex; align-items: center; gap: var(--space-sm);">
+            <div style="flex: 1; height: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                <div style="height: 100%; width: {{ (done_steps / total_steps * 100) if total_steps > 0 else 0 }}%; background: var(--accent-green);"></div>
+            </div>
+            <span class="mono" style="font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0;">{{ done_steps }}/{{ total_steps }}</span>
+        </div>
     </div>
 </div>
+
+{# Error/success feedback #}
+<div id="exec-feedback" class="hidden" style="padding: var(--space-sm) var(--space-md); margin-bottom: var(--space-sm); border: 1px solid; font-family: var(--font-mono); font-size: 0.8rem;"></div>
 
 <div class="panel">
     <div class="panel-header">STEPS</div>
@@ -55,10 +66,15 @@
     <div class="step-row{% if is_current %} current{% endif %}" data-step="{{ step.order }}" onclick="toggleStep({{ step.order }})">
         <span class="step-num">{{ step.step_number }}</span>
         <span class="step-dot {% if step.status in ('completed', 'signed_off') %}completed{% elif step.status == 'in_progress' %}in-progress{% elif step.status == 'skipped' %}skipped{% endif %}"></span>
-        <span class="step-title">{{ step.title }}</span>
-        <span class="status" style="font-size: 0.6rem;">{{ step.status | upper | replace('_', ' ') }}</span>
+        <span class="step-title" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ step.title }}</span>
+        {% if step.status == 'awaiting_signoff' %}
+        <span class="status status-warn" style="font-size: 0.55rem;">SIGNOFF</span>
+        {% else %}
+        <span class="status" style="font-size: 0.55rem;">{{ step.status | upper | replace('_', ' ') }}</span>
+        {% endif %}
     </div>
     <div class="step-detail" id="step-detail-{{ step.order }}">
+        {# Instructions #}
         {% if step.instructions %}
         <div class="step-instructions">{{ step.instructions }}</div>
         {% endif %}
@@ -66,32 +82,100 @@
         {% if step.requires_signoff %}
         <div class="mono" style="font-size: 0.7rem; color: var(--accent-yellow); margin-top: var(--space-xs);">REQUIRES SIGNOFF</div>
         {% endif %}
-
         {% if step.estimated_duration_minutes %}
         <div class="mono" style="font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-xs);">EST. {{ step.estimated_duration_minutes }} MIN</div>
         {% endif %}
 
-        {% if step.notes %}
+        {# Data capture form #}
+        {% if step.data_schema and step.data_schema.fields %}
+        <div style="margin-top: var(--space-md); padding: var(--space-sm); border: 1px solid var(--border-color);">
+            <div class="mono" style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-sm);">DATA CAPTURE</div>
+            {% for field in step.data_schema.fields %}
+            <div class="form-group">
+                <label class="form-label">{{ field.label | default(field.name) }}{% if field.required %} *{% endif %}</label>
+                {% if field.type == 'number' %}
+                <input type="number" step="any" class="form-input" id="data-{{ step.order }}-{{ field.name }}" name="{{ field.name }}" value="{{ step.data_captured[field.name] if step.data_captured and field.name in step.data_captured else '' }}" {% if step.status not in ('pending', 'in_progress') %}disabled{% endif %}>
+                {% elif field.type == 'boolean' %}
+                <select class="form-select" id="data-{{ step.order }}-{{ field.name }}" name="{{ field.name }}" {% if step.status not in ('pending', 'in_progress') %}disabled{% endif %}>
+                    <option value="">--</option>
+                    <option value="true" {% if step.data_captured and step.data_captured.get(field.name) == true %}selected{% endif %}>YES</option>
+                    <option value="false" {% if step.data_captured and step.data_captured.get(field.name) == false %}selected{% endif %}>NO</option>
+                </select>
+                {% else %}
+                <input type="text" class="form-input" id="data-{{ step.order }}-{{ field.name }}" name="{{ field.name }}" value="{{ step.data_captured[field.name] if step.data_captured and field.name in step.data_captured else '' }}" {% if step.status not in ('pending', 'in_progress') %}disabled{% endif %}>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Operator notes #}
+        {% if step.status in ('pending', 'in_progress') %}
+        <div class="form-group" style="margin-top: var(--space-sm);">
+            <label class="form-label">NOTES</label>
+            <textarea class="form-input" id="notes-{{ step.order }}" rows="2" style="min-height: 60px;" placeholder="Operator notes..." onclick="event.stopPropagation();">{{ step.notes or '' }}</textarea>
+            <button class="btn btn-sm" style="margin-top: var(--space-xs);" onclick="saveNotes({{ instance.id }}, {{ step.order }}); event.stopPropagation();">SAVE NOTES</button>
+        </div>
+        {% elif step.notes %}
         <div style="margin-top: var(--space-sm); padding: var(--space-sm); border: 1px solid var(--border-color);">
-            <div class="mono" style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-xs);">OPERATOR NOTES</div>
+            <div class="mono" style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-xs);">NOTES</div>
             <div style="font-size: 0.85rem; white-space: pre-wrap;">{{ step.notes }}</div>
         </div>
         {% endif %}
 
+        {# Action buttons for active steps #}
         {% if step.status in ('pending', 'in_progress') %}
-        <div class="btn-row" style="margin-top: var(--space-md);">
-            <button class="btn btn-primary" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="completeStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">COMPLETE</button>
-            <button class="btn" onclick="skipStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">SKIP</button>
+        <div style="margin-top: var(--space-md); border-top: 1px solid var(--border-color); padding-top: var(--space-md);">
+            {% if step.status == 'pending' %}
+            <button class="btn btn-full" style="border-color: var(--accent-blue); color: var(--accent-blue); margin-bottom: var(--space-sm);" onclick="startStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">START STEP</button>
+            {% endif %}
+            <div class="btn-row">
+                <button class="btn" style="border-color: var(--accent-green); color: var(--accent-green);" onclick="completeStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">COMPLETE</button>
+                <button class="btn" onclick="skipStep({{ instance.id }}, {{ step.order }}); event.stopPropagation();">SKIP</button>
+            </div>
+            <div class="btn-row" style="margin-top: var(--space-sm);">
+                <button class="btn" style="border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openStepScanner({{ step.order }}); event.stopPropagation();">SCAN CONSUME</button>
+                <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="toggleNC({{ step.order }}); event.stopPropagation();">LOG NC</button>
+            </div>
         </div>
-        <button class="btn btn-full" style="margin-top: var(--space-sm); border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="openStepScanner({{ step.order }}); event.stopPropagation();">SCAN TO CONSUME</button>
+
+        {# Inline scanner #}
         <div id="step-scanner-{{ step.order }}" class="scanner-inline hidden">
             <div id="step-scanner-view-{{ step.order }}" class="scanner-viewport"></div>
-            <button class="btn btn-sm btn-full" style="margin-top: var(--space-sm);" onclick="closeStepScanner({{ step.order }}); event.stopPropagation();">CLOSE SCANNER</button>
+            <div id="step-scan-result-{{ step.order }}" class="hidden" style="padding: var(--space-sm); border: 1px solid var(--border-color); margin-top: var(--space-xs);"></div>
+            <button class="btn btn-sm btn-full" style="margin-top: var(--space-xs);" onclick="closeStepScanner({{ step.order }}); event.stopPropagation();">CLOSE</button>
         </div>
+
+        {# NC form #}
+        <div id="nc-form-{{ step.order }}" class="hidden" style="margin-top: var(--space-sm); padding: var(--space-sm); border: 1px solid var(--accent-red);">
+            <div class="mono" style="font-size: 0.7rem; color: var(--accent-red); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-sm);">LOG NON-CONFORMANCE</div>
+            <div class="form-group">
+                <label class="form-label">TITLE *</label>
+                <input type="text" class="form-input" id="nc-title-{{ step.order }}" onclick="event.stopPropagation();">
+            </div>
+            <div class="form-group">
+                <label class="form-label">DESCRIPTION</label>
+                <textarea class="form-input" id="nc-desc-{{ step.order }}" rows="2" onclick="event.stopPropagation();"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">PRIORITY</label>
+                <select class="form-select" id="nc-priority-{{ step.order }}" onclick="event.stopPropagation();">
+                    <option value="medium">MEDIUM</option>
+                    <option value="low">LOW</option>
+                    <option value="high">HIGH</option>
+                    <option value="critical">CRITICAL</option>
+                </select>
+            </div>
+            <div class="btn-row">
+                <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="submitNC({{ instance.id }}, {{ step.order }}); event.stopPropagation();">SUBMIT NC</button>
+                <button class="btn" onclick="toggleNC({{ step.order }}); event.stopPropagation();">CANCEL</button>
+            </div>
+        </div>
+
         {% elif step.status == 'completed' and step.completed_at %}
-        <div class="mono" style="font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-sm);">
-            COMPLETED: {{ step.completed_at }}
-        </div>
+        <div class="mono" style="font-size: 0.7rem; color: var(--text-muted); margin-top: var(--space-sm);">COMPLETED: {{ step.completed_at }}</div>
+        {% elif step.status == 'awaiting_signoff' %}
+        <div class="mono" style="font-size: 0.7rem; color: var(--accent-yellow); margin-top: var(--space-sm);">AWAITING SIGNOFF</div>
         {% endif %}
     </div>
     {% endfor %}
@@ -104,79 +188,164 @@
     </div>
 </div>
 {% endif %}
+
+<a href="/m/exec" class="btn btn-full" style="margin-top: var(--space-sm);">BACK TO EXECUTIONS</a>
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
-    var stepScanners = {};
+var instanceId = {{ instance.id if instance is defined and instance is not none else 'null' }};
+var stepScanners = {};
 
-    function toggleStep(n) {
-        var el = document.getElementById('step-detail-' + n);
-        if (el) el.classList.toggle('expanded');
+function showFeedback(msg, isError) {
+    var el = document.getElementById('exec-feedback');
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--accent-red)' : 'var(--accent-green)';
+    el.style.borderColor = isError ? 'var(--accent-red)' : 'var(--accent-green)';
+    el.classList.remove('hidden');
+    if (!isError) setTimeout(function() { el.classList.add('hidden'); }, 3000);
+}
+
+function toggleStep(n) {
+    var el = document.getElementById('step-detail-' + n);
+    if (el) el.classList.toggle('expanded');
+}
+
+(function() {
+    var cur = document.querySelector('.step-row.current');
+    if (cur) {
+        var n = cur.getAttribute('data-step');
+        var d = document.getElementById('step-detail-' + n);
+        if (d) d.classList.add('expanded');
     }
+})();
 
-    (function() {
-        var cur = document.querySelector('.step-row.current');
-        if (cur) {
-            var n = cur.getAttribute('data-step');
-            var d = document.getElementById('step-detail-' + n);
-            if (d) d.classList.add('expanded');
+function gatherDataCaptured(stepOrder) {
+    var data = {};
+    var inputs = document.querySelectorAll('[id^="data-' + stepOrder + '-"]');
+    inputs.forEach(function(input) {
+        var name = input.name;
+        var val = input.value;
+        if (val !== '' && val !== null) {
+            if (input.type === 'number') val = parseFloat(val);
+            else if (val === 'true') val = true;
+            else if (val === 'false') val = false;
+            data[name] = val;
         }
-    })();
+    });
+    return Object.keys(data).length > 0 ? data : null;
+}
 
-    function completeStep(id, step) {
-        fetch('/api/procedure-instances/' + id + '/steps/' + step + '/complete', {
-            method: 'POST', headers: getHeaders(), body: JSON.stringify({})
-        }).then(function(r) {
-            if (r.ok) window.location.reload();
-            else r.json().then(function(e) { alert('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail))); });
-        }).catch(function(e) { alert('Network error: ' + e.message); });
-    }
+function startStep(id, step) {
+    fetch('/api/procedure-instances/' + id + '/steps/' + step + '/start', {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify({})
+    }).then(function(r) {
+        if (r.ok) window.location.reload();
+        else r.json().then(function(e) { showFeedback('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+    }).catch(function(e) { showFeedback('Network error: ' + e.message, true); });
+}
 
-    function skipStep(id, step) {
-        var reason = prompt('Skip reason (optional):');
-        if (reason === null) return;
-        fetch('/api/procedure-instances/' + id + '/steps/' + step + '/skip', {
-            method: 'POST', headers: getHeaders(), body: JSON.stringify({ reason: reason || null })
-        }).then(function(r) {
-            if (r.ok) window.location.reload();
-            else r.json().then(function(e) { alert('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail))); });
-        }).catch(function(e) { alert('Network error: ' + e.message); });
-    }
+function completeStep(id, step) {
+    var body = {};
+    var data = gatherDataCaptured(step);
+    if (data) body.data_captured = data;
+    fetch('/api/procedure-instances/' + id + '/steps/' + step + '/complete', {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(body)
+    }).then(function(r) {
+        if (r.ok) window.location.reload();
+        else r.json().then(function(e) { showFeedback('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+    }).catch(function(e) { showFeedback('Network error: ' + e.message, true); });
+}
 
-    function openStepScanner(n) {
-        var c = document.getElementById('step-scanner-' + n);
-        c.classList.remove('hidden');
-        var qr = new Html5Qrcode('step-scanner-view-' + n);
-        stepScanners[n] = qr;
-        qr.start({ facingMode: 'environment' }, {
-            fps: 10,
-            qrbox: function(w, h) { var s = Math.floor(Math.min(w, h) * 0.6); return { width: Math.max(s, 150), height: Math.max(s, 150) }; },
-            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
-        }, function(code) {
-            qr.stop().catch(function() {});
-            delete stepScanners[n];
-            c.classList.add('hidden');
-            handleConsumeScan(code, n);
-        }, function() {}
-        ).catch(function(err) { c.innerHTML = '<div style="padding: var(--space-md); color: var(--accent-red);" class="mono">Camera error: ' + err + '</div>'; });
-    }
+function skipStep(id, step) {
+    var reason = prompt('Skip reason (optional):');
+    if (reason === null) return;
+    fetch('/api/procedure-instances/' + id + '/steps/' + step + '/skip', {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify({ reason: reason || null })
+    }).then(function(r) {
+        if (r.ok) window.location.reload();
+        else r.json().then(function(e) { showFeedback('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+    }).catch(function(e) { showFeedback('Network error: ' + e.message, true); });
+}
 
-    function closeStepScanner(n) {
-        var s = stepScanners[n];
-        if (s) { s.stop().catch(function() {}); delete stepScanners[n]; }
-        document.getElementById('step-scanner-' + n).classList.add('hidden');
-    }
+function saveNotes(id, step) {
+    var notes = document.getElementById('notes-' + step).value;
+    fetch('/api/procedure-instances/' + id + '/steps/' + step + '/notes', {
+        method: 'PATCH', headers: getHeaders(), body: JSON.stringify({ notes: notes })
+    }).then(function(r) {
+        if (r.ok) showFeedback('Notes saved', false);
+        else r.json().then(function(e) { showFeedback('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+    }).catch(function(e) { showFeedback('Network error: ' + e.message, true); });
+}
 
-    function handleConsumeScan(code, step) {
-        fetch('/api/scan/' + encodeURIComponent(code), { headers: getHeaders() })
-        .then(function(r) { return r.ok ? r.json() : Promise.reject('Not recognized'); })
-        .then(function(res) {
-            if (res.type !== 'inventory') { alert('Not an inventory item (type: ' + res.type + ')'); return; }
-            if (!res.found) { alert('Inventory not found: ' + code); return; }
-            alert('Scanned: ' + res.label + (res.sublabel ? ' (' + res.sublabel + ')' : '') + '\nRecord ID: ' + res.id);
-        }).catch(function(e) { alert('Scan error: ' + e); });
-    }
+function toggleNC(step) {
+    var el = document.getElementById('nc-form-' + step);
+    el.classList.toggle('hidden');
+}
+
+function submitNC(id, step) {
+    var title = document.getElementById('nc-title-' + step).value.trim();
+    if (!title) { showFeedback('NC title is required', true); return; }
+    var desc = document.getElementById('nc-desc-' + step).value;
+    var priority = document.getElementById('nc-priority-' + step).value;
+    fetch('/api/procedure-instances/' + id + '/steps/' + step + '/nc', {
+        method: 'POST', headers: getHeaders(),
+        body: JSON.stringify({ title: title, description: desc || null, priority: priority })
+    }).then(function(r) {
+        if (r.ok) { showFeedback('Non-conformance logged', false); toggleNC(step); }
+        else r.json().then(function(e) { showFeedback('Error: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+    }).catch(function(e) { showFeedback('Network error: ' + e.message, true); });
+}
+
+function openStepScanner(n) {
+    var c = document.getElementById('step-scanner-' + n);
+    c.classList.remove('hidden');
+    var qr = new Html5Qrcode('step-scanner-view-' + n);
+    stepScanners[n] = qr;
+    qr.start({ facingMode: 'environment' }, {
+        fps: 10,
+        qrbox: function(w, h) { var s = Math.floor(Math.min(w, h) * 0.6); return { width: Math.max(s, 150), height: Math.max(s, 150) }; },
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+    }, function(code) {
+        qr.stop().catch(function() {});
+        delete stepScanners[n];
+        handleConsumeScan(code, n);
+    }, function() {}
+    ).catch(function(err) { c.innerHTML = '<div style="padding: var(--space-md); color: var(--accent-red);" class="mono">Camera error: ' + err + '</div>'; });
+}
+
+function closeStepScanner(n) {
+    var s = stepScanners[n];
+    if (s) { s.stop().catch(function() {}); delete stepScanners[n]; }
+    document.getElementById('step-scanner-' + n).classList.add('hidden');
+}
+
+function handleConsumeScan(code, stepNum) {
+    var resultDiv = document.getElementById('step-scan-result-' + stepNum);
+    var scannerDiv = document.getElementById('step-scanner-' + stepNum);
+
+    fetch('/api/scan/' + encodeURIComponent(code), { headers: getHeaders() })
+    .then(function(r) { return r.ok ? r.json() : Promise.reject('Not recognized'); })
+    .then(function(res) {
+        if (res.type !== 'inventory' || !res.found) {
+            showFeedback('Not an inventory item', true);
+            scannerDiv.classList.add('hidden');
+            return;
+        }
+        // Consume it
+        fetch('/api/procedure-instances/' + instanceId + '/steps/' + stepNum + '/consume', {
+            method: 'POST', headers: getHeaders(),
+            body: JSON.stringify({ consumptions: [{ inventory_record_id: res.id, quantity: 1, usage_type: 'consume' }] })
+        }).then(function(r2) {
+            if (r2.ok) {
+                showFeedback('Consumed: ' + res.label, false);
+            } else {
+                r2.json().then(function(e) { showFeedback('Consume failed: ' + (typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)), true); });
+            }
+            scannerDiv.classList.add('hidden');
+        }).catch(function(e) { showFeedback('Network error: ' + e.message, true); scannerDiv.classList.add('hidden'); });
+    }).catch(function(e) { showFeedback('Scan error: ' + e, true); scannerDiv.classList.add('hidden'); });
+}
 </script>
 {% endblock %}

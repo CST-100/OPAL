@@ -1,0 +1,59 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+{% set ist = issue.status.value if issue.status.value is defined else issue.status %}
+{% set itype = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+{% set ipri = issue.priority.value if issue.priority.value is defined else issue.priority %}
+
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-xs);">
+        <span class="mono">{{ issue.issue_number or 'ISSUE' }}</span>
+        <div style="display: flex; gap: var(--space-xs);">
+            <span class="status" style="font-size: 0.65rem;">{{ itype | upper | replace('_', ' ') }}</span>
+            <span class="status status-{{ ist }}" style="font-size: 0.65rem;">{{ ist | upper | replace('_', ' ') }}</span>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="mono" style="font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--text-primary);">{{ issue.title }}</div>
+
+        <table class="data-table">
+            <tr>
+                <th style="width: 90px;">STATUS</th>
+                <td><span class="status status-{{ ist }}">{{ ist | upper | replace('_', ' ') }}</span></td>
+            </tr>
+            <tr>
+                <th>PRIORITY</th>
+                <td><span class="status {% if ipri == 'critical' %}status-error{% elif ipri == 'high' %}status-warning{% endif %}">{{ ipri | upper }}</span></td>
+            </tr>
+            <tr>
+                <th>TYPE</th>
+                <td class="mono">{{ itype | upper | replace('_', ' ') }}</td>
+            </tr>
+            <tr>
+                <th>CREATED</th>
+                <td class="mono">{{ issue.created_at.isoformat() if issue.created_at.isoformat is defined else issue.created_at }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+{% if issue.description %}
+<div class="panel" style="margin-top: var(--space-sm);">
+    <div class="panel-header">DESCRIPTION</div>
+    <div class="panel-body">
+        <div style="white-space: pre-wrap; font-size: 0.85rem;">{{ issue.description }}</div>
+    </div>
+</div>
+{% endif %}
+
+{% if issue.part_id %}
+<div class="panel" style="margin-top: var(--space-sm);">
+    <div class="panel-header">LINKED PART</div>
+    <div class="panel-body">
+        <a href="/m/parts/{{ issue.part_id }}" class="btn btn-full" style="min-height: 44px; display: flex; align-items: center; justify-content: center;">VIEW PART #{{ issue.part_id }}</a>
+    </div>
+</div>
+{% endif %}
+
+<a href="/m/issues" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK TO ISSUES</a>
+{% endblock %}

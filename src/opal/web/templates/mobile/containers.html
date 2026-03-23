@@ -1,0 +1,113 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>CONTAINERS</span>
+        <button class="btn btn-primary btn-sm" onclick="toggleCreateForm()" style="min-height: 36px;">CREATE</button>
+    </div>
+
+    {% if containers %}
+    {% for c in containers %}
+    <a href="/m/containers/{{ c.id }}" style="display: block; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); min-height: 44px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1; min-width: 0;">
+                <div class="mono" style="font-weight: 600; font-size: 0.85rem;">{{ c.code }}</div>
+                {% if c.name %}
+                <div class="mono" style="font-size: 0.8rem; color: var(--text-secondary);">{{ c.name }}</div>
+                {% endif %}
+                <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-xs); flex-wrap: wrap;">
+                    <span class="status" style="font-size: 0.65rem;">{{ c.container_type | upper }}</span>
+                    <span class="status status-{{ c.status }}" style="font-size: 0.65rem;">{{ c.status | upper }}</span>
+                    <span class="mono" style="font-size: 0.7rem; color: var(--text-muted);">{{ c.items | length }} item{{ 's' if c.items | length != 1 else '' }}</span>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="panel-body">
+        <div class="mono" style="color: var(--text-muted); font-size: 0.85rem;">No containers found.</div>
+    </div>
+    {% endif %}
+</div>
+
+<div id="create-form" class="panel hidden" style="margin-top: var(--space-sm);">
+    <div class="panel-header">CREATE CONTAINER</div>
+    <div class="panel-body">
+        <div id="create-error" class="hidden" style="padding: var(--space-sm); margin-bottom: var(--space-sm); border: 1px solid var(--accent-red); color: var(--accent-red); font-family: var(--font-mono); font-size: 0.8rem;"></div>
+
+        <div class="form-group">
+            <label class="form-label">NAME (OPTIONAL)</label>
+            <input type="text" id="create-name" class="form-input" placeholder="Container name" autocapitalize="off">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">TYPE</label>
+            <select id="create-type" class="form-select">
+                <option value="general">General</option>
+                <option value="kit">Kit</option>
+                <option value="staging">Staging</option>
+                <option value="wip">WIP</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">NOTES (OPTIONAL)</label>
+            <textarea id="create-notes" class="form-input" rows="3" placeholder="Notes"></textarea>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn" onclick="toggleCreateForm()" style="min-height: 44px;">CANCEL</button>
+            <button class="btn btn-primary" id="create-submit-btn" onclick="createContainer()" style="min-height: 44px;">CREATE</button>
+        </div>
+    </div>
+</div>
+
+<a href="/m/more" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCreateForm() {
+        document.getElementById('create-form').classList.toggle('hidden');
+        document.getElementById('create-error').classList.add('hidden');
+    }
+
+    function createContainer() {
+        var name = document.getElementById('create-name').value.trim();
+        var ctype = document.getElementById('create-type').value;
+        var notes = document.getElementById('create-notes').value.trim();
+        var errEl = document.getElementById('create-error');
+        var submitBtn = document.getElementById('create-submit-btn');
+
+        errEl.classList.add('hidden');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'CREATING...';
+
+        var body = { container_type: ctype };
+        if (name) body.name = name;
+        if (notes) body.notes = notes;
+
+        fetch('/api/containers', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(body)
+        }).then(function(resp) {
+            if (!resp.ok) {
+                return resp.json().then(function(err) {
+                    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+                });
+            }
+            return resp.json();
+        }).then(function(container) {
+            window.location.href = '/m/containers/' + container.id;
+        }).catch(function(e) {
+            errEl.textContent = e.message;
+            errEl.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'CREATE';
+        });
+    }
+</script>
+{% endblock %}

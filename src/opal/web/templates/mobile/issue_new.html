@@ -1,0 +1,101 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">CREATE ISSUE</div>
+    <div class="panel-body">
+        <div id="form-error" class="hidden" style="padding: var(--space-sm); margin-bottom: var(--space-sm); border: 1px solid var(--accent-red); color: var(--accent-red); font-family: var(--font-mono); font-size: 0.8rem;"></div>
+
+        <div class="form-group">
+            <label class="form-label" for="issue-title">TITLE *</label>
+            <input type="text" id="issue-title" class="form-input" placeholder="Issue title" required autocapitalize="off">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="issue-type">TYPE</label>
+            <select id="issue-type" class="form-select">
+                {% for t in types %}
+                <option value="{{ t }}"{% if t == 'task' %} selected{% endif %}>{{ t | upper | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="issue-priority">PRIORITY</label>
+            <select id="issue-priority" class="form-select">
+                {% for p in priorities %}
+                <option value="{{ p }}"{% if p == 'medium' %} selected{% endif %}>{{ p | upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="issue-desc">DESCRIPTION</label>
+            <textarea id="issue-desc" class="form-input" rows="5" placeholder="Describe the issue..."></textarea>
+        </div>
+
+        <div class="btn-row" style="margin-top: var(--space-md);">
+            <a href="/m/issues" class="btn" style="min-height: 44px; display: flex; align-items: center; justify-content: center;">CANCEL</a>
+            <button class="btn btn-primary" id="submit-btn" onclick="submitIssue()" style="min-height: 44px; flex: 1;">CREATE ISSUE</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function submitIssue() {
+        var title = document.getElementById('issue-title').value.trim();
+        var issueType = document.getElementById('issue-type').value;
+        var priority = document.getElementById('issue-priority').value;
+        var desc = document.getElementById('issue-desc').value.trim();
+        var errEl = document.getElementById('form-error');
+        var submitBtn = document.getElementById('submit-btn');
+
+        errEl.classList.add('hidden');
+
+        if (!title) {
+            errEl.textContent = 'Title is required.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'CREATING...';
+
+        var body = {
+            title: title,
+            issue_type: issueType,
+            priority: priority
+        };
+        if (desc) body.description = desc;
+
+        fetch('/api/issues', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(body)
+        }).then(function(resp) {
+            if (!resp.ok) {
+                return resp.json().then(function(err) {
+                    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+                });
+            }
+            return resp.json();
+        }).then(function(issue) {
+            window.location.href = '/m/issues/' + issue.id;
+        }).catch(function(e) {
+            errEl.textContent = e.message;
+            errEl.classList.remove('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'CREATE ISSUE';
+        });
+    }
+
+    document.getElementById('issue-title').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitIssue();
+        }
+    });
+</script>
+{% endblock %}

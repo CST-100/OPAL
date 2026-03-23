@@ -1,0 +1,76 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>ISSUES</span>
+        <a href="/m/issues/new" class="btn btn-primary btn-sm" style="min-height: 36px; display: flex; align-items: center;">CREATE</a>
+    </div>
+    <div class="panel-body">
+        <div class="search-row">
+            <input type="text" id="issue-search" class="form-input" placeholder="Filter issues..." autocapitalize="off" autocorrect="off">
+        </div>
+    </div>
+
+    <div id="issues-list">
+        {% if issues %}
+        {% for issue in issues %}
+        {% set ist = issue.status.value if issue.status.value is defined else issue.status %}
+        {% set itype = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+        {% set ipri = issue.priority.value if issue.priority.value is defined else issue.priority %}
+        <a href="/m/issues/{{ issue.id }}" class="issue-row" data-title="{{ issue.title | lower }}" data-number="{{ issue.issue_number | default('', true) | lower }}" style="display: block; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); min-height: 44px;">
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem;">{{ issue.title }}</div>
+            <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-xs); flex-wrap: wrap; align-items: center;">
+                {% if issue.issue_number %}
+                <span class="mono" style="font-size: 0.7rem; color: var(--text-muted);">{{ issue.issue_number }}</span>
+                {% endif %}
+                <span class="status" style="font-size: 0.6rem;">{{ itype | upper | replace('_', ' ') }}</span>
+                <span class="status {% if ipri == 'critical' %}status-error{% elif ipri == 'high' %}status-warning{% endif %}" style="font-size: 0.6rem;">{{ ipri | upper }}</span>
+                <span class="status status-{{ ist }}" style="font-size: 0.6rem;">{{ ist | upper | replace('_', ' ') }}</span>
+            </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <div class="panel-body">
+            <div class="mono" style="color: var(--text-muted); font-size: 0.85rem;">No issues found.</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="no-results" class="panel-body hidden">
+        <div class="mono" style="color: var(--text-muted); font-size: 0.85rem;">No matching issues.</div>
+    </div>
+</div>
+
+<a href="/m/more" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var searchInput = document.getElementById('issue-search');
+    var rows = document.querySelectorAll('.issue-row');
+    var noResults = document.getElementById('no-results');
+
+    searchInput.addEventListener('input', function() {
+        var q = this.value.trim().toLowerCase();
+        var visible = 0;
+
+        for (var i = 0; i < rows.length; i++) {
+            var title = rows[i].getAttribute('data-title') || '';
+            var number = rows[i].getAttribute('data-number') || '';
+            if (!q || title.indexOf(q) !== -1 || number.indexOf(q) !== -1) {
+                rows[i].style.display = '';
+                visible++;
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+
+        if (visible === 0 && rows.length > 0 && q) {
+            noResults.classList.remove('hidden');
+        } else {
+            noResults.classList.add('hidden');
+        }
+    });
+</script>
+{% endblock %}

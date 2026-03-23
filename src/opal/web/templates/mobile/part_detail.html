@@ -1,0 +1,92 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">PART</div>
+    <div class="panel-body">
+        <div class="mono" style="font-size: 1.1rem; font-weight: 700; margin-bottom: var(--space-md); color: var(--text-primary);">{{ part.name }}</div>
+
+        <table class="data-table">
+            <tr>
+                <th style="width: 100px;">INTERNAL PN</th>
+                <td class="mono">{{ part.internal_pn or '--' }}</td>
+            </tr>
+            <tr>
+                <th>EXTERNAL PN</th>
+                <td class="mono">{{ part.external_pn or '--' }}</td>
+            </tr>
+            <tr>
+                <th>CATEGORY</th>
+                <td>
+                    {% if part.category %}
+                    <span class="status">{{ part.category | upper }}</span>
+                    {% else %}
+                    <span class="mono">--</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>TIER</th>
+                <td class="mono">{{ part.tier }}{% if part.tier_name %} &mdash; {{ part.tier_name }}{% endif %}</td>
+            </tr>
+            <tr>
+                <th>TRACKING</th>
+                <td class="mono">{{ part.tracking_type | upper }}</td>
+            </tr>
+            <tr>
+                <th>UNIT</th>
+                <td class="mono">{{ part.unit_of_measure | upper }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+{% if part.description %}
+<div class="panel" style="margin-top: var(--space-sm);">
+    <div class="panel-header">DESCRIPTION</div>
+    <div class="panel-body">
+        <div style="white-space: pre-wrap; font-size: 0.85rem;">{{ part.description }}</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="panel" style="margin-top: var(--space-sm);">
+    <div class="panel-header">STOCK ({{ inventory | length }})</div>
+    {% if inventory %}
+    <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>OPAL #</th>
+                    <th>QTY</th>
+                    <th>LOCATION</th>
+                    <th>LOT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inv in inventory %}
+                <tr>
+                    <td class="mono" style="font-size: 0.75rem;">
+                        {% if inv.opal_number %}
+                        <a href="/m/inventory/detail?opal={{ inv.opal_number }}" style="color: var(--accent-blue); text-decoration: none;">{{ inv.opal_number }}</a>
+                        {% else %}
+                        --
+                        {% endif %}
+                    </td>
+                    <td class="mono" style="font-size: 0.8rem;">{{ inv.quantity }}</td>
+                    <td class="mono" style="font-size: 0.75rem;">{{ inv.location }}</td>
+                    <td class="mono" style="font-size: 0.75rem;">{{ inv.lot_number or '--' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="panel-body">
+        <div class="mono" style="color: var(--text-muted); font-size: 0.85rem;">No stock records.</div>
+    </div>
+    {% endif %}
+</div>
+
+<a href="/m/parts" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK TO PARTS</a>
+{% endblock %}

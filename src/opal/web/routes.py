@@ -3054,6 +3054,7 @@ async def mobile_execution_detail(request: Request, db: DbSession, instance_id: 
             "instructions": vs.get("instructions", ""),
             "requires_signoff": vs.get("requires_signoff", False),
             "estimated_duration_minutes": vs.get("estimated_duration_minutes"),
+            "data_schema": vs.get("required_data_schema"),
             "status": status,
             "completed_at": step_exec.completed_at if step_exec else None,
             "notes": step_exec.notes if step_exec else None,
@@ -3080,5 +3081,168 @@ async def mobile_more(request: Request, db: DbSession) -> HTMLResponse:
     ctx = _get_mobile_context(request, db)
     if not ctx["current_user"]:
         return RedirectResponse(url="/m/login", status_code=302)
-    # Reuse inventory template for now; will get its own page later
-    return templates.TemplateResponse("mobile/home.html", ctx)
+    return templates.TemplateResponse("mobile/more.html", ctx)
+
+
+@router.get("/m/containers", response_class=HTMLResponse)
+async def mobile_containers(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile container list."""
+    from opal.db.models.container import Container
+
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    containers = db.query(Container).order_by(Container.id.desc()).all()
+    # Build serializable list for template
+    container_list = []
+    for c in containers:
+        ct = c.container_type.value if hasattr(c.container_type, "value") else c.container_type
+        st = c.status.value if hasattr(c.status, "value") else c.status
+        container_list.append({
+            "id": c.id,
+            "code": c.code,
+            "name": c.name,
+            "container_type": ct,
+            "status": st,
+            "items": list(c.items),
+        })
+    ctx["containers"] = container_list
+    return templates.TemplateResponse("mobile/containers.html", ctx)
+
+
+@router.get("/m/containers/{container_id}", response_class=HTMLResponse)
+async def mobile_container_detail(
+    request: Request, db: DbSession, container_id: int,
+) -> HTMLResponse:
+    """Mobile container detail — loads data via JS fetch."""
+    from opal.db.models.container import Container
+
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    c = db.query(Container).filter(Container.id == container_id).first()
+    if not c:
+        return RedirectResponse(url="/m/containers", status_code=302)
+
+    ctx["container_id"] = container_id
+    return templates.TemplateResponse("mobile/container_detail.html", ctx)
+
+
+@router.get("/m/issues", response_class=HTMLResponse)
+async def mobile_issues(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile issue list."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    issues = (
+        db.query(Issue)
+        .filter(Issue.deleted_at.is_(None))
+        .order_by(Issue.id.desc())
+        .limit(100)
+        .all()
+    )
+    ctx["issues"] = issues
+    return templates.TemplateResponse("mobile/issues.html", ctx)
+
+
+@router.get("/m/issues/new", response_class=HTMLResponse)
+async def mobile_issue_new(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile create issue form."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    ctx["types"] = [t.value for t in IssueType]
+    ctx["priorities"] = [p.value for p in IssuePriority]
+    return templates.TemplateResponse("mobile/issue_new.html", ctx)
+
+
+@router.get("/m/issues/{issue_id}", response_class=HTMLResponse)
+async def mobile_issue_detail(
+    request: Request, db: DbSession, issue_id: int,
+) -> HTMLResponse:
+    """Mobile issue detail."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    issue = (
+        db.query(Issue)
+        .filter(Issue.id == issue_id, Issue.deleted_at.is_(None))
+        .first()
+    )
+    if not issue:
+        return RedirectResponse(url="/m/issues", status_code=302)
+
+    ctx["issue"] = issue
+    return templates.TemplateResponse("mobile/issue_detail.html", ctx)
+
+
+@router.get("/m/parts", response_class=HTMLResponse)
+async def mobile_parts(request: Request, db: DbSession) -> HTMLResponse:
+    """Mobile part search page."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+    return templates.TemplateResponse("mobile/parts.html", ctx)
+
+
+@router.get("/m/parts/{part_id}", response_class=HTMLResponse)
+async def mobile_part_detail(
+    request: Request, db: DbSession, part_id: int,
+) -> HTMLResponse:
+    """Mobile part detail with inventory records."""
+    ctx = _get_mobile_context(request, db)
+    if not ctx["current_user"]:
+        return RedirectResponse(url="/m/login", status_code=302)
+
+    part = db.query(Part).filter(Part.id == part_id, Part.deleted_at.is_(None)).first()
+    if not part:
+        return RedirectResponse(url="/m/parts", status_code=302)
+
+    # Get inventory records for this part
+    inventory = (
+        db.query(InventoryRecord)
+        .filter(InventoryRecord.part_id == part_id)
+        .order_by(InventoryRecord.id.desc())
+        .all()
+    )
+
+    # Build a part dict with tier_name
+    from opal.config import get_active_project
+    tier_name = None
+    project = get_active_project()
+    if project:
+        tier = project.get_tier(part.tier)
+        if tier:
+            tier_name = tier.name
+
+    part_dict = {
+        "id": part.id,
+        "name": part.name,
+        "internal_pn": part.internal_pn,
+        "external_pn": part.external_pn,
+        "description": part.description,
+        "category": part.category,
+        "tier": part.tier,
+        "tier_name": tier_name,
+        "tracking_type": part.tracking_type,
+        "unit_of_measure": part.unit_of_measure,
+    }
+
+    inv_list = []
+    for inv in inventory:
+        inv_list.append({
+            "id": inv.id,
+            "opal_number": inv.opal_number,
+            "quantity": inv.quantity,
+            "location": inv.location,
+            "lot_number": inv.lot_number,
+        })
+
+    ctx["part"] = part_dict
+    ctx["inventory"] = inv_list
+    return templates.TemplateResponse("mobile/part_detail.html", ctx)

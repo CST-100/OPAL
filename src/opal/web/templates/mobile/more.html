@@ -1,0 +1,49 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">MORE</div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-top: var(--space-sm);">
+    <a href="/m/containers" class="panel" style="text-decoration: none; color: var(--text-primary); min-height: 100px; display: flex; flex-direction: column;">
+        <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-md);">
+            <div style="font-size: 1.8rem; margin-bottom: var(--space-xs);">&#9633;</div>
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-xs);">CONTAINERS</div>
+            <div class="mono" style="font-size: 0.7rem; color: var(--text-muted);">Kits, WIP bins, staging</div>
+        </div>
+    </a>
+
+    <a href="/m/issues" class="panel" style="text-decoration: none; color: var(--text-primary); min-height: 100px; display: flex; flex-direction: column;">
+        <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-md);">
+            <div style="font-size: 1.8rem; margin-bottom: var(--space-xs);">&#9888;</div>
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-xs);">ISSUES</div>
+            <div class="mono" style="font-size: 0.7rem; color: var(--text-muted);">NCRs, bugs, tasks</div>
+        </div>
+    </a>
+
+    <a href="/m/parts" class="panel" style="text-decoration: none; color: var(--text-primary); min-height: 100px; display: flex; flex-direction: column;">
+        <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-md);">
+            <div style="font-size: 1.8rem; margin-bottom: var(--space-xs);">&#9881;</div>
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-xs);">PARTS</div>
+            <div class="mono" style="font-size: 0.7rem; color: var(--text-muted);">Search part catalog</div>
+        </div>
+    </a>
+
+    <a href="/" class="panel" style="text-decoration: none; color: var(--text-primary); min-height: 100px; display: flex; flex-direction: column;">
+        <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-md);">
+            <div style="font-size: 1.8rem; margin-bottom: var(--space-xs);">&#9635;</div>
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-xs);">DESKTOP VIEW</div>
+            <div class="mono" style="font-size: 0.7rem; color: var(--text-muted);">Full desktop UI</div>
+        </div>
+    </a>
+
+    <a href="/logout" class="panel" style="text-decoration: none; color: var(--text-primary); min-height: 100px; display: flex; flex-direction: column; grid-column: 1 / -1;">
+        <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: var(--space-md);">
+            <div style="font-size: 1.8rem; margin-bottom: var(--space-xs);">&#10005;</div>
+            <div class="mono" style="font-weight: 600; font-size: 0.85rem; margin-bottom: var(--space-xs);">SIGN OUT</div>
+            <div class="mono" style="font-size: 0.7rem; color: var(--text-muted);">Log out of current session</div>
+        </div>
+    </a>
+</div>
+{% endblock %}

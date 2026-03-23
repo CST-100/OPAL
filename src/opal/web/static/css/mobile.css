@@ -321,6 +321,45 @@ body.mobile-layout .search-row .btn {
     border-top: 1px solid var(--border-color);
 }
 
+/* ── More tab grid ──────────────────────────────── */
+
+.more-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+}
+
+.more-grid a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg) var(--space-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+    color: var(--text-primary);
+    min-height: 100px;
+    text-align: center;
+}
+
+.more-grid a:active {
+    background: var(--bg-tertiary);
+}
+
+.more-grid .more-icon {
+    font-size: 1.5rem;
+    margin-bottom: var(--space-xs);
+}
+
+.more-grid .more-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
 /* ── Utility ────────────────────────────────────── */
 
 .hidden { display: none !important; }

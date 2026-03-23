@@ -1,0 +1,108 @@
+{% extends "layouts/mobile.html" %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">PART SEARCH</div>
+    <div class="panel-body">
+        <div class="search-row">
+            <input type="text" id="part-search" class="form-input" placeholder="Search by name, PN, description..." autocapitalize="off" autocorrect="off">
+        </div>
+    </div>
+
+    <div id="search-status" class="panel-body">
+        <div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">Type to search parts.</div>
+    </div>
+
+    <div id="search-results"></div>
+</div>
+
+<a href="/m/more" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var searchInput = document.getElementById('part-search');
+    var resultsEl = document.getElementById('search-results');
+    var statusEl = document.getElementById('search-status');
+    var debounceTimer = null;
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    searchInput.addEventListener('input', function() {
+        var q = this.value.trim();
+        if (debounceTimer) clearTimeout(debounceTimer);
+
+        if (!q) {
+            resultsEl.innerHTML = '';
+            statusEl.innerHTML = '<div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">Type to search parts.</div>';
+            statusEl.classList.remove('hidden');
+            return;
+        }
+
+        statusEl.innerHTML = '<div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">LOADING...</div>';
+        statusEl.classList.remove('hidden');
+
+        debounceTimer = setTimeout(function() {
+            searchParts(q);
+        }, 300);
+    });
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            var q = this.value.trim();
+            if (q) searchParts(q);
+        }
+    });
+
+    function searchParts(query) {
+        fetch('/api/parts?search=' + encodeURIComponent(query) + '&page=1&page_size=30', {
+            headers: getHeaders()
+        }).then(function(resp) {
+            if (!resp.ok) throw new Error('Search failed');
+            return resp.json();
+        }).then(function(data) {
+            var items = data.items || [];
+            if (items.length === 0) {
+                statusEl.innerHTML = '<div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">No parts found for &ldquo;' + escapeHtml(query) + '&rdquo;</div>';
+                statusEl.classList.remove('hidden');
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            statusEl.innerHTML = '<div class="mono" style="color: var(--text-secondary); font-size: 0.75rem;">' + items.length + ' result' + (items.length !== 1 ? 's' : '') + (data.total > items.length ? ' of ' + data.total : '') + '</div>';
+            statusEl.classList.remove('hidden');
+
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                var p = items[i];
+                html += '<a href="/m/parts/' + p.id + '" style="display: block; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); min-height: 44px;">';
+                html += '<div class="mono" style="font-weight: 600; font-size: 0.85rem;">' + escapeHtml(p.name) + '</div>';
+                html += '<div style="display: flex; gap: var(--space-sm); margin-top: var(--space-xs); flex-wrap: wrap; align-items: center;">';
+                html += '<span class="mono" style="font-size: 0.75rem; color: var(--accent-blue);">' + escapeHtml(p.internal_pn || '--') + '</span>';
+                if (p.category) {
+                    html += '<span class="status" style="font-size: 0.6rem;">' + escapeHtml(p.category.toUpperCase()) + '</span>';
+                }
+                if (p.tier_name) {
+                    html += '<span class="mono" style="font-size: 0.7rem; color: var(--text-muted);">T' + p.tier + ' ' + escapeHtml(p.tier_name) + '</span>';
+                } else {
+                    html += '<span class="mono" style="font-size: 0.7rem; color: var(--text-muted);">TIER ' + p.tier + '</span>';
+                }
+                html += '</div>';
+                html += '</a>';
+            }
+            resultsEl.innerHTML = html;
+        }).catch(function(e) {
+            statusEl.innerHTML = '<div class="mono" style="color: var(--accent-red); font-size: 0.8rem;">Error: ' + escapeHtml(e.message) + '</div>';
+            statusEl.classList.remove('hidden');
+            resultsEl.innerHTML = '';
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,297 @@
+{% extends "layouts/mobile.html" %}
+
+{% block head %}
+<script src="/static/js/html5-qrcode.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="loading-state" class="panel">
+    <div class="panel-body" style="text-align: center; padding: var(--space-xl);">
+        <div class="mono" style="color: var(--text-muted);">LOADING...</div>
+    </div>
+</div>
+
+<div id="error-state" class="panel hidden">
+    <div class="panel-body" style="text-align: center; padding: var(--space-xl);">
+        <div class="mono" style="color: var(--accent-red);" id="error-message">Failed to load container.</div>
+    </div>
+</div>
+
+<div id="container-content" class="hidden">
+    <div class="panel">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="mono" id="container-code">---</span>
+            <span class="status" id="container-status-badge">---</span>
+        </div>
+        <div class="panel-body">
+            <table class="data-table">
+                <tr><th style="width: 90px;">TYPE</th><td class="mono" id="container-type">--</td></tr>
+                <tr><th>NAME</th><td class="mono" id="container-name">--</td></tr>
+                <tr><th>NOTES</th><td class="mono" id="container-notes" style="white-space: pre-wrap;">--</td></tr>
+                <tr><th>EXECUTION</th><td class="mono" id="container-exec">--</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div id="action-error" class="hidden" style="padding: var(--space-sm); margin-top: var(--space-sm); border: 1px solid var(--accent-red); color: var(--accent-red); font-family: var(--font-mono); font-size: 0.8rem;"></div>
+
+    <div class="panel" style="margin-top: var(--space-sm);">
+        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>ITEMS (<span id="item-count">0</span>)</span>
+            <button class="btn btn-primary btn-sm" id="scan-item-btn" onclick="toggleItemScanner()" style="min-height: 36px;">SCAN ITEM IN</button>
+        </div>
+
+        <div id="scan-container" class="scanner-inline hidden">
+            <div id="scan-viewport" class="scanner-viewport" style="max-height: 35vh;"></div>
+            <div class="panel-body">
+                <div id="scan-feedback" class="hidden mono" style="font-size: 0.8rem; padding: var(--space-sm) 0;"></div>
+                <button class="btn btn-sm btn-full" onclick="closeItemScanner()" style="min-height: 44px;">CLOSE SCANNER</button>
+            </div>
+        </div>
+
+        <div id="items-list">
+            <div class="panel-body">
+                <div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">No items.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-actions" class="btn-row" style="margin-top: var(--space-sm); gap: var(--space-sm);"></div>
+</div>
+
+<a href="/m/containers" class="btn btn-full" style="margin-top: var(--space-sm); min-height: 44px; display: flex; align-items: center; justify-content: center;">&larr; BACK TO CONTAINERS</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var containerId = {{ container_id }};
+    var containerData = null;
+    var itemScanner = null;
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function loadContainer() {
+        document.getElementById('loading-state').classList.remove('hidden');
+        document.getElementById('container-content').classList.add('hidden');
+        document.getElementById('error-state').classList.add('hidden');
+
+        fetch('/api/containers/' + containerId, {
+            headers: getHeaders()
+        }).then(function(resp) {
+            if (!resp.ok) throw new Error('Container not found');
+            return resp.json();
+        }).then(function(data) {
+            containerData = data;
+            renderContainer(data);
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('container-content').classList.remove('hidden');
+        }).catch(function(e) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('error-message').textContent = e.message;
+            document.getElementById('error-state').classList.remove('hidden');
+        });
+    }
+
+    function renderContainer(c) {
+        document.getElementById('container-code').textContent = c.code;
+
+        var badge = document.getElementById('container-status-badge');
+        badge.textContent = c.status.toUpperCase();
+        badge.className = 'status status-' + c.status;
+
+        document.getElementById('container-type').textContent = c.container_type.toUpperCase();
+        document.getElementById('container-name').textContent = c.name || '--';
+        document.getElementById('container-notes').textContent = c.notes || '--';
+        document.getElementById('container-exec').textContent = c.procedure_instance_id ? 'Execution #' + c.procedure_instance_id : '--';
+
+        renderItems(c.items);
+        renderStatusActions(c.status);
+
+        // Disable scan button if not open
+        var scanBtn = document.getElementById('scan-item-btn');
+        if (c.status !== 'open') {
+            scanBtn.disabled = true;
+            scanBtn.style.opacity = '0.5';
+        } else {
+            scanBtn.disabled = false;
+            scanBtn.style.opacity = '1';
+        }
+    }
+
+    function renderItems(items) {
+        document.getElementById('item-count').textContent = items.length;
+        var el = document.getElementById('items-list');
+
+        if (items.length === 0) {
+            el.innerHTML = '<div class="panel-body"><div class="mono" style="color: var(--text-muted); font-size: 0.8rem;">No items.</div></div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var ts = item.scanned_at ? item.scanned_at.replace('T', ' ').substring(0, 19) + 'Z' : '--';
+            html += '<div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-color); min-height: 44px;">';
+            html += '<div style="flex: 1; min-width: 0;">';
+            html += '<div class="mono" style="font-weight: 600; font-size: 0.85rem;">' + escapeHtml(item.part_name || 'Unknown') + '</div>';
+            html += '<div class="mono" style="font-size: 0.75rem; color: var(--text-secondary);">' + escapeHtml(item.part_pn || '--') + '</div>';
+            html += '<div style="display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: 2px;">';
+            html += '<span class="mono" style="font-size: 0.7rem; color: var(--accent-blue);">' + escapeHtml(item.opal_number || '--') + '</span>';
+            html += '<span class="mono" style="font-size: 0.7rem; color: var(--text-muted);">Qty: ' + item.quantity + '</span>';
+            html += '<span class="mono" style="font-size: 0.65rem; color: var(--text-muted);">' + ts + '</span>';
+            html += '</div></div>';
+            if (containerData && containerData.status === 'open') {
+                html += '<button class="btn btn-danger btn-sm" onclick="removeItem(' + item.id + ')" style="min-height: 36px; min-width: 36px; padding: 0 var(--space-sm);">&#10005;</button>';
+            }
+            html += '</div>';
+        }
+        el.innerHTML = html;
+    }
+
+    function renderStatusActions(status) {
+        var el = document.getElementById('status-actions');
+        var html = '';
+        if (status === 'open') {
+            html += '<button class="btn btn-primary btn-full" onclick="changeStatus(\'sealed\')" style="min-height: 44px;">SEAL CONTAINER</button>';
+        }
+        if (status === 'open' || status === 'sealed') {
+            html += '<button class="btn btn-danger btn-full" onclick="changeStatus(\'archived\')" style="min-height: 44px;">ARCHIVE</button>';
+        }
+        el.innerHTML = html;
+    }
+
+    function showActionError(msg) {
+        var el = document.getElementById('action-error');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    function hideActionError() {
+        document.getElementById('action-error').classList.add('hidden');
+    }
+
+    function changeStatus(newStatus) {
+        hideActionError();
+        fetch('/api/containers/' + containerId, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ status: newStatus })
+        }).then(function(resp) {
+            if (!resp.ok) {
+                return resp.json().then(function(err) {
+                    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+                });
+            }
+            return resp.json();
+        }).then(function() {
+            loadContainer();
+        }).catch(function(e) {
+            showActionError(e.message);
+        });
+    }
+
+    function removeItem(itemId) {
+        hideActionError();
+        fetch('/api/containers/' + containerId + '/items/' + itemId, {
+            method: 'DELETE',
+            headers: getHeaders()
+        }).then(function(resp) {
+            if (!resp.ok) {
+                return resp.json().then(function(err) {
+                    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+                });
+            }
+            loadContainer();
+        }).catch(function(e) {
+            showActionError(e.message);
+        });
+    }
+
+    // ── Scanner ──
+
+    function toggleItemScanner() {
+        var container = document.getElementById('scan-container');
+        if (container.classList.contains('hidden')) {
+            openItemScanner();
+        } else {
+            closeItemScanner();
+        }
+    }
+
+    function openItemScanner() {
+        var container = document.getElementById('scan-container');
+        container.classList.remove('hidden');
+        document.getElementById('scan-feedback').classList.add('hidden');
+
+        itemScanner = new Html5Qrcode('scan-viewport');
+        itemScanner.start(
+            { facingMode: 'environment' },
+            {
+                fps: 10,
+                qrbox: function(w, h) {
+                    var s = Math.floor(Math.min(w, h) * 0.65);
+                    return { width: Math.max(s, 150), height: Math.max(s, 150) };
+                },
+                aspectRatio: 1.0
+            },
+            function(code) {
+                itemScanner.stop().then(function() {
+                    itemScanner = null;
+                    handleScanResult(code);
+                }).catch(function() {
+                    itemScanner = null;
+                    handleScanResult(code);
+                });
+            },
+            function() {}
+        ).catch(function(err) {
+            var fb = document.getElementById('scan-feedback');
+            fb.textContent = 'Camera error: ' + err;
+            fb.style.color = 'var(--accent-red)';
+            fb.classList.remove('hidden');
+        });
+    }
+
+    function closeItemScanner() {
+        if (itemScanner) {
+            itemScanner.stop().catch(function() {});
+            itemScanner = null;
+        }
+        document.getElementById('scan-container').classList.add('hidden');
+    }
+
+    function handleScanResult(code) {
+        var fb = document.getElementById('scan-feedback');
+        fb.textContent = 'Scanning...';
+        fb.style.color = 'var(--text-muted)';
+        fb.classList.remove('hidden');
+
+        fetch('/api/containers/' + containerId + '/scan', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ code: code })
+        }).then(function(resp) {
+            if (!resp.ok) {
+                return resp.json().then(function(err) {
+                    throw new Error(typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail));
+                });
+            }
+            return resp.json();
+        }).then(function(item) {
+            fb.textContent = 'Added: ' + (item.part_name || item.opal_number || 'item');
+            fb.style.color = 'var(--accent-green)';
+            loadContainer();
+        }).catch(function(e) {
+            fb.textContent = 'Error: ' + e.message;
+            fb.style.color = 'var(--accent-red)';
+        });
+    }
+
+    loadContainer();
+</script>
+{% endblock %}
