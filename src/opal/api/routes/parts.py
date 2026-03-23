@@ -290,7 +290,7 @@ async def get_part_qrcode(
     mri = encode_part_mri(part)
     qr = segno.make(mri)
     buf = _io.BytesIO()
-    qr.save(buf, kind="svg", scale=4, border=1)
+    qr.save(buf, kind="svg", scale=1, border=1, svgclass=None, lineclass=None)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
 
 

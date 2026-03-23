@@ -252,5 +252,5 @@ async def get_container_qrcode(container_id: int, db: DbSession) -> Response:
     mri = encode_container_mri(c.code)
     qr = segno.make(mri)
     buf = io.BytesIO()
-    qr.save(buf, kind="svg", scale=4, border=1)
+    qr.save(buf, kind="svg", scale=1, border=1, svgclass=None, lineclass=None)
     return Response(content=buf.getvalue(), media_type="image/svg+xml")
