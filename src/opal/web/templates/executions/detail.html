@@ -26,7 +26,7 @@
 <div class="grid grid-2">
     {% call ok.panel(instance.work_order_number or "EXECUTION #" ~ instance.id, actions=ok.status(inst_status | upper | replace('_', ' '))) %}
             {% call ok.table() %}
-                {{ ok.detail_row("PROCEDURE", '<a href="/procedures/' ~ instance.procedure_id ~ '">' ~ instance.procedure.name ~ '</a>', th_width="120px") }}
+                {{ ok.detail_row("PROCEDURE", ok.link(instance.procedure.name, "/procedures/" ~ instance.procedure_id), th_width="120px") }}
                 {{ ok.detail_row("VERSION", ok.mono("v" ~ version.version_number), th_width="120px") }}
                 {{ ok.detail_row("WORK ORDER", ok.mono(instance.work_order_number or '-'), th_width="120px") }}
                 {{ ok.detail_row("CREATED", ok.timestamp(instance.created_at), th_width="120px") }}

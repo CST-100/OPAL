@@ -9,7 +9,8 @@
 
 {% block content %}
 {% set type_val_header = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
-{% call ok.panel("ISSUE " ~ (issue.issue_number or issue.id), max_width="1100px", actions='<span id="save-flash" style="display: none; color: var(--accent-green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>' ~ ok.status(type_val_header | upper | replace('_', ' '), "error" if type_val_header == 'non_conformance' else ("warn" if type_val_header == 'bug' else ("info" if type_val_header == 'improvement' else "draft")))) %}
+{% set issue_actions %}<span id="save-flash" style="display: none; color: var(--accent-green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>{{ ok.status(type_val_header | upper | replace('_', ' '), "error" if type_val_header == 'non_conformance' else ("warn" if type_val_header == 'bug' else ("info" if type_val_header == 'improvement' else "draft"))) }}{% endset %}
+{% call ok.panel("ISSUE " ~ (issue.issue_number or issue.id), max_width="1100px", actions=issue_actions) %}
         <div style="display: flex; gap: var(--space-lg);">
             <!-- LEFT COLUMN (60%) -->
             <div style="flex: 3; min-width: 0;">

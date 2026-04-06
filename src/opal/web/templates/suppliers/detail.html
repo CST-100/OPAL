@@ -24,7 +24,7 @@
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">CONTACT</div>
             {% call ok.table() %}
-                {{ ok.detail_row("EMAIL", '<a href="mailto:' ~ supplier.email ~ '">' ~ supplier.email ~ '</a>' if supplier.email else '-') }}
+                {{ ok.detail_row("EMAIL", ok.link(supplier.email, "mailto:" ~ supplier.email) if supplier.email else '-') }}
                 {{ ok.detail_row("PHONE", supplier.phone or '-', mono=true) }}
                 {{ ok.detail_row("WEBSITE", ok.link(supplier.website, supplier.website, external=true) if supplier.website else '-') }}
             {% endcall %}
@@ -71,7 +71,7 @@
             <tbody>
                 {% for po in purchases %}
                 <tr>
-                    <td>{{ ok.mono('<a href="/purchases/' ~ po.id ~ '">' ~ (po.reference or 'PO-' ~ po.id) ~ '</a>') }}</td>
+                    <td class="mono">{{ ok.link(po.reference or 'PO-' ~ po.id, "/purchases/" ~ po.id) }}</td>
                     <td>{{ ok.status(po.status | status_value | upper) }}</td>
                     <td>{{ ok.timestamp(po.ordered_at) if po.ordered_at else '-' }}</td>
                     {{ ok.td(po.lines | length, mono=true, align="right") }}

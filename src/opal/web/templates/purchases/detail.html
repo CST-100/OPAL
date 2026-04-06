@@ -9,7 +9,8 @@
 
 {% block content %}
 {% call ok.grid(cols=2) %}
-    {% call ok.panel(purchase.reference or ('PO-' ~ purchase.id), actions=('<span>' ~ (ok.status("OVERDUE", "error") if purchase.is_overdue else '') ~ ok.status(purchase.status|status_value|upper) ~ '</span>')) %}
+    {% set po_actions %}{{ ok.status("OVERDUE", "error") if purchase.is_overdue else '' }}{{ ok.status(purchase.status|status_value|upper) }}{% endset %}
+    {% call ok.panel(purchase.reference or ('PO-' ~ purchase.id), actions=po_actions) %}
         {% call ok.table() %}
             {{ ok.detail_row("REFERENCE", ok.mono(purchase.reference or '-'), th_width="140px") }}
             <tr>

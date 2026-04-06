@@ -14,7 +14,7 @@
         {% call ok.table() %}
             {{ ok.detail_row("ID", ok.id_cell(user.id)) }}
             {{ ok.detail_row("NAME", user.name) }}
-            {{ ok.detail_row("EMAIL", '<a href="mailto:' ~ user.email ~ '">' ~ user.email ~ '</a>' if user.email else '-') }}
+            {{ ok.detail_row("EMAIL", ok.link(user.email, "mailto:" ~ user.email) if user.email else '-') }}
             {% if user.is_admin %}
             {{ ok.detail_row("ROLE", ok.status("ADMIN", "warn")) }}
             {% else %}
