@@ -24,47 +24,21 @@
 
 <!-- Header row: info + collaboration + progress -->
 <div class="grid grid-2">
-    <div class="panel">
-        <div class="panel-header">
-            <span>{{ instance.work_order_number or "EXECUTION #" ~ instance.id }}</span>
-            <div class="panel-header-actions">
-                {{ ok.status(inst_status | upper | replace('_', ' ')) }}
-            </div>
-        </div>
-        <div class="panel-body">
-            <table class="data-table">
-                <tr>
-                    <th style="width: 120px;">PROCEDURE</th>
-                    <td><a href="/procedures/{{ instance.procedure_id }}">{{ instance.procedure.name }}</a></td>
-                </tr>
-                <tr>
-                    <th>VERSION</th>
-                    <td class="mono">v{{ version.version_number }}</td>
-                </tr>
-                <tr>
-                    <th>WORK ORDER</th>
-                    <td class="mono">{{ instance.work_order_number or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>CREATED</th>
-                    <td class="timestamp">{{ instance.created_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z</td>
-                </tr>
-                <tr>
-                    <th>STARTED</th>
-                    <td class="timestamp">{% if instance.started_at %}{{ instance.started_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}-{% endif %}</td>
-                </tr>
-                <tr>
-                    <th>COMPLETED</th>
-                    <td class="timestamp">{% if instance.completed_at %}{{ instance.completed_at.strftime('%Y-%m-%dT%H:%M:%S') }}Z{% else %}-{% endif %}</td>
-                </tr>
-            </table>
+    {% call ok.panel(instance.work_order_number or "EXECUTION #" ~ instance.id, actions=ok.status(inst_status | upper | replace('_', ' '))) %}
+            {% call ok.table() %}
+                {{ ok.detail_row("PROCEDURE", '<a href="/procedures/' ~ instance.procedure_id ~ '">' ~ instance.procedure.name ~ '</a>', th_width="120px") }}
+                {{ ok.detail_row("VERSION", ok.mono("v" ~ version.version_number), th_width="120px") }}
+                {{ ok.detail_row("WORK ORDER", ok.mono(instance.work_order_number or '-'), th_width="120px") }}
+                {{ ok.detail_row("CREATED", ok.timestamp(instance.created_at), th_width="120px") }}
+                {{ ok.detail_row("STARTED", ok.timestamp(instance.started_at) if instance.started_at else '-', th_width="120px") }}
+                {{ ok.detail_row("COMPLETED", ok.timestamp(instance.completed_at) if instance.completed_at else '-', th_width="120px") }}
+            {% endcall %}
             {% if inst_status == 'in_progress' %}
             <div style="margin-top: var(--space-md);">
-                <button class="btn text-red" onclick="abortExecution()">ABORT EXECUTION</button>
+                {{ ok.btn("ABORT EXECUTION", variant="danger", attrs='onclick="abortExecution()"') }}
             </div>
             {% endif %}
-        </div>
-    </div>
+    {% endcall %}
 
     <div class="panel">
         <div class="panel-header">

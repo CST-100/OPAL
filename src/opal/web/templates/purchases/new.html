@@ -8,11 +8,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 900px;">
-    <div class="panel-header"><span>NEW PURCHASE ORDER</span></div>
-    <div class="panel-body">
+{% call ok.panel("NEW PURCHASE ORDER", max_width="900px") %}
         <form id="new-po-form" onsubmit="createPO(event)">
-            <div class="grid grid-2" style="gap: var(--space-lg);">
+            {% call ok.grid(cols=2, gap="var(--space-lg)") %}
                 <div>
                     <div class="form-group">
                         <label class="form-label" for="reference">PO REFERENCE</label>
@@ -31,11 +29,7 @@
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label" for="supplier">SUPPLIER NAME *</label>
-                        <input type="text" id="supplier" name="supplier" class="form-input" required>
-                        <small class="text-muted">Auto-filled when supplier is selected, or enter manually</small>
-                    </div>
+                    {{ ok.field("supplier", "SUPPLIER NAME *", required=true, help="Auto-filled when supplier is selected, or enter manually") }}
 
                     <div class="form-group">
                         <label class="form-label" for="supplier_reference">SUPPLIER REF</label>
@@ -44,50 +38,37 @@
                 </div>
 
                 <div>
-                    <div class="form-group">
-                        <label class="form-label" for="target_date">TARGET DATE</label>
-                        <input type="date" id="target_date" name="target_date" class="form-input">
-                    </div>
+                    {{ ok.field("target_date", "TARGET DATE", type="date") }}
 
-                    <div class="form-group">
-                        <label class="form-label" for="destination">DESTINATION</label>
-                        <input type="text" id="destination" name="destination" class="form-input" maxlength="255" placeholder="Default receiving location">
-                    </div>
+                    {{ ok.field("destination", "DESTINATION", placeholder="Default receiving location", attrs='maxlength="255"') }}
 
-                    <div class="form-group">
-                        <label class="form-label" for="notes">NOTES</label>
-                        <textarea id="notes" name="notes" class="form-textarea" rows="3"></textarea>
-                    </div>
+                    {{ ok.field("notes", "NOTES", type="textarea", rows=3) }}
                 </div>
-            </div>
+            {% endcall %}
 
             <div class="form-group" style="margin-top: var(--space-lg);">
                 <label class="form-label">LINE ITEMS</label>
-                <table class="data-table" id="lines-table">
+                {% call ok.table(id="lines-table") %}
                     <thead>
                         <tr>
-                            <th>PART</th>
-                            <th style="width: 100px;">QTY</th>
-                            <th style="width: 100px;">UNIT COST</th>
-                            <th style="width: 150px;">DESTINATION</th>
-                            <th style="width: 50px;"></th>
+                            {{ ok.th("PART") }}
+                            {{ ok.th("QTY", width="100px") }}
+                            {{ ok.th("UNIT COST", width="100px") }}
+                            {{ ok.th("DESTINATION", width="150px") }}
+                            {{ ok.th("", width="50px") }}
                         </tr>
                     </thead>
                     <tbody id="lines-body">
                     </tbody>
-                </table>
+                {% endcall %}
                 {{ ok.btn("+ ADD LINE", attrs='onclick="addLine()" style="margin-top: var(--space-sm);"') }}
             </div>
 
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                {{ ok.btn("CANCEL", href="/purchases") }}
-                {{ ok.btn("CREATE PO", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/purchases", submit_text="CREATE PO", cancel_text="CANCEL") }}
         </form>
 
-        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+        {{ ok.form_messages() }}
+{% endcall %}
 
 <script>
 const suppliers = {{ suppliers | tojson | safe }};

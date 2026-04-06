@@ -9,51 +9,20 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header"><span>EDIT SUPPLIER #{{ supplier.id }}</span></div>
-    <div class="panel-body">
+{% call ok.panel("EDIT SUPPLIER #" ~ supplier.id, max_width="600px") %}
         <form id="supplier-form" onsubmit="updateSupplier(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required maxlength="255" value="{{ supplier.name }}">
-            </div>
+            {{ ok.field("name", "NAME", value=supplier.name, required=true, attrs='maxlength="255"') }}
+            {{ ok.field("code", "CODE", value=supplier.code or '', placeholder="SUP001", help="Short unique code for quick reference", attrs='maxlength="50" class="form-input mono"') }}
 
-            <div class="form-group">
-                <label class="form-label" for="code">CODE</label>
-                <input type="text" id="code" name="code" class="form-input mono" maxlength="50" value="{{ supplier.code or '' }}" placeholder="SUP001">
-                <small class="text-muted">Short unique code for quick reference</small>
-            </div>
+            {% call ok.grid(cols=2) %}
+                {{ ok.field("email", "EMAIL", type="email", value=supplier.email or '', attrs='maxlength="255"') }}
+                {{ ok.field("phone", "PHONE", type="tel", value=supplier.phone or '', attrs='maxlength="50"') }}
+            {% endcall %}
 
-            <div class="grid grid-2" style="gap: var(--space-md);">
-                <div class="form-group">
-                    <label class="form-label" for="email">EMAIL</label>
-                    <input type="email" id="email" name="email" class="form-input" maxlength="255" value="{{ supplier.email or '' }}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="phone">PHONE</label>
-                    <input type="tel" id="phone" name="phone" class="form-input" maxlength="50" value="{{ supplier.phone or '' }}">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="website">WEBSITE</label>
-                <input type="url" id="website" name="website" class="form-input" maxlength="255" value="{{ supplier.website or '' }}" placeholder="https://...">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="address">ADDRESS</label>
-                <textarea id="address" name="address" class="form-input" rows="3">{{ supplier.address or '' }}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-input" rows="2">{{ supplier.description or '' }}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="notes">NOTES</label>
-                <textarea id="notes" name="notes" class="form-input" rows="2">{{ supplier.notes or '' }}</textarea>
-            </div>
+            {{ ok.field("website", "WEBSITE", type="url", value=supplier.website or '', placeholder="https://...", attrs='maxlength="255"') }}
+            {{ ok.field("address", "ADDRESS", type="textarea", value=supplier.address or '', rows=3) }}
+            {{ ok.field("description", "DESCRIPTION", type="textarea", value=supplier.description or '', rows=2) }}
+            {{ ok.field("notes", "NOTES", type="textarea", value=supplier.notes or '', rows=2) }}
 
             <div class="form-group">
                 <label class="form-checkbox">
@@ -62,15 +31,10 @@
                 </label>
             </div>
 
-            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
-
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/suppliers/" ~ supplier.id) }}
-                <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/suppliers/" ~ supplier.id, submit_text="SAVE CHANGES") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function updateSupplier(event) {

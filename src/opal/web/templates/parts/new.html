@@ -8,11 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px; margin: 0 auto;">
-    <div class="panel-header">
-        <span>NEW PART</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("NEW PART", max_width="800px") %}
         <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
             <div class="form-group">
                 <label class="form-label" for="external_pn">EXTERNAL PART NUMBER</label>
@@ -109,13 +105,9 @@
                 <small class="form-help">Optional: Additional structured data as JSON</small>
             </div>
 
-            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/parts") }}
-                {{ ok.btn("CREATE PART", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/parts", submit_text="CREATE PART") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 function autoResize(textarea) {

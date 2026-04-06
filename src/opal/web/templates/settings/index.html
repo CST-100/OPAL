@@ -11,25 +11,16 @@
 
 {# ── PROJECT CONFIGURATION ── #}
 {% if project %}
-<div class="panel">
-    <div class="panel-header">
-        <span>PROJECT CONFIGURATION</span>
-        {% if is_admin %}
-        <div class="panel-header-actions">
-            {{ ok.btn("EDIT", href="/project/edit") }}
-        </div>
-        {% endif %}
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("PROJECT CONFIGURATION", actions=ok.btn("EDIT", href="/project/edit") if is_admin else none) %}
+        {% call ok.table() %}
             {{ ok.detail_row("NAME", project.name) }}
             {{ ok.detail_row("DESCRIPTION", project.description or '-') }}
-        </table>
+        {% endcall %}
 
         {# Tiers #}
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">INVENTORY TIERS</div>
-            <table class="data-table">
+            {% call ok.table() %}
                 <thead>
                     <tr>
                         {{ ok.th("LEVEL", width="60px") }}
@@ -48,18 +39,18 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
         </div>
 
         {# Part numbering #}
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">PART NUMBERING</div>
-            <table class="data-table">
+            {% call ok.table() %}
                 {{ ok.detail_row("PREFIX", project.part_numbering.prefix or '-', mono=true) }}
                 {{ ok.detail_row("SEPARATOR", project.part_numbering.separator if project.part_numbering.separator else '(none)', mono=true) }}
                 {{ ok.detail_row("SEQUENCE DIGITS", project.part_numbering.sequence_digits) }}
                 {{ ok.detail_row("FORMAT", project.part_numbering.format, mono=true) }}
-            </table>
+            {% endcall %}
         </div>
 
         {# Categories #}
@@ -100,29 +91,20 @@
             </table>
         </div>
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 {% else %}
-<div class="panel">
-    <div class="panel-header">
-        <span>PROJECT CONFIGURATION</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("PROJECT CONFIGURATION") %}
         {% if is_admin %}
         {{ ok.empty("No project configured", action_text="CREATE PROJECT", action_href="/project/new") }}
         {% else %}
         {{ ok.empty("No project configured") }}
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
 {# ── ONSHAPE INTEGRATION ── #}
 {% if onshape_enabled %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>ONSHAPE INTEGRATION</span>
-        <div class="panel-header-actions">
+{% set onshape_actions %}
             <button class="btn"
                     hx-post="/settings/onshape/sync/pull"
                     hx-target="#onshape-sync-result"
@@ -137,13 +119,12 @@
                 PUSH
                 <span id="onshape-push-spinner" class="htmx-indicator" style="margin-left: 4px;">...</span>
             </button>
-        </div>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% endset %}
+{% call ok.panel("ONSHAPE INTEGRATION", actions=onshape_actions, margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             {{ ok.detail_row("STATUS", ok.status("CONNECTED", "ok") if onshape_connected else ok.status("CREDENTIALS ONLY", "warn")) }}
             {{ ok.detail_row("POLL INTERVAL", (onshape_poll_interval ~ " min") if onshape_poll_interval else ok.status("DISABLED", "default"), mono=true) }}
-        </table>
+        {% endcall %}
 
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">REGISTERED DOCUMENTS</div>
@@ -167,47 +148,20 @@
 
 {# ── USER MANAGEMENT (admin only) ── #}
 {% if is_admin %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>USER MANAGEMENT</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW USER", href="/users/new", variant="primary") }}
+{% call ok.panel("USER MANAGEMENT", actions=ok.btn("+ NEW USER", href="/users/new", variant="primary"), margin_top="var(--space-md)") %}
+        <div class="toolbar">
+            {{ ok.toolbar_search(name="search", id="search-input", placeholder="Search users...", hx_get="/users/table", hx_target="#users-table-body", hx_include="#status-filter") }}
+            {{ ok.toolbar_filter("is_active", [{"value": "", "label": "All status"}, {"value": "true", "label": "Active"}, {"value": "false", "label": "Inactive"}], value="true", id="status-filter", hx_get="/users/table", hx_target="#users-table-body", hx_include="#search-input") }}
         </div>
-    </div>
-    <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
-            <input type="text"
-                   id="search-input"
-                   class="form-input"
-                   placeholder="Search users..."
-                   style="max-width: 300px;"
-                   hx-get="/users/table"
-                   hx-trigger="keyup changed delay:300ms, search"
-                   hx-target="#users-table-body"
-                   hx-include="#status-filter"
-                   name="search">
-            <select id="status-filter"
-                    name="is_active"
-                    class="form-select"
-                    style="max-width: 150px;"
-                    hx-get="/users/table"
-                    hx-trigger="change"
-                    hx-target="#users-table-body"
-                    hx-include="#search-input">
-                <option value="">All status</option>
-                <option value="true" selected>Active</option>
-                <option value="false">Inactive</option>
-            </select>
-        </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>NAME</th>
-                    <th style="width: 250px;">EMAIL</th>
-                    <th style="width: 80px;">ROLE</th>
-                    <th style="width: 180px;">CREATED</th>
-                    <th style="width: 80px;">STATUS</th>
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("EMAIL", width="250px") }}
+                    {{ ok.th("ROLE", width="80px") }}
+                    {{ ok.th("CREATED", width="180px") }}
+                    {{ ok.th("STATUS", width="80px") }}
                 </tr>
             </thead>
             <tbody id="users-table-body" hx-get="/users/table?is_active=true" hx-trigger="load">
@@ -215,38 +169,32 @@
                     <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endif %}
 
 {# ── SYSTEM INFORMATION ── #}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>SYSTEM INFORMATION</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("SYSTEM INFORMATION", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             {{ ok.detail_row("OPAL VERSION", sys_info.opal_version, mono=true) }}
             {{ ok.detail_row("PYTHON VERSION", sys_info.python_version, mono=true) }}
             {{ ok.detail_row("PLATFORM", sys_info.platform, mono=true) }}
             {{ ok.detail_row("SERVER", sys_info.server, mono=true) }}
             {{ ok.detail_row("DEBUG MODE", ok.status("ON", "warn") if sys_info.debug else ok.status("OFF", "ok")) }}
             {{ ok.detail_row("AUTH MODE", sys_info.auth_mode, mono=true) }}
-        </table>
+        {% endcall %}
 
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">STORAGE</div>
-            <table class="data-table">
+            {% call ok.table() %}
                 {{ ok.detail_row("DATA DIRECTORY", sys_info.data_dir, mono=true) }}
                 {{ ok.detail_row("DATABASE", sys_info.db_path, mono=true) }}
                 {{ ok.detail_row("DATABASE SIZE", sys_info.db_size, mono=true) }}
                 {{ ok.detail_row("UPLOAD DIRECTORY", sys_info.upload_dir, mono=true) }}
                 {{ ok.detail_row("MAX UPLOAD SIZE", sys_info.max_upload_size, mono=true) }}
-            </table>
+            {% endcall %}
         </div>
-    </div>
-</div>
+{% endcall %}
 
 </div>
 {% endblock %}

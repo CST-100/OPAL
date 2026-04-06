@@ -7,48 +7,26 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>TEMPLATES</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW TEMPLATE", href="/procedures/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
-        <div class="toolbar">
-            <input type="text"
-                   id="search-input"
-                   class="form-input toolbar-search"
-                   placeholder="Search procedures..."
-                   hx-get="/procedures/table"
-                   hx-trigger="keyup changed delay:300ms, search"
-                   hx-target="#procedures-table-body"
-                   hx-include="#status-filter"
-                   name="search">
-            <select id="status-filter"
-                    name="status"
-                    class="form-select toolbar-filter"
-                    hx-get="/procedures/table"
-                    hx-trigger="change"
-                    hx-target="#procedures-table-body"
-                    hx-include="#search-input">
-                <option value="">All statuses</option>
-                {% for status in statuses %}
-                <option value="{{ status }}">{{ status | upper }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <table class="data-table">
+{% call ok.panel("TEMPLATES", actions=ok.btn("+ NEW TEMPLATE", href="/procedures/new", variant="primary")) %}
+        {% call ok.toolbar() %}
+            {{ ok.toolbar_search(name="search", id="search-input", placeholder="Search procedures...", hx_get="/procedures/table", hx_target="#procedures-table-body", hx_include="#status-filter") }}
+            {% set status_options = [{"value": "", "label": "All statuses"}] %}
+            {% for s in statuses %}
+            {% set _ = status_options.append({"value": s, "label": s | upper}) %}
+            {% endfor %}
+            {{ ok.toolbar_filter("status", status_options, id="status-filter", hx_get="/procedures/table", hx_target="#procedures-table-body", hx_include="#search-input") }}
+        {% endcall %}
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>NAME</th>
-                    <th style="width: 80px;">TYPE</th>
-                    <th style="width: 100px;">STATUS</th>
-                    <th style="width: 80px;">VERSION</th>
-                    <th style="width: 60px;">STEPS</th>
-                    <th style="width: 180px;">CREATED</th>
-                    <th style="width: 180px;">UPDATED</th>
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("TYPE", width="80px") }}
+                    {{ ok.th("STATUS", width="100px") }}
+                    {{ ok.th("VERSION", width="80px") }}
+                    {{ ok.th("STEPS", width="60px") }}
+                    {{ ok.th("CREATED", width="180px") }}
+                    {{ ok.th("UPDATED", width="180px") }}
                 </tr>
             </thead>
             <tbody id="procedures-table-body" hx-get="/procedures/table" hx-trigger="load">
@@ -56,7 +34,6 @@
                     <td colspan="8" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

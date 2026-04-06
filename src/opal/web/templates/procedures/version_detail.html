@@ -9,10 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>{{ version.content.procedure_name }} - VERSION {{ version.version_number }}</span>
-        <div class="panel-header-actions">
+{% set version_actions %}
             {{ ok.btn("PRINT TRAVELER", attrs='onclick="window.open(\'/procedures/' ~ procedure.id ~ '/versions/' ~ version.id ~ '/print\', \'_blank\')"') }}
             {{ ok.btn("RESTORE TO DRAFT", attrs='onclick="restoreFromVersion()"') }}
             {% if procedure.current_version_id == version.id %}
@@ -20,25 +17,15 @@
             {% else %}
             {{ ok.status("ARCHIVED", "warn") }}
             {% endif %}
-        </div>
-    </div>
-    <div class="panel-body">
-        <table class="data-table" style="margin-bottom: var(--space-md);">
-            <tr>
-                <th style="width: 120px;">VERSION</th>
-                <td class="mono">v{{ version.version_number }}</td>
-            </tr>
-            <tr>
-                <th>PUBLISHED</th>
-                <td>{{ ok.timestamp(version.created_at) }}</td>
-            </tr>
+{% endset %}
+{% call ok.panel(version.content.procedure_name ~ " - VERSION " ~ version.version_number, actions=version_actions) %}
+        {% call ok.table() %}
+            {{ ok.detail_row("VERSION", ok.mono("v" ~ version.version_number), th_width="120px") }}
+            {{ ok.detail_row("PUBLISHED", ok.timestamp(version.created_at), th_width="120px") }}
             {% if version.content.procedure_description %}
-            <tr>
-                <th>DESCRIPTION</th>
-                <td>{{ version.content.procedure_description }}</td>
-            </tr>
+            {{ ok.detail_row("DESCRIPTION", version.content.procedure_description, th_width="120px") }}
             {% endif %}
-        </table>
+        {% endcall %}
 
         <!-- Hierarchical step display -->
         <div class="form-label" style="margin-bottom: var(--space-sm);">OPERATIONS ({{ ops | length }}{% if contingency_ops %} + {{ contingency_ops | length }} contingency{% endif %})</div>
@@ -77,7 +64,7 @@
                     <div style="margin: var(--space-sm) 0;">
                         <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">DATA CAPTURE SCHEMA</div>
                         <table class="data-table">
-                            <thead><tr><th>FIELD</th><th style="width:80px;">TYPE</th><th style="width:80px;">REQUIRED</th></tr></thead>
+                            <thead><tr>{{ ok.th("FIELD") }}{{ ok.th("TYPE", width="80px") }}{{ ok.th("REQUIRED", width="80px") }}</tr></thead>
                             <tbody>
                                 {% for field in step.required_data_schema.fields %}
                                 <tr>
@@ -138,7 +125,7 @@
                     <div style="margin: var(--space-sm) 0;">
                         <div class="form-label" style="font-size: 0.75rem; margin-bottom: var(--space-xs);">DATA CAPTURE SCHEMA</div>
                         <table class="data-table">
-                            <thead><tr><th>FIELD</th><th style="width:80px;">TYPE</th><th style="width:80px;">REQUIRED</th></tr></thead>
+                            <thead><tr>{{ ok.th("FIELD") }}{{ ok.th("TYPE", width="80px") }}{{ ok.th("REQUIRED", width="80px") }}</tr></thead>
                             <tbody>
                                 {% for field in step.required_data_schema.fields %}
                                 <tr>
@@ -162,47 +149,47 @@
         <!-- Kit Items (if captured in version snapshot) -->
         {% if version.content.kit_items %}
         <div class="form-label" style="margin-top: var(--space-lg); margin-bottom: var(--space-sm);">KIT ITEMS ({{ version.content.kit_items | length }})</div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">PART</th>
-                    <th>NAME</th>
-                    <th style="width: 100px; text-align: right;">QTY REQ</th>
+                    {{ ok.th("PART", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("QTY REQ", width="100px", align="right") }}
                 </tr>
             </thead>
             <tbody>
                 {% for item in version.content.kit_items %}
                 <tr>
-                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ ok.id_cell(item.part_id, "/parts/" ~ item.part_id) }}</td>
                     <td>{{ kit_parts.get(item.part_id, {}).get('name', '-') if kit_parts else '-' }}</td>
-                    <td class="mono" style="text-align: right;">{{ '%g' % item.quantity_required }}</td>
+                    {{ ok.td('%g' % item.quantity_required, mono=true, align="right") }}
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% endif %}
 
         <!-- Output Items (if captured in version snapshot) -->
         {% if version.content.output_items %}
         <div class="form-label" style="margin-top: var(--space-lg); margin-bottom: var(--space-sm);">OUTPUTS ({{ version.content.output_items | length }})</div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">PART</th>
-                    <th>NAME</th>
-                    <th style="width: 100px; text-align: right;">QTY</th>
+                    {{ ok.th("PART", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("QTY", width="100px", align="right") }}
                 </tr>
             </thead>
             <tbody>
                 {% for item in version.content.output_items %}
                 <tr>
-                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ ok.id_cell(item.part_id, "/parts/" ~ item.part_id) }}</td>
                     <td>{{ kit_parts.get(item.part_id, {}).get('name', '-') if kit_parts else '-' }}</td>
-                    <td class="mono" style="text-align: right;">{{ '%g' % item.quantity_produced }}</td>
+                    {{ ok.td('%g' % item.quantity_produced, mono=true, align="right") }}
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% endif %}
 
         {% if versions and versions | length > 1 %}
@@ -220,8 +207,7 @@
             {{ ok.btn("BACK TO TEMPLATE", href="/procedures/" ~ procedure.id) }}
         </div>
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 
 <script>
 function getHeaders() {

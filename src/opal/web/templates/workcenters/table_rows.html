@@ -2,8 +2,8 @@
 {% if workcenters %}
 {% for wc in workcenters %}
 <tr>
-    <td class="id-cell"><a href="/workcenters/{{ wc.id }}">{{ wc.id }}</a></td>
-    <td class="mono">{{ wc.code }}</td>
+    <td>{{ ok.id_cell(wc.id, "/workcenters/" ~ wc.id) }}</td>
+    <td>{{ ok.mono(wc.code) }}</td>
     <td><a href="/workcenters/{{ wc.id }}">{{ wc.name }}</a></td>
     <td>{{ wc.location or '-' }}</td>
     <td>

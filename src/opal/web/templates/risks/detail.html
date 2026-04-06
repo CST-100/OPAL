@@ -8,18 +8,11 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px;">
-    <div class="panel-header">
-        <span>RISK #{{ risk.id }}</span>
-        <div class="panel-header-actions">
-            {% set score = risk.probability * risk.impact %}
-            {{ ok.status("SCORE: " ~ score, "ok" if score <= 5 else ("warn" if score <= 12 else "error")) }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% set score = risk.probability * risk.impact %}
+{% call ok.panel("RISK #" ~ risk.id, actions=ok.status("SCORE: " ~ score, "ok" if score <= 5 else ("warn" if score <= 12 else "error")), max_width="800px") %}
         <h2 style="margin-bottom: var(--space-md);">{{ risk.title }}</h2>
 
-        <table class="data-table" style="margin-bottom: var(--space-md);">
+        {% call ok.table() %}
             <tr>
                 <th style="width: 120px;">STATUS</th>
                 <td>
@@ -74,10 +67,10 @@
             {% if risk.linked_issue_id %}
             <tr>
                 <th>LINKED ISSUE</th>
-                <td><a href="/issues/{{ risk.linked_issue_id }}">Issue #{{ risk.linked_issue_id }}</a></td>
+                <td>{{ ok.link("Issue #" ~ risk.linked_issue_id, "/issues/" ~ risk.linked_issue_id) }}</td>
             </tr>
             {% endif %}
-        </table>
+        {% endcall %}
 
         {% if risk.description %}
         <div class="form-label">DESCRIPTION</div>
@@ -95,10 +88,9 @@
 
         <div style="display: flex; gap: var(--space-sm);">
             {{ ok.btn("BACK", href="/risks") }}
-            {{ ok.btn("DELETE", variant="danger", attrs='onclick="deleteRisk()"') }}
+            {{ ok.confirm_btn("DELETE", message="Are you sure you want to delete this risk?", action="/api/risks/" ~ risk.id, method="DELETE", redirect="/risks") }}
         </div>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 const riskId = {{ risk.id }};

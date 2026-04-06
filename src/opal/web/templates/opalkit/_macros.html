@@ -285,10 +285,12 @@
 
 {# Toolbar search input
    Usage: {{ ok.toolbar_search(name="q", placeholder="Search parts...", hx_get="/parts/table", hx_target="#table-body") }}
+          {{ ok.toolbar_search(name="search", id="search-input", hx_get="/parts/table", hx_target="#table-body", hx_include="#filter1, #filter2") }}
 #}
-{% macro toolbar_search(name="q", placeholder="Search...", value="", hx_get=none, hx_target=none, hx_trigger="keyup changed delay:300ms") %}
+{% macro toolbar_search(name="q", placeholder="Search...", value="", hx_get=none, hx_target=none, hx_trigger="keyup changed delay:300ms, search", hx_include=none, id=none) %}
 <div class="toolbar-search">
     <input type="text"
+           {% if id %}id="{{ id }}"{% endif %}
            name="{{ name }}"
            class="form-input"
            placeholder="{{ placeholder }}"
@@ -296,20 +298,24 @@
            {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
            {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
            {% if hx_get %}hx-trigger="{{ hx_trigger }}"{% endif %}
+           {% if hx_include %}hx-include="{{ hx_include }}"{% endif %}
            autocomplete="off">
 </div>
 {%- endmacro %}
 
 {# Toolbar filter select
    Usage: {{ ok.toolbar_filter("status", [{"value": "", "label": "All"}, {"value": "active", "label": "Active"}], hx_get="/parts/table") }}
+          {{ ok.toolbar_filter("status", options, id="status-filter", hx_get="/parts/table", hx_target="#table-body", hx_include="#search-input") }}
 #}
-{% macro toolbar_filter(name, options, value="", hx_get=none, hx_target=none, hx_trigger="change") %}
+{% macro toolbar_filter(name, options, value="", hx_get=none, hx_target=none, hx_trigger="change", hx_include=none, id=none) %}
 <div class="toolbar-filter">
-    <select name="{{ name }}"
+    <select {% if id %}id="{{ id }}"{% endif %}
+            name="{{ name }}"
             class="form-select"
             {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
             {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
-            {% if hx_get %}hx-trigger="{{ hx_trigger }}"{% endif %}>
+            {% if hx_get %}hx-trigger="{{ hx_trigger }}"{% endif %}
+            {% if hx_include %}hx-include="{{ hx_include }}"{% endif %}>
         {%- for opt in options -%}
         {%- if opt is mapping -%}
         <option value="{{ opt.value }}" {% if opt.value == value %}selected{% endif %}>{{ opt.label }}</option>

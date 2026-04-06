@@ -13,43 +13,27 @@
 <div style="display: flex; gap: var(--space-md);">
     <!-- Dataset Info Panel -->
     <div style="width: 300px;">
-        <div class="panel">
-            <div class="panel-header">
-                <span>{{ dataset.name }}</span>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel(dataset.name) %}
                 {% if dataset.description %}
                 <p style="margin-bottom: var(--space-md);">{{ dataset.description }}</p>
                 {% endif %}
 
-                <table class="data-table" style="margin-bottom: var(--space-md);">
-                    <tr>
-                        <th>ID</th>
-                        <td>{{ ok.id_cell(dataset.id) }}</td>
-                    </tr>
-                    <tr>
-                        <th>POINTS</th>
-                        <td>{{ ok.mono(data_points | length) }}</td>
-                    </tr>
-                    <tr>
-                        <th>CREATED</th>
-                        <td>{{ ok.timestamp(dataset.created_at) }}</td>
-                    </tr>
+                {% call ok.table() %}
+                    {{ ok.detail_row("ID", ok.id_cell(dataset.id)) }}
+                    {{ ok.detail_row("POINTS", ok.mono(data_points | length)) }}
+                    {{ ok.detail_row("CREATED", ok.timestamp(dataset.created_at)) }}
                     {% if dataset.procedure_id %}
-                    <tr>
-                        <th>PROCEDURE</th>
-                        <td><a href="/procedures/{{ dataset.procedure_id }}">View</a></td>
-                    </tr>
+                    {{ ok.detail_row("PROCEDURE", ok.link("View", "/procedures/" ~ dataset.procedure_id)) }}
                     {% endif %}
-                </table>
+                {% endcall %}
 
                 <div class="form-label">SCHEMA FIELDS</div>
-                <table class="data-table" style="margin-bottom: var(--space-md);">
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th>NAME</th>
-                            <th>TYPE</th>
-                            <th>UNIT</th>
+                            {{ ok.th("NAME") }}
+                            {{ ok.th("TYPE") }}
+                            {{ ok.th("UNIT") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -61,24 +45,20 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
 
                 <div style="display: flex; gap: var(--space-sm); flex-wrap: wrap;">
                     {{ ok.btn("BACK", href="/datasets") }}
                     {{ ok.btn("ADD POINT", attrs='onclick="openAddPointModal()"') }}
                     {{ ok.btn("EXPORT CSV", href="/api/datasets/" ~ dataset.id ~ "/export") }}
-                    {{ ok.btn("DELETE", variant="danger", attrs='onclick="deleteDataset()"') }}
+                    {{ ok.confirm_btn("DELETE", message="Are you sure you want to delete this dataset and all its data points?", action="/api/datasets/" ~ dataset.id, method="DELETE", redirect="/datasets") }}
                 </div>
-            </div>
-        </div>
+        {% endcall %}
     </div>
 
     <!-- Chart and Data Panel -->
     <div style="flex: 1;">
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>CHART</span>
-                <div class="panel-header-actions">
+        {% set chart_actions %}
                     <select id="chart-type" class="form-select" style="width: 120px;" onchange="updateChart()">
                         <option value="line">Line</option>
                         <option value="scatter">Scatter</option>
@@ -91,28 +71,23 @@
                         {% endif %}
                         {% endfor %}
                     </select>
-                </div>
-            </div>
-            <div class="panel-body">
+        {% endset %}
+        {% call ok.panel("CHART", actions=chart_actions) %}
                 <div style="height: 300px;">
                     <canvas id="dataChart"></canvas>
                 </div>
-            </div>
-        </div>
+        {% endcall %}
 
-        <div class="panel">
-            <div class="panel-header">
-                <span>DATA POINTS ({{ data_points | length }})</span>
-            </div>
-            <div class="panel-body" style="max-height: 400px; overflow-y: auto;">
-                <table class="data-table">
+        {% call ok.panel("DATA POINTS (" ~ (data_points | length) ~ ")") %}
+            <div style="max-height: 400px; overflow-y: auto;">
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th style="width: 160px;">RECORDED</th>
+                            {{ ok.th("RECORDED", width="160px") }}
                             {% for field in dataset.schema.fields %}
-                            <th>{{ field.name | upper }}</th>
+                            {{ ok.th(field.name | upper) }}
                             {% endfor %}
-                            <th style="width: 60px;"></th>
+                            {{ ok.th("", width="60px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -130,9 +105,9 @@
                         <tr><td colspan="{{ dataset.schema.fields | length + 2 }}">{{ ok.empty("No data points") }}</td></tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
             </div>
-        </div>
+        {% endcall %}
     </div>
 </div>
 

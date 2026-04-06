@@ -8,14 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>RISK MATRIX</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("LIST VIEW", href="/risks") }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("RISK MATRIX", actions=ok.btn("LIST VIEW", href="/risks")) %}
         <div style="display: flex; gap: var(--space-lg);">
             <!-- Matrix Grid -->
             <div style="flex: 1;">
@@ -107,29 +100,14 @@
 
             <!-- Stats Panel -->
             <div style="width: 250px;">
-                <div class="panel" style="margin: 0;">
-                    <div class="panel-header"><span>SUMMARY</span></div>
-                    <div class="panel-body">
-                        <table class="data-table">
-                            <tr>
-                                <th>TOTAL ACTIVE</th>
-                                <td style="text-align: right;">{{ total_risks }}</td>
-                            </tr>
-                            <tr>
-                                <th>HIGH RISK</th>
-                                <td style="text-align: right; color: var(--status-error);">{{ high_count }}</td>
-                            </tr>
-                            <tr>
-                                <th>MEDIUM RISK</th>
-                                <td style="text-align: right; color: var(--status-warn);">{{ medium_count }}</td>
-                            </tr>
-                            <tr>
-                                <th>LOW RISK</th>
-                                <td style="text-align: right; color: var(--status-ok);">{{ low_count }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
+                {% call ok.panel("SUMMARY") %}
+                        {% call ok.table() %}
+                            {{ ok.detail_row("TOTAL ACTIVE", total_risks) }}
+                            <tr><th>HIGH RISK</th><td style="text-align: right; color: var(--status-error);">{{ high_count }}</td></tr>
+                            <tr><th>MEDIUM RISK</th><td style="text-align: right; color: var(--status-warn);">{{ medium_count }}</td></tr>
+                            <tr><th>LOW RISK</th><td style="text-align: right; color: var(--status-ok);">{{ low_count }}</td></tr>
+                        {% endcall %}
+                {% endcall %}
 
                 <div id="cell-risks" style="margin-top: var(--space-md); display: none;">
                     <div class="panel" style="margin: 0;">
@@ -140,8 +118,7 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
+{% endcall %}
 
 <style>
 .matrix-cell {

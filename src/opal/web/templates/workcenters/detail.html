@@ -8,42 +8,18 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px;">
-    <div class="panel-header">
-        <span>WORKCENTER: {{ workcenter.code }}</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("EDIT", href="/workcenters/" ~ workcenter.id ~ "/edit") }}
-        </div>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
-            <tr>
-                <th style="width: 150px;">ID</th>
-                <td class="id-cell mono">{{ workcenter.id }}</td>
-            </tr>
-            <tr>
-                <th>CODE</th>
-                <td class="mono" style="font-size: 1.2em;">{{ workcenter.code }}</td>
-            </tr>
-            <tr>
-                <th>NAME</th>
-                <td>{{ workcenter.name }}</td>
-            </tr>
-            <tr>
-                <th>LOCATION</th>
-                <td>{{ workcenter.location or '-' }}</td>
-            </tr>
-            <tr>
-                <th>STATUS</th>
-                <td>
-                    {% if workcenter.is_active %}
-                    {{ ok.status("ACTIVE", "active") }}
-                    {% else %}
-                    {{ ok.status("INACTIVE", "inactive") }}
-                    {% endif %}
-                </td>
-            </tr>
-        </table>
+{% call ok.panel("WORKCENTER: " ~ workcenter.code, actions=ok.btn("EDIT", href="/workcenters/" ~ workcenter.id ~ "/edit"), max_width="800px") %}
+        {% call ok.table() %}
+            {{ ok.detail_row("ID", ok.id_cell(workcenter.id)) }}
+            {{ ok.detail_row("CODE", workcenter.code, mono=true) }}
+            {{ ok.detail_row("NAME", workcenter.name) }}
+            {{ ok.detail_row("LOCATION", workcenter.location or '-') }}
+            {% if workcenter.is_active %}
+            {{ ok.detail_row("STATUS", ok.status("ACTIVE", "active")) }}
+            {% else %}
+            {{ ok.detail_row("STATUS", ok.status("INACTIVE", "inactive")) }}
+            {% endif %}
+        {% endcall %}
 
         {% if workcenter.description %}
         <div style="margin-top: var(--space-md);">
@@ -54,16 +30,9 @@
         </div>
         {% endif %}
 
-        <table class="data-table" style="margin-top: var(--space-lg);">
-            <tr>
-                <th style="width: 150px;">CREATED</th>
-                <td>{{ ok.timestamp(workcenter.created_at) }}</td>
-            </tr>
-            <tr>
-                <th>UPDATED</th>
-                <td>{{ ok.timestamp(workcenter.updated_at) }}</td>
-            </tr>
-        </table>
-    </div>
-</div>
+        {% call ok.table() %}
+            {{ ok.detail_row("CREATED", ok.timestamp(workcenter.created_at)) }}
+            {{ ok.detail_row("UPDATED", ok.timestamp(workcenter.updated_at)) }}
+        {% endcall %}
+{% endcall %}
 {% endblock %}

@@ -5,7 +5,7 @@
     <td class="mono"><a href="/purchases/{{ po.id }}">{{ po.reference or ('PO-' ~ po.id) }}</a></td>
     <td>
         {% if po.supplier_rel %}
-        <a href="/suppliers/{{ po.supplier_rel.id }}">{{ po.supplier_rel.name }}</a>
+        {{ ok.link(po.supplier_rel.name, "/suppliers/" ~ po.supplier_rel.id) }}
         {% else %}
         {{ po.supplier }}
         {% endif %}
@@ -17,7 +17,7 @@
         {% endif %}
     </td>
     <td class="mono {% if po.is_overdue %}text-red{% endif %}">{{ po.target_date.strftime('%Y-%m-%d') if po.target_date else '-' }}</td>
-    <td class="mono" style="text-align: center;">{{ po.lines | length }}</td>
+    {{ ok.td(po.lines | length, mono=true, align="center") }}
     <td>{{ ok.timestamp(po.created_at) }}</td>
 </tr>
 {% endfor %}

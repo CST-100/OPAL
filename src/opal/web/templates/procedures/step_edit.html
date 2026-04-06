@@ -10,21 +10,11 @@
 
 {% block content %}
 <div class="grid grid-2">
-    <div class="panel">
-        <div class="panel-header">
-            <span>EDIT STEP {{ step.step_number }}</span>
-        </div>
-        <div class="panel-body">
+    {% call ok.panel("EDIT STEP " ~ step.step_number) %}
             <form id="edit-step-form" onsubmit="updateStep(event)">
-                <div class="form-group">
-                    <label class="form-label" for="title">TITLE *</label>
-                    <input type="text" id="title" name="title" class="form-input" value="{{ step.title }}" required>
-                </div>
+                {{ ok.field("title", "TITLE", value=step.title, required=true) }}
 
-                <div class="form-group">
-                    <label class="form-label" for="instructions">INSTRUCTIONS (Markdown supported)</label>
-                    <textarea id="instructions" name="instructions" class="form-textarea" rows="6">{{ step.instructions or '' }}</textarea>
-                </div>
+                {{ ok.field("instructions", "INSTRUCTIONS (Markdown supported)", type="textarea", value=step.instructions or '', rows=6) }}
 
                 <div style="display: flex; gap: var(--space-md);">
                     <div class="form-group" style="flex: 1;">
@@ -44,24 +34,13 @@
                     </div>
                 </div>
 
-                <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                    {{ ok.btn("CANCEL", href="/procedures/" ~ procedure.id) }}
-                    {{ ok.btn("SAVE", variant="primary", type="submit") }}
-                </div>
+                {{ ok.form_actions(cancel_href="/procedures/" ~ procedure.id) }}
             </form>
 
-            <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-        </div>
-    </div>
+            {{ ok.form_messages() }}
+    {% endcall %}
 
-    <div class="panel">
-        <div class="panel-header">
-            <span>STEP PARTS</span>
-            <div class="panel-header-actions">
-                {{ ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddPart()"') }}
-            </div>
-        </div>
-        <div class="panel-body">
+    {% call ok.panel("STEP PARTS", actions=ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddPart()"')) %}
             <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
                 Parts required specifically for this step. Use "consume" for installed parts, "tooling" for GSE/fixtures.
             </p>
@@ -70,10 +49,10 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>PART</th>
-                            <th style="width: 80px;">QTY</th>
-                            <th style="width: 80px;">TYPE</th>
-                            <th style="width: 60px;"></th>
+                            {{ ok.th("PART") }}
+                            {{ ok.th("QTY", width="80px") }}
+                            {{ ok.th("TYPE", width="80px") }}
+                            {{ ok.th("", width="60px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -99,27 +78,18 @@
                 {{ ok.empty("No step-specific parts defined") }}
                 {% endif %}
             </div>
-        </div>
-    </div>
+    {% endcall %}
 </div>
 
 <!-- Data Capture Schema Builder -->
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>DATA CAPTURE FIELDS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD FIELD", variant="primary", attrs='onclick="showAddField()"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("DATA CAPTURE FIELDS", actions=ok.btn("+ ADD FIELD", variant="primary", attrs='onclick="showAddField()"'), margin_top="var(--space-md)") %}
         <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.875rem;">
             Define data fields operators must fill in during execution.
         </p>
         <div id="schema-fields-list">
             <!-- Populated by JS from step.required_data_schema -->
         </div>
-    </div>
-</div>
+{% endcall %}
 
 <!-- Add/Edit Field Modal -->
 <div id="field-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
@@ -198,6 +168,7 @@
                         {{ ok.btn("SAVE FIELD", variant="primary", type="submit") }}
                     </div>
                 </form>
+
             </div>
         </div>
     </div>

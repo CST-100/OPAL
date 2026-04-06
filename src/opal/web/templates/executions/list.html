@@ -7,50 +7,39 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>EXECUTIONS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW EXECUTION", href="/executions/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("EXECUTIONS", actions=ok.btn("+ NEW EXECUTION", href="/executions/new", variant="primary")) %}
         <div class="toolbar">
-            <select id="procedure-filter"
-                    name="procedure_id"
-                    class="form-select toolbar-filter"
-                    hx-get="/executions/table"
-                    hx-trigger="change"
-                    hx-target="#executions-table-body"
-                    hx-include="#status-filter">
-                <option value="">All Procedures</option>
-                {% for p in procedures %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
-                {% endfor %}
-            </select>
-            <select id="status-filter"
-                    name="status"
-                    class="form-select toolbar-filter"
-                    hx-get="/executions/table"
-                    hx-trigger="change"
-                    hx-target="#executions-table-body"
-                    hx-include="#procedure-filter">
-                <option value="">All Statuses</option>
-                {% for s in statuses %}
-                <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
-                {% endfor %}
-            </select>
+            <div class="toolbar-filter">
+                <select id="procedure-filter" name="procedure_id" class="form-select"
+                        hx-get="/executions/table" hx-trigger="change" hx-target="#executions-table-body"
+                        hx-include="#status-filter">
+                    <option value="">All Procedures</option>
+                    {% for p in procedures %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="toolbar-filter">
+                <select id="status-filter" name="status" class="form-select"
+                        hx-get="/executions/table" hx-trigger="change" hx-target="#executions-table-body"
+                        hx-include="#procedure-filter">
+                    <option value="">All Statuses</option>
+                    {% for s in statuses %}
+                    <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>PROCEDURE</th>
-                    <th style="width: 80px;">VERSION</th>
-                    <th style="width: 120px;">WORK ORDER</th>
-                    <th style="width: 100px;">STATUS</th>
-                    <th style="width: 100px;">PROGRESS</th>
-                    <th style="width: 170px;">STARTED</th>
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("PROCEDURE") }}
+                    {{ ok.th("VERSION", width="80px") }}
+                    {{ ok.th("WORK ORDER", width="120px") }}
+                    {{ ok.th("STATUS", width="100px") }}
+                    {{ ok.th("PROGRESS", width="100px") }}
+                    {{ ok.th("STARTED", width="170px") }}
                 </tr>
             </thead>
             <tbody id="executions-table-body"
@@ -61,7 +50,6 @@
                     <td colspan="7" class="text-muted" style="text-align: center;">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

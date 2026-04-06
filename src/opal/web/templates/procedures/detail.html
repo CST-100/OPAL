@@ -9,25 +9,12 @@
 
 {% block content %}
 <div class="grid grid-2">
-    <div class="panel">
-        <div class="panel-header">
-            <span>{{ procedure.name }}</span>
-            <div class="panel-header-actions">
-                {{ ok.status(procedure.status | upper, "ok" if procedure.status == "active" else ("error" if procedure.status == "deprecated" else "warn")) }}
-            </div>
-        </div>
-        <div class="panel-body">
-            <table class="data-table">
+    {% call ok.panel(procedure.name, actions=ok.status(procedure.status | upper, "ok" if procedure.status == "active" else ("error" if procedure.status == "deprecated" else "warn"))) %}
+            {% call ok.table() %}
+                {{ ok.detail_row("ID", ok.id_cell(procedure.id), th_width="120px") }}
+                {{ ok.detail_row("TYPE", ok.status(procedure.procedure_type | upper, "info" if procedure.procedure_type == "build" else "default"), th_width="120px") }}
                 <tr>
-                    <th style="width: 120px;">ID</th>
-                    <td class="id-cell">{{ procedure.id }}</td>
-                </tr>
-                <tr>
-                    <th>TYPE</th>
-                    <td>{{ ok.status(procedure.procedure_type | upper, "info" if procedure.procedure_type == "build" else "default") }}</td>
-                </tr>
-                <tr>
-                    <th>STATUS</th>
+                    <th style="width: 120px;">STATUS</th>
                     <td>
                         <select id="status-select" class="form-select" style="width: auto;" onchange="updateStatus(this.value)">
                             {% for s in statuses %}
@@ -36,19 +23,10 @@
                         </select>
                     </td>
                 </tr>
-                <tr>
-                    <th>CURRENT VER</th>
-                    <td class="mono">{% if procedure.current_version_id %}v{{ current_version_num }}{% else %}-{% endif %}</td>
-                </tr>
-                <tr>
-                    <th>CREATED</th>
-                    <td>{{ ok.timestamp(procedure.created_at) }}</td>
-                </tr>
-                <tr>
-                    <th>UPDATED</th>
-                    <td>{{ ok.timestamp(procedure.updated_at) }}</td>
-                </tr>
-            </table>
+                {{ ok.detail_row("CURRENT VER", ok.mono("v" ~ current_version_num) if procedure.current_version_id else "-", th_width="120px") }}
+                {{ ok.detail_row("CREATED", ok.timestamp(procedure.created_at), th_width="120px") }}
+                {{ ok.detail_row("UPDATED", ok.timestamp(procedure.updated_at), th_width="120px") }}
+            {% endcall %}
             {% if procedure.description %}
             <div style="margin-top: var(--space-md);">
                 <div class="form-label">DESCRIPTION</div>
@@ -60,21 +38,16 @@
                 {{ ok.btn("CLONE", attrs='onclick="cloneProcedure()"') }}
                 {{ ok.btn("PUBLISH VERSION", variant="primary", attrs='onclick="publishVersion()"') }}
             </div>
-        </div>
-    </div>
+    {% endcall %}
 
-    <div class="panel">
-        <div class="panel-header">
-            <span>VERSIONS</span>
-        </div>
-        <div class="panel-body">
+    {% call ok.panel("VERSIONS") %}
             {% if versions %}
-            <table class="data-table">
+            {% call ok.table() %}
                 <thead>
                     <tr>
-                        <th style="width: 80px;">VERSION</th>
-                        <th>PUBLISHED</th>
-                        <th style="width: 60px;"></th>
+                        {{ ok.th("VERSION", width="80px") }}
+                        {{ ok.th("PUBLISHED") }}
+                        {{ ok.th("", width="60px") }}
                     </tr>
                 </thead>
                 <tbody>
@@ -86,7 +59,7 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
             {% if versions | length >= 2 %}
             <div style="margin-top: var(--space-md); display: flex; gap: var(--space-sm); align-items: center;">
                 <span class="form-label" style="margin: 0;">COMPARE:</span>
@@ -107,18 +80,10 @@
             {% else %}
             {{ ok.empty("No versions published yet") }}
             {% endif %}
-        </div>
-    </div>
+    {% endcall %}
 </div>
 
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>OPERATIONS (DRAFT)</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD OP", variant="primary", attrs='onclick="showAddOp()"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("OPERATIONS (DRAFT)", actions=ok.btn("+ ADD OP", variant="primary", attrs='onclick="showAddOp()"'), margin_top="var(--space-md)") %}
         {% if ops %}
         <div id="ops-list">
             {% for op_data in ops %}
@@ -204,18 +169,10 @@
         {% else %}
         {{ ok.empty("No operations defined yet") }}
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 
 {% if contingency_ops %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>CONTINGENCY OPERATIONS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("CONTINGENCY OPERATIONS", actions=ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"'), margin_top="var(--space-md)") %}
         <div id="contingency-ops-list">
             {% for op_data in contingency_ops %}
             {% set op = op_data.step %}
@@ -298,96 +255,71 @@
             </div>
             {% endfor %}
         </div>
-    </div>
-</div>
+{% endcall %}
 {% else %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>CONTINGENCY OPERATIONS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("CONTINGENCY OPERATIONS", actions=ok.btn("+ ADD CONTINGENCY", attrs='onclick="showAddOp(true)"'), margin_top="var(--space-md)") %}
         {{ ok.empty("No contingency operations defined") }}
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>KIT (BILL OF MATERIALS)</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddKit()"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("KIT (BILL OF MATERIALS)", actions=ok.btn("+ ADD PART", variant="primary", attrs='onclick="showAddKit()"'), margin_top="var(--space-md)") %}
         {% if kit_items %}
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">PART</th>
-                    <th>NAME</th>
-                    <th style="width: 120px;">PN</th>
-                    <th style="width: 100px; text-align: right;">QTY REQ</th>
-                    <th style="width: 60px;"></th>
+                    {{ ok.th("PART", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("PN", width="120px") }}
+                    {{ ok.th("QTY REQ", width="100px", align="right") }}
+                    {{ ok.th("", width="60px") }}
                 </tr>
             </thead>
             <tbody>
                 {% for item in kit_items %}
                 <tr>
-                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ ok.id_cell(item.part_id, "/parts/" ~ item.part_id) }}</td>
                     <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
-                    <td class="mono">{{ item.part_external_pn or '-' }}</td>
-                    <td class="mono" style="text-align: right;">{{ item.quantity_required }}</td>
+                    {{ ok.td(item.part_external_pn or '-', mono=true) }}
+                    {{ ok.td(item.quantity_required, mono=true, align="right") }}
                     <td>{{ ok.btn("X", variant="danger", attrs='onclick="removeKitItem(' ~ item.part_id ~ ')"') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% else %}
         {{ ok.empty("No parts in kit") }}
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 
 {% if procedure.procedure_type == "build" %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>OUTPUTS (ASSEMBLY PRODUCTS)</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD OUTPUT", variant="primary", attrs='onclick="showAddOutput()"') }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("OUTPUTS (ASSEMBLY PRODUCTS)", actions=ok.btn("+ ADD OUTPUT", variant="primary", attrs='onclick="showAddOutput()"'), margin_top="var(--space-md)") %}
         {% if output_items %}
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">PART</th>
-                    <th>NAME</th>
-                    <th style="width: 120px;">PN</th>
-                    <th style="width: 100px; text-align: right;">QTY</th>
-                    <th style="width: 60px;"></th>
+                    {{ ok.th("PART", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("PN", width="120px") }}
+                    {{ ok.th("QTY", width="100px", align="right") }}
+                    {{ ok.th("", width="60px") }}
                 </tr>
             </thead>
             <tbody>
                 {% for item in output_items %}
                 <tr>
-                    <td class="id-cell"><a href="/parts/{{ item.part_id }}">{{ item.part_id }}</a></td>
+                    <td>{{ ok.id_cell(item.part_id, "/parts/" ~ item.part_id) }}</td>
                     <td><a href="/parts/{{ item.part_id }}">{{ item.part_name }}</a></td>
-                    <td class="mono">{{ item.part_external_pn or '-' }}</td>
-                    <td class="mono" style="text-align: right;">{{ item.quantity_produced }}</td>
+                    {{ ok.td(item.part_external_pn or '-', mono=true) }}
+                    {{ ok.td(item.quantity_produced, mono=true, align="right") }}
                     <td>{{ ok.btn("X", variant="danger", attrs='onclick="removeOutputItem(' ~ item.part_id ~ ')"') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% else %}
         {{ ok.empty("No outputs defined — add the part(s) this procedure produces") }}
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
 <!-- Add Output Modal -->

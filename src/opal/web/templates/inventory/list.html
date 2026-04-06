@@ -7,26 +7,20 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>PHYSICAL INVENTORY - TRACEABLE ITEMS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ ADD RECORD", href="/inventory/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
-        <div class="toolbar">
-            <input type="text"
-                   id="opal-search"
-                   name="opal_search"
-                   placeholder="Search OPAL-XXXXX..."
-                   class="form-input toolbar-search"
-                   hx-get="/inventory/table"
-                   hx-trigger="input changed delay:300ms, keyup[key=='Enter']"
-                   hx-target="#inventory-table-body"
-                   hx-include="#location-filter,#source-filter,#expiration-filter,#calibration-filter">
+{% call ok.panel("PHYSICAL INVENTORY - TRACEABLE ITEMS", actions=ok.btn("+ ADD RECORD", href="/inventory/new", variant="primary")) %}
+        {% call ok.toolbar() %}
+            {{ ok.toolbar_search(
+                name="opal_search",
+                id="opal-search",
+                placeholder="Search OPAL-XXXXX...",
+                hx_get="/inventory/table",
+                hx_trigger="input changed delay:300ms, keyup[key=='Enter']",
+                hx_target="#inventory-table-body",
+                hx_include="#location-filter,#source-filter,#expiration-filter,#calibration-filter"
+            ) }}
             <span class="text-muted" style="font-size: 0.85em;">or scan QR</span>
 
+            {# Location filter uses dynamic options from locations list, kept as raw HTML #}
             <select id="location-filter"
                     name="location"
                     class="form-select toolbar-filter"
@@ -40,60 +34,63 @@
                 {% endfor %}
             </select>
 
-            <select id="source-filter"
-                    name="source_type"
-                    class="form-select toolbar-filter"
-                    hx-get="/inventory/table"
-                    hx-trigger="change"
-                    hx-target="#inventory-table-body"
-                    hx-include="#opal-search,#location-filter,#expiration-filter,#calibration-filter">
-                <option value="">All sources</option>
-                <option value="purchase">From PO</option>
-                <option value="production">Produced</option>
-                <option value="manual">Manual entry</option>
-            </select>
+            {{ ok.toolbar_filter(
+                name="source_type",
+                id="source-filter",
+                options=[
+                    {"value": "", "label": "All sources"},
+                    {"value": "purchase", "label": "From PO"},
+                    {"value": "production", "label": "Produced"},
+                    {"value": "manual", "label": "Manual entry"}
+                ],
+                hx_get="/inventory/table",
+                hx_target="#inventory-table-body",
+                hx_include="#opal-search,#location-filter,#expiration-filter,#calibration-filter"
+            ) }}
 
-            <select id="expiration-filter"
-                    name="expiration"
-                    class="form-select toolbar-filter"
-                    hx-get="/inventory/table"
-                    hx-trigger="change"
-                    hx-target="#inventory-table-body"
-                    hx-include="#opal-search,#location-filter,#source-filter,#calibration-filter">
-                <option value="">All expiration</option>
-                <option value="expired">Expired</option>
-                <option value="expiring">Expiring soon (30d)</option>
-            </select>
+            {{ ok.toolbar_filter(
+                name="expiration",
+                id="expiration-filter",
+                options=[
+                    {"value": "", "label": "All expiration"},
+                    {"value": "expired", "label": "Expired"},
+                    {"value": "expiring", "label": "Expiring soon (30d)"}
+                ],
+                hx_get="/inventory/table",
+                hx_target="#inventory-table-body",
+                hx_include="#opal-search,#location-filter,#source-filter,#calibration-filter"
+            ) }}
 
-            <select id="calibration-filter"
-                    name="calibration"
-                    class="form-select toolbar-filter"
-                    hx-get="/inventory/table"
-                    hx-trigger="change"
-                    hx-target="#inventory-table-body"
-                    hx-include="#opal-search,#location-filter,#source-filter,#expiration-filter">
-                <option value="">All calibration</option>
-                <option value="overdue">Cal overdue</option>
-            </select>
-        </div>
+            {{ ok.toolbar_filter(
+                name="calibration",
+                id="calibration-filter",
+                options=[
+                    {"value": "", "label": "All calibration"},
+                    {"value": "overdue", "label": "Cal overdue"}
+                ],
+                hx_get="/inventory/table",
+                hx_target="#inventory-table-body",
+                hx_include="#opal-search,#location-filter,#source-filter,#expiration-filter"
+            ) }}
+        {% endcall %}
 
         <p class="text-muted" style="margin-bottom: var(--space-md); font-size: 0.9em;">
             Each row is a unique physical item or batch with full traceability.
             Click an OPAL number to view its complete history.
         </p>
 
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 130px;">OPAL #</th>
-                    <th>PART</th>
-                    <th style="width: 120px;">LOCATION</th>
-                    <th style="width: 90px; text-align: right;">QTY</th>
-                    <th style="width: 100px;">SOURCE</th>
-                    <th style="width: 90px;">LOT</th>
-                    <th style="width: 100px;">EXPIRATION</th>
-                    <th style="width: 80px;">CAL</th>
-                    <th style="width: 160px;">RECEIVED</th>
+                    {{ ok.th("OPAL #", width="130px") }}
+                    {{ ok.th("PART") }}
+                    {{ ok.th("LOCATION", width="120px") }}
+                    {{ ok.th("QTY", width="90px", align="right") }}
+                    {{ ok.th("SOURCE", width="100px") }}
+                    {{ ok.th("LOT", width="90px") }}
+                    {{ ok.th("EXPIRATION", width="100px") }}
+                    {{ ok.th("CAL", width="80px") }}
+                    {{ ok.th("RECEIVED", width="160px") }}
                 </tr>
             </thead>
             <tbody id="inventory-table-body" hx-get="/inventory/table" hx-trigger="load">
@@ -101,7 +98,6 @@
                     <td colspan="9" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

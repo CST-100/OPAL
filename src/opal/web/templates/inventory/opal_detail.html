@@ -208,15 +208,15 @@
     <div class="panel-body">
         <div id="test-status-summary" class="mono" style="margin-bottom: var(--space-md); font-size: 0.875rem;"></div>
         {% if test_results %}
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th>TEST NAME</th>
-                    <th style="width: 70px;">RESULT</th>
-                    <th style="width: 120px;">VALUE</th>
-                    <th style="width: 120px;">TESTED BY</th>
-                    <th style="width: 160px;">TESTED AT</th>
-                    <th style="width: 60px;"></th>
+                    {{ ok.th("TEST NAME") }}
+                    {{ ok.th("RESULT", width="70px") }}
+                    {{ ok.th("VALUE", width="120px") }}
+                    {{ ok.th("TESTED BY", width="120px") }}
+                    {{ ok.th("TESTED AT", width="160px") }}
+                    {{ ok.th("", width="60px") }}
                 </tr>
             </thead>
             <tbody>
@@ -233,7 +233,7 @@
                         {{ ok.status("PENDING", "warn") }}
                         {% endif %}
                     </td>
-                    <td class="mono">{{ tr.value or '-' }}</td>
+                    {{ ok.td(tr.value or '-', mono=true) }}
                     <td>{% if tr.tested_by_user %}{{ tr.tested_by_user.display_name or tr.tested_by_user.email }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                     <td>{% if tr.tested_at %}{{ ok.timestamp(tr.tested_at) }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                     <td>
@@ -242,7 +242,7 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% else %}
         {{ ok.empty("No test results recorded") }}
         {% endif %}
@@ -250,86 +250,73 @@
 </div>
 
 {% if source_wo %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>SOURCE PRODUCTION</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("SOURCE PRODUCTION", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             <tr>
                 <th style="width: 140px;">WORK ORDER</th>
                 <td>
                     {% if source_wo.work_order_number %}
-                    <a href="/executions/{{ source_wo.instance_id }}" class="mono">{{ source_wo.work_order_number }}</a>
+                    {{ ok.link(source_wo.work_order_number, "/executions/" ~ source_wo.instance_id, mono=true) }}
                     {% else %}
-                    <a href="/executions/{{ source_wo.instance_id }}">Execution #{{ source_wo.instance_id }}</a>
+                    {{ ok.link("Execution #" ~ source_wo.instance_id, "/executions/" ~ source_wo.instance_id) }}
                     {% endif %}
                 </td>
             </tr>
             {% if source_wo.serial_number %}
-            <tr>
-                <th>SERIAL NUMBER</th>
-                <td class="mono">{{ source_wo.serial_number }}</td>
-            </tr>
+            {{ ok.detail_row("SERIAL NUMBER", source_wo.serial_number, mono=true, th_width="140px") }}
             {% endif %}
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endif %}
 
 {% if genealogy_components or genealogy_assemblies %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>GENEALOGY</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("GENEALOGY", margin_top="var(--space-md)") %}
         {% if genealogy_components %}
         <h4 style="margin-bottom: var(--space-sm);">COMPONENTS IN THIS ASSEMBLY</h4>
-        <table class="data-table" style="margin-bottom: var(--space-lg);">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 140px;">OPAL #</th>
-                    <th>PART</th>
-                    <th style="width: 100px; text-align: right;">QTY USED</th>
+                    {{ ok.th("OPAL #", width="140px") }}
+                    {{ ok.th("PART") }}
+                    {{ ok.th("QTY USED", width="100px", align="right") }}
                 </tr>
             </thead>
             <tbody>
                 {% for comp in genealogy_components %}
                 <tr>
-                    <td class="mono"><a href="/inventory/opal/{{ comp.component_opal_number }}">{{ comp.component_opal_number }}</a></td>
-                    <td>{% if comp.part_id %}<a href="/parts/{{ comp.part_id }}">{{ comp.part_name or 'Unknown' }}</a>{% else %}Unknown{% endif %}</td>
-                    <td class="mono" style="text-align: right;">{{ comp.quantity_used }}</td>
+                    <td>{{ ok.id_cell(comp.component_opal_number, "/inventory/opal/" ~ comp.component_opal_number) }}</td>
+                    <td>{% if comp.part_id %}{{ ok.link(comp.part_name or 'Unknown', "/parts/" ~ comp.part_id) }}{% else %}Unknown{% endif %}</td>
+                    {{ ok.td(comp.quantity_used, mono=true, align="right") }}
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% endif %}
 
         {% if genealogy_assemblies %}
         <h4 style="margin-bottom: var(--space-sm);">ASSEMBLIES CONTAINING THIS COMPONENT</h4>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 140px;">ASSEMBLY OPAL #</th>
-                    <th>PART</th>
-                    <th style="width: 140px;">WORK ORDER</th>
-                    <th style="width: 100px; text-align: right;">QTY USED</th>
+                    {{ ok.th("ASSEMBLY OPAL #", width="140px") }}
+                    {{ ok.th("PART") }}
+                    {{ ok.th("WORK ORDER", width="140px") }}
+                    {{ ok.th("QTY USED", width="100px", align="right") }}
                 </tr>
             </thead>
             <tbody>
                 {% for asm in genealogy_assemblies %}
                 <tr>
-                    <td class="mono"><a href="/inventory/opal/{{ asm.assembly_opal_number }}">{{ asm.assembly_opal_number }}</a></td>
-                    <td>{% if asm.part_id %}<a href="/parts/{{ asm.part_id }}">{{ asm.part_name or 'Unknown' }}</a>{% else %}Unknown{% endif %}</td>
-                    <td class="mono">{{ asm.work_order_number or '-' }}</td>
-                    <td class="mono" style="text-align: right;">{{ asm.quantity_used }}</td>
+                    <td>{{ ok.id_cell(asm.assembly_opal_number, "/inventory/opal/" ~ asm.assembly_opal_number) }}</td>
+                    <td>{% if asm.part_id %}{{ ok.link(asm.part_name or 'Unknown', "/parts/" ~ asm.part_id) }}{% else %}Unknown{% endif %}</td>
+                    {{ ok.td(asm.work_order_number or '-', mono=true) }}
+                    {{ ok.td(asm.quantity_used, mono=true, align="right") }}
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
+        {% endcall %}
         {% endif %}
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
 <style>
@@ -354,20 +341,11 @@
                 <button class="btn btn-sm" onclick="hideScrapModal()" style="margin-left: auto;">&times;</button>
             </div>
             <div class="panel-body">
-                <table class="data-table" style="margin-bottom: var(--space-md);">
-                    <tr>
-                        <th style="width: 100px;">OPAL #</th>
-                        <td class="mono">{{ opal_number }}</td>
-                    </tr>
-                    <tr>
-                        <th>PART</th>
-                        <td>{{ record.part.name }}</td>
-                    </tr>
-                    <tr>
-                        <th>CURRENT QTY</th>
-                        <td class="mono">{{ '%g' % record.quantity }}</td>
-                    </tr>
-                </table>
+                {% call ok.table() %}
+                    {{ ok.detail_row("OPAL #", ok.mono(opal_number), th_width="100px") }}
+                    {{ ok.detail_row("PART", record.part.name, th_width="100px") }}
+                    {{ ok.detail_row("CURRENT QTY", ok.mono('%g' % record.quantity), th_width="100px") }}
+                {% endcall %}
                 <form id="scrap-form" onsubmit="event.preventDefault(); submitScrap();">
                     <div class="form-group">
                         <label class="form-label" for="scrap-qty">QUANTITY TO SCRAP <span class="text-red">*</span></label>
@@ -389,7 +367,7 @@
                         <label class="form-label" for="scrap-notes">NOTES</label>
                         <textarea id="scrap-notes" class="form-input" rows="3" placeholder="Additional details about the scrap event..."></textarea>
                     </div>
-                    <div style="display: flex; gap: var(--space-sm); justify-content: flex-end; margin-top: var(--space-md);">
+                    <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-md);">
                         {{ ok.btn("CANCEL", attrs='onclick="hideScrapModal()"') }}
                         {{ ok.btn("CONFIRM SCRAP", variant="danger", type="submit") }}
                     </div>

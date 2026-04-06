@@ -10,101 +10,53 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px;">
-    <div class="panel-header">
-        <span>USER #{{ user.id }}</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("EDIT", href="/users/" ~ user.id ~ "/edit") }}
-        </div>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
-            <tr>
-                <th style="width: 150px;">ID</th>
-                <td class="id-cell mono">{{ user.id }}</td>
-            </tr>
-            <tr>
-                <th>NAME</th>
-                <td>{{ user.name }}</td>
-            </tr>
-            <tr>
-                <th>EMAIL</th>
-                <td>
-                    {% if user.email %}
-                    <a href="mailto:{{ user.email }}">{{ user.email }}</a>
-                    {% else %}-{% endif %}
-                </td>
-            </tr>
-            <tr>
-                <th>ROLE</th>
-                <td>
-                    {% if user.is_admin %}
-                    {{ ok.status("ADMIN", "warn") }}
-                    {% else %}
-                    {{ ok.status("USER", "info") }}
-                    {% endif %}
-                </td>
-            </tr>
-            <tr>
-                <th>STATUS</th>
-                <td>
-                    {% if user.is_active %}
-                    {{ ok.status("ACTIVE", "ok") }}
-                    {% else %}
-                    {{ ok.status("INACTIVE", "inactive") }}
-                    {% endif %}
-                </td>
-            </tr>
-        </table>
+{% call ok.panel("USER #" ~ user.id, actions=ok.btn("EDIT", href="/users/" ~ user.id ~ "/edit"), max_width="800px") %}
+        {% call ok.table() %}
+            {{ ok.detail_row("ID", ok.id_cell(user.id)) }}
+            {{ ok.detail_row("NAME", user.name) }}
+            {{ ok.detail_row("EMAIL", '<a href="mailto:' ~ user.email ~ '">' ~ user.email ~ '</a>' if user.email else '-') }}
+            {% if user.is_admin %}
+            {{ ok.detail_row("ROLE", ok.status("ADMIN", "warn")) }}
+            {% else %}
+            {{ ok.detail_row("ROLE", ok.status("USER", "info")) }}
+            {% endif %}
+            {% if user.is_active %}
+            {{ ok.detail_row("STATUS", ok.status("ACTIVE", "ok")) }}
+            {% else %}
+            {{ ok.detail_row("STATUS", ok.status("INACTIVE", "inactive")) }}
+            {% endif %}
+        {% endcall %}
 
         <div style="margin-top: var(--space-lg);">
             <div class="form-label">PRESENCE</div>
-            <table class="data-table">
-                <tr>
-                    <th style="width: 150px;">LAST SEEN</th>
-                    <td>{{ ok.timestamp(user.last_seen_at) }}</td>
-                </tr>
-                <tr>
-                    <th>ACTIVITY</th>
-                    <td class="mono">{{ user.current_activity or '-' }}</td>
-                </tr>
-            </table>
+            {% call ok.table() %}
+                {{ ok.detail_row("LAST SEEN", ok.timestamp(user.last_seen_at)) }}
+                {{ ok.detail_row("ACTIVITY", user.current_activity or '-', mono=true) }}
+            {% endcall %}
         </div>
 
-        <table class="data-table" style="margin-top: var(--space-lg);">
-            <tr>
-                <th style="width: 150px;">CREATED</th>
-                <td>{{ ok.timestamp(user.created_at) }}</td>
-            </tr>
-            <tr>
-                <th>UPDATED</th>
-                <td>{{ ok.timestamp(user.updated_at) }}</td>
-            </tr>
-        </table>
-    </div>
-</div>
+        {% call ok.table() %}
+            {{ ok.detail_row("CREATED", ok.timestamp(user.created_at)) }}
+            {{ ok.detail_row("UPDATED", ok.timestamp(user.updated_at)) }}
+        {% endcall %}
+{% endcall %}
 
 {% if is_own_profile %}
 <!-- Preferences panel, only visible when viewing own profile -->
-<div class="panel" style="max-width: 800px; margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>PREFERENCES</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("PREFERENCES", max_width="800px", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             <tr>
                 <th style="width: 150px;">THEME</th>
                 <td>
                     <div style="display: flex; gap: var(--space-sm); align-items: center;">
-                        <button type="button" class="btn btn-sm" id="theme-btn-dark" onclick="setTheme('dark'); updateThemeButtons();">DARK</button>
-                        <button type="button" class="btn btn-sm" id="theme-btn-light" onclick="setTheme('light'); updateThemeButtons();">LIGHT</button>
+                        {{ ok.btn("DARK", size="sm", attrs='id="theme-btn-dark" onclick="setTheme(\'dark\'); updateThemeButtons();"') }}
+                        {{ ok.btn("LIGHT", size="sm", attrs='id="theme-btn-light" onclick="setTheme(\'light\'); updateThemeButtons();"') }}
                     </div>
                     <div class="text-muted" style="font-size: 0.75rem; font-family: var(--font-mono); margin-top: var(--space-xs);">Stored in browser localStorage. Not synced across devices.</div>
                 </td>
             </tr>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 
 <script>
 function updateThemeButtons() {
@@ -123,18 +75,15 @@ document.addEventListener('DOMContentLoaded', updateThemeButtons);
 </script>
 
 <!-- Delete account panel, only visible when viewing own profile -->
-<div class="panel" style="max-width: 800px; margin-top: var(--space-md);">
-    <div class="panel-header">
-        <span>DANGER ZONE</span>
-    </div>
-    <div class="panel-body" style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <div style="font-weight: 600;">DELETE ACCOUNT</div>
-            <div class="text-muted" style="font-size: 0.75rem; font-family: var(--font-mono);">Deactivate this account. You will be signed out.</div>
+{% call ok.panel("DANGER ZONE", max_width="800px", margin_top="var(--space-md)") %}
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 600;">DELETE ACCOUNT</div>
+                <div class="text-muted" style="font-size: 0.75rem; font-family: var(--font-mono);">Deactivate this account. You will be signed out.</div>
+            </div>
+            {{ ok.btn("DELETE ACCOUNT", variant="danger", attrs='onclick="deleteAccount()"') }}
         </div>
-        <button type="button" class="btn btn-danger" onclick="deleteAccount()">DELETE ACCOUNT</button>
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
 <script>

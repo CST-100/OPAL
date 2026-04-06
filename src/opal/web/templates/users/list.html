@@ -7,47 +7,20 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>USERS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW USER", href="/users/new", variant="primary") }}
+{% call ok.panel("USERS", actions=ok.btn("+ NEW USER", href="/users/new", variant="primary")) %}
+        <div class="toolbar">
+            {{ ok.toolbar_search(name="search", id="search-input", placeholder="Search users...", hx_get="/users/table", hx_target="#users-table-body", hx_include="#status-filter") }}
+            {{ ok.toolbar_filter("is_active", [{"value": "", "label": "All status"}, {"value": "true", "label": "Active"}, {"value": "false", "label": "Inactive"}], value="true", id="status-filter", hx_get="/users/table", hx_target="#users-table-body", hx_include="#search-input") }}
         </div>
-    </div>
-    <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
-            <input type="text"
-                   id="search-input"
-                   class="form-input"
-                   placeholder="Search users..."
-                   style="max-width: 300px;"
-                   hx-get="/users/table"
-                   hx-trigger="keyup changed delay:300ms, search"
-                   hx-target="#users-table-body"
-                   hx-include="#status-filter"
-                   name="search">
-            <select id="status-filter"
-                    name="is_active"
-                    class="form-select"
-                    style="max-width: 150px;"
-                    hx-get="/users/table"
-                    hx-trigger="change"
-                    hx-target="#users-table-body"
-                    hx-include="#search-input">
-                <option value="">All status</option>
-                <option value="true" selected>Active</option>
-                <option value="false">Inactive</option>
-            </select>
-        </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th>NAME</th>
-                    <th style="width: 250px;">EMAIL</th>
-                    <th style="width: 80px;">ROLE</th>
-                    <th style="width: 180px;">CREATED</th>
-                    <th style="width: 80px;">STATUS</th>
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("EMAIL", width="250px") }}
+                    {{ ok.th("ROLE", width="80px") }}
+                    {{ ok.th("CREATED", width="180px") }}
+                    {{ ok.th("STATUS", width="80px") }}
                 </tr>
             </thead>
             <tbody id="users-table-body" hx-get="/users/table?is_active=true" hx-trigger="load">
@@ -55,7 +28,6 @@
                     <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

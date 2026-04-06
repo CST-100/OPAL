@@ -8,11 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header">
-        <span>NEW EXECUTION</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("NEW EXECUTION", max_width="600px") %}
         <form id="new-execution-form" onsubmit="startExecution(event)">
             <div class="form-group">
                 <label class="form-label" for="procedure">PROCEDURE *</label>
@@ -32,15 +28,10 @@
             </div>
             {% endif %}
 
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                {{ ok.btn("CANCEL", href="/executions") }}
-                {{ ok.btn("START", variant="primary", type="submit", attrs='{% if not procedures %}disabled{% endif %}') }}
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/executions", submit_text="START") }}
         </form>
-
-        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function startExecution(event) {

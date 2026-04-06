@@ -8,16 +8,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 1100px;">
-    <div class="panel-header">
-        <span>ISSUE {{ issue.issue_number or issue.id }}</span>
-        <span id="save-flash" style="display: none; color: var(--accent-green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>
-        <div class="panel-header-actions">
-            {% set type_val = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
-            {{ ok.status(type_val | upper | replace('_', ' '), "error" if type_val == 'non_conformance' else ("warn" if type_val == 'bug' else ("info" if type_val == 'improvement' else "draft"))) }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% set type_val_header = issue.issue_type.value if issue.issue_type.value is defined else issue.issue_type %}
+{% call ok.panel("ISSUE " ~ (issue.issue_number or issue.id), max_width="1100px", actions='<span id="save-flash" style="display: none; color: var(--accent-green); font-weight: bold; margin-left: var(--space-md);">SAVED</span>' ~ ok.status(type_val_header | upper | replace('_', ' '), "error" if type_val_header == 'non_conformance' else ("warn" if type_val_header == 'bug' else ("info" if type_val_header == 'improvement' else "draft")))) %}
         <div style="display: flex; gap: var(--space-lg);">
             <!-- LEFT COLUMN (60%) -->
             <div style="flex: 3; min-width: 0;">
@@ -157,17 +149,15 @@
                     <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">ATTACHMENTS</div>
 
                     {% if attachments %}
-                    <table class="data-table" style="margin-bottom: var(--space-sm);">
+                    {% call ok.table() %}
                         {% for att in attachments %}
                         <tr>
-                            <td style="font-family: var(--font-mono);">{{ att.original_filename }}</td>
-                            <td class="text-secondary">{{ att.mime_type }}</td>
-                            <td style="text-align: right;">
-                                <a href="/api/attachments/{{ att.id }}/download">Download</a>
-                            </td>
+                            <td>{{ ok.mono(att.original_filename) }}</td>
+                            <td>{{ ok.muted(att.mime_type) }}</td>
+                            {{ ok.td("Download", align="right", href="/api/attachments/" ~ att.id ~ "/download") }}
                         </tr>
                         {% endfor %}
-                    </table>
+                    {% endcall %}
                     {% else %}
                     <div class="text-muted" style="padding: var(--space-sm) 0;">No attachments.</div>
                     {% endif %}
@@ -181,9 +171,9 @@
 
             <!-- RIGHT COLUMN (40%) -->
             <div style="flex: 2; min-width: 200px;">
-                <table class="data-table">
+                {% call ok.table() %}
                     <tr>
-                        <th style="width: 110px;">STATUS</th>
+                        {{ ok.th("STATUS", width="110px") }}
                         <td>
                             <select id="status-select" class="form-select" style="width: 100%;" onchange="updateIssue('status', this.value)">
                                 {% for s in statuses %}
@@ -226,46 +216,30 @@
                             </select>
                         </td>
                     </tr>
-                    <tr>
-                        <th>CREATED</th>
-                        <td>{{ ok.timestamp(issue.created_at) }}</td>
-                    </tr>
-                    <tr>
-                        <th>UPDATED</th>
-                        <td>{{ ok.timestamp(issue.updated_at) }}</td>
-                    </tr>
-                </table>
+                    {{ ok.detail_row("CREATED", ok.timestamp(issue.created_at)) }}
+                    {{ ok.detail_row("UPDATED", ok.timestamp(issue.updated_at)) }}
+                {% endcall %}
 
                 <!-- Links -->
                 {% if issue.part_id or issue.procedure_id or issue.procedure_instance_id %}
                 <div style="margin-top: var(--space-md); border: 1px solid var(--border-color); padding: var(--space-md);">
                     <div class="form-label" style="margin-bottom: var(--space-sm); font-weight: bold;">LINKS</div>
-                    <table class="data-table">
+                    {% call ok.table() %}
                         {% if issue.part_id %}
-                        <tr>
-                            <th style="width: 80px;">PART</th>
-                            <td><a href="/parts/{{ issue.part_id }}">{{ issue.part.name if issue.part else ('Part #' ~ issue.part_id) }}</a></td>
-                        </tr>
+                        {{ ok.detail_row("PART", ok.link(issue.part.name if issue.part else ('Part #' ~ issue.part_id), "/parts/" ~ issue.part_id), th_width="80px") }}
                         {% endif %}
                         {% if issue.procedure_id %}
-                        <tr>
-                            <th>TEMPLATE</th>
-                            <td><a href="/procedures/{{ issue.procedure_id }}">{{ issue.procedure.name if issue.procedure else ('Procedure #' ~ issue.procedure_id) }}</a></td>
-                        </tr>
+                        {{ ok.detail_row("TEMPLATE", ok.link(issue.procedure.name if issue.procedure else ('Procedure #' ~ issue.procedure_id), "/procedures/" ~ issue.procedure_id)) }}
                         {% endif %}
                         {% if issue.procedure_instance_id %}
-                        <tr>
-                            <th>EXECUTION</th>
-                            <td><a href="/executions/{{ issue.procedure_instance_id }}">Execution #{{ issue.procedure_instance_id }}</a></td>
-                        </tr>
+                        {{ ok.detail_row("EXECUTION", ok.link("Execution #" ~ issue.procedure_instance_id, "/executions/" ~ issue.procedure_instance_id)) }}
                         {% endif %}
-                    </table>
+                    {% endcall %}
                 </div>
                 {% endif %}
             </div>
         </div>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 const issueId = {{ issue.id }};

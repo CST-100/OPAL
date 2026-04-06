@@ -3,4 +3,4 @@
 An enterprise resource planning system for small teams and hardware projects.
 """
 
-__version__ = "1.2.0_beta"
+__version__ = "1.2.0"

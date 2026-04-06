@@ -8,20 +8,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header"><span>NEW USER</span></div>
-    <div class="panel-body">
+{% call ok.panel("NEW USER", max_width="600px") %}
         <form id="user-form" onsubmit="createUser(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required maxlength="255">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="email">EMAIL</label>
-                <input type="email" id="email" name="email" class="form-input" maxlength="255">
-                <small class="text-muted">Optional - for contact purposes</small>
-            </div>
+            {{ ok.field("name", "NAME", required=true, attrs='maxlength="255"') }}
+            {{ ok.field("email", "EMAIL", type="email", help="Optional - for contact purposes", attrs='maxlength="255"') }}
 
             <div class="form-group">
                 <label class="form-checkbox">
@@ -31,15 +21,10 @@
                 <small class="text-muted">Admins can manage users and project settings</small>
             </div>
 
-            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
-
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/users") }}
-                {{ ok.btn("CREATE USER", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/users", submit_text="CREATE USER") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function createUser(event) {

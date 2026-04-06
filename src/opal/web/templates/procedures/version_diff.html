@@ -9,14 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>DIFF: v{{ version_a.version_number }} → v{{ version_b.version_number }}</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("BACK", href="/procedures/" ~ procedure.id) }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("DIFF: v" ~ version_a.version_number ~ " → v" ~ version_b.version_number, actions=ok.btn("BACK", href="/procedures/" ~ procedure.id)) %}
         <!-- Summary -->
         <div style="margin-bottom: var(--space-md); font-family: var(--font-mono); font-size: 0.875rem;">
             <span>v{{ version_a.version_number }} published {{ ok.timestamp(version_a.created_at) }}</span>
@@ -26,48 +19,44 @@
 
         <!-- Procedure-level changes -->
         {% if proc_changes %}
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">PROCEDURE CHANGES</div>
-            <div class="panel-body">
-                <table class="data-table">
+        {% call ok.panel("PROCEDURE CHANGES") %}
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th style="width: 150px;">FIELD</th>
-                            <th>v{{ version_a.version_number }}</th>
-                            <th>v{{ version_b.version_number }}</th>
+                            {{ ok.th("FIELD", width="150px") }}
+                            {{ ok.th("v" ~ version_a.version_number) }}
+                            {{ ok.th("v" ~ version_b.version_number) }}
                         </tr>
                     </thead>
                     <tbody>
                         {% for field in proc_changes %}
                         <tr class="diff-modified">
-                            <td class="mono">{{ field }}</td>
+                            {{ ok.td(field, mono=true) }}
                             <td>{{ version_a.content.get(field, '-') }}</td>
                             <td>{{ version_b.content.get(field, '-') }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-        </div>
+                {% endcall %}
+        {% endcall %}
         {% endif %}
 
         <!-- Step diffs -->
-        <div class="panel">
-            <div class="panel-header">
+        {% set step_changes_title %}
                 STEP CHANGES
                 <span class="text-muted" style="margin-left: var(--space-md); font-weight: normal; font-size: 0.75rem;">
                     {{ added_count }} added, {{ removed_count }} removed, {{ modified_count }} modified, {{ unchanged_count }} unchanged
                 </span>
-            </div>
-            <div class="panel-body">
-                <table class="data-table">
+        {% endset %}
+        {% call ok.panel(step_changes_title) %}
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th style="width: 60px;">#</th>
-                            <th style="width: 80px;">STATUS</th>
-                            <th>v{{ version_a.version_number }}</th>
-                            <th>v{{ version_b.version_number }}</th>
-                            <th style="width: 150px;">CHANGED FIELDS</th>
+                            {{ ok.th("#", width="60px") }}
+                            {{ ok.th("STATUS", width="80px") }}
+                            {{ ok.th("v" ~ version_a.version_number) }}
+                            {{ ok.th("v" ~ version_b.version_number) }}
+                            {{ ok.th("CHANGED FIELDS", width="150px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -117,9 +106,7 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
+                {% endcall %}
+        {% endcall %}
+{% endcall %}
 {% endblock %}

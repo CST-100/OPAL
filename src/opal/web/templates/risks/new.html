@@ -8,52 +8,22 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 700px;">
-    <div class="panel-header"><span>NEW RISK</span></div>
-    <div class="panel-body">
+{% call ok.panel("NEW RISK", max_width="700px") %}
         <form id="new-risk-form" onsubmit="createRisk(event)">
-            <div class="form-group">
-                <label class="form-label" for="title">TITLE *</label>
-                <input type="text" id="title" name="title" class="form-input" required>
-            </div>
+            {{ ok.field("title", "TITLE", required=true) }}
+            {{ ok.field("description", "DESCRIPTION", type="textarea", rows=3) }}
 
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-textarea" rows="3"></textarea>
-            </div>
-
-            <div style="display: flex; gap: var(--space-md);">
-                <div class="form-group" style="flex: 1;">
-                    <label class="form-label" for="probability">PROBABILITY (1-5)</label>
-                    <select id="probability" name="probability" class="form-select">
-                        <option value="1">1 - Rare</option>
-                        <option value="2">2 - Unlikely</option>
-                        <option value="3" selected>3 - Possible</option>
-                        <option value="4">4 - Likely</option>
-                        <option value="5">5 - Almost Certain</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1;">
-                    <label class="form-label" for="impact">IMPACT (1-5)</label>
-                    <select id="impact" name="impact" class="form-select">
-                        <option value="1">1 - Negligible</option>
-                        <option value="2">2 - Minor</option>
-                        <option value="3" selected>3 - Moderate</option>
-                        <option value="4">4 - Major</option>
-                        <option value="5">5 - Severe</option>
-                    </select>
-                </div>
-            </div>
+            {% call ok.grid(cols=2) %}
+                {{ ok.field("probability", "PROBABILITY (1-5)", type="select", value="3", options=[{"value": "1", "label": "1 - Rare"}, {"value": "2", "label": "2 - Unlikely"}, {"value": "3", "label": "3 - Possible"}, {"value": "4", "label": "4 - Likely"}, {"value": "5", "label": "5 - Almost Certain"}]) }}
+                {{ ok.field("impact", "IMPACT (1-5)", type="select", value="3", options=[{"value": "1", "label": "1 - Negligible"}, {"value": "2", "label": "2 - Minor"}, {"value": "3", "label": "3 - Moderate"}, {"value": "4", "label": "4 - Major"}, {"value": "5", "label": "5 - Severe"}]) }}
+            {% endcall %}
 
             <div class="form-group">
                 <label class="form-label">CALCULATED SCORE</label>
                 <div id="score-display" style="font-size: 1.5rem; font-weight: bold;">9 (MEDIUM)</div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="mitigation">MITIGATION PLAN</label>
-                <textarea id="mitigation" name="mitigation_plan" class="form-textarea" rows="4" placeholder="Describe how this risk will be mitigated..."></textarea>
-            </div>
+            {{ ok.field("mitigation_plan", "MITIGATION PLAN", type="textarea", rows=4, placeholder="Describe how this risk will be mitigated...", attrs='id="mitigation"') }}
 
             <div class="form-group">
                 <label class="form-label" for="linked-issue">LINKED ISSUE (optional)</label>
@@ -65,15 +35,10 @@
                 </select>
             </div>
 
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                {{ ok.btn("CANCEL", href="/risks") }}
-                {{ ok.btn("CREATE", type="submit", variant="primary") }}
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/risks", submit_text="CREATE") }}
         </form>
-
-        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 function updateScore() {

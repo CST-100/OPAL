@@ -7,72 +7,34 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>PARTS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("IMPORT CSV", href="/parts/import") }}
-            {{ ok.btn("+ NEW PART", href="/parts/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% set parts_actions %}{{ ok.btn("IMPORT CSV", href="/parts/import") }} {{ ok.btn("+ NEW PART", href="/parts/new", variant="primary") }}{% endset %}
+{% call ok.panel("PARTS", actions=parts_actions) %}
         <div class="toolbar">
-            <input type="text"
-                   id="search-input"
-                   class="form-input toolbar-search"
-                   placeholder="Search parts by name, PN, description..."
-                   hx-get="/parts/table"
-                   hx-trigger="keyup changed delay:300ms, search"
-                   hx-target="#parts-table-body"
-                   hx-include="#category-filter, #tier-filter, #top-level-filter, #low-stock-filter"
-                   name="search">
-            <select id="category-filter"
-                    name="category"
-                    class="form-select toolbar-filter"
-                    hx-get="/parts/table"
-                    hx-trigger="change"
-                    hx-target="#parts-table-body"
-                    hx-include="#search-input, #tier-filter, #top-level-filter">
-                <option value="">All categories</option>
-                {% for cat in categories %}
-                <option value="{{ cat }}">{{ cat }}</option>
-                {% endfor %}
-            </select>
-            <select id="tier-filter"
-                    name="tier"
-                    class="form-select toolbar-filter"
-                    hx-get="/parts/table"
-                    hx-trigger="change"
-                    hx-target="#parts-table-body"
-                    hx-include="#search-input, #category-filter, #top-level-filter">
-                <option value="">All tiers</option>
-                {% for tier in tiers %}
-                <option value="{{ tier.number }}">Tier {{ tier.number }} - {{ tier.name }}</option>
-                {% endfor %}
-            </select>
-            <select id="top-level-filter"
-                    name="top_level"
-                    class="form-select toolbar-filter"
-                    hx-get="/parts/table"
-                    hx-trigger="change"
-                    hx-target="#parts-table-body"
-                    hx-include="#search-input, #category-filter, #tier-filter, #low-stock-filter">
-                <option value="">All parts</option>
-                <option value="true">Top-level only</option>
-                <option value="false">Sub-components only</option>
-            </select>
-            <select id="low-stock-filter"
-                    name="low_stock"
-                    class="form-select toolbar-filter"
-                    hx-get="/parts/table"
-                    hx-trigger="change"
-                    hx-target="#parts-table-body"
-                    hx-include="#search-input, #category-filter, #tier-filter, #top-level-filter">
-                <option value="">All stock levels</option>
-                <option value="true">Low stock only</option>
-            </select>
+            {{ ok.toolbar_search(name="search", id="search-input", placeholder="Search parts by name, PN, description...", hx_get="/parts/table", hx_target="#parts-table-body", hx_include="#category-filter, #tier-filter, #top-level-filter, #low-stock-filter") }}
+            <div class="toolbar-filter">
+                <select id="category-filter" name="category" class="form-select"
+                        hx-get="/parts/table" hx-trigger="change" hx-target="#parts-table-body"
+                        hx-include="#search-input, #tier-filter, #top-level-filter">
+                    <option value="">All categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="toolbar-filter">
+                <select id="tier-filter" name="tier" class="form-select"
+                        hx-get="/parts/table" hx-trigger="change" hx-target="#parts-table-body"
+                        hx-include="#search-input, #category-filter, #top-level-filter">
+                    <option value="">All tiers</option>
+                    {% for tier in tiers %}
+                    <option value="{{ tier.number }}">Tier {{ tier.number }} - {{ tier.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {{ ok.toolbar_filter("top_level", [{"value": "", "label": "All parts"}, {"value": "true", "label": "Top-level only"}, {"value": "false", "label": "Sub-components only"}], id="top-level-filter", hx_get="/parts/table", hx_target="#parts-table-body", hx_include="#search-input, #category-filter, #tier-filter, #low-stock-filter") }}
+            {{ ok.toolbar_filter("low_stock", [{"value": "", "label": "All stock levels"}, {"value": "true", "label": "Low stock only"}], id="low-stock-filter", hx_get="/parts/table", hx_target="#parts-table-body", hx_include="#search-input, #category-filter, #tier-filter, #top-level-filter") }}
         </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
                     <th style="width: 60px; cursor: pointer; user-select: none;"
@@ -146,7 +108,6 @@
                     <td colspan="8" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

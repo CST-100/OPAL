@@ -9,39 +9,19 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header">
-        <span>EDIT TEMPLATE</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("EDIT TEMPLATE", max_width="600px") %}
         <form id="edit-procedure-form" onsubmit="updateProcedure(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" value="{{ procedure.name }}" required>
-            </div>
+            {{ ok.field("name", "NAME", value=procedure.name, required=true) }}
 
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-textarea" rows="4">{{ procedure.description or '' }}</textarea>
-            </div>
+            {{ ok.field("description", "DESCRIPTION", type="textarea", value=procedure.description or '', rows=4) }}
 
-            <div class="form-group">
-                <label class="form-label" for="procedure_type">TYPE</label>
-                <select id="procedure_type" name="procedure_type" class="form-select">
-                    <option value="op" {% if procedure.procedure_type == "op" %}selected{% endif %}>OP - Work Order (no output)</option>
-                    <option value="build" {% if procedure.procedure_type == "build" %}selected{% endif %}>BUILD - Produces assembly</option>
-                </select>
-            </div>
+            {{ ok.field("procedure_type", "TYPE", type="select", value=procedure.procedure_type, options=[{"value": "op", "label": "OP - Work Order (no output)"}, {"value": "build", "label": "BUILD - Produces assembly"}]) }}
 
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                {{ ok.btn("CANCEL", href="/procedures/" ~ procedure.id) }}
-                {{ ok.btn("SAVE", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/procedures/" ~ procedure.id) }}
         </form>
 
-        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+        {{ ok.form_messages() }}
+{% endcall %}
 
 <script>
 async function updateProcedure(event) {

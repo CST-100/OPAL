@@ -21,7 +21,7 @@
         {% endif %}
     </td>
     <td>{{ ok.mono(rec.location) }}</td>
-    <td class="mono" style="text-align: right;">{{ rec.quantity }}</td>
+    {{ ok.td(rec.quantity, mono=true, align="right") }}
     <td>
         {% if rec.source_type %}
             {% set source = rec.source_type.value if rec.source_type.value is defined else rec.source_type %}

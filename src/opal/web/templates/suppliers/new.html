@@ -8,51 +8,20 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header"><span>NEW SUPPLIER</span></div>
-    <div class="panel-body">
+{% call ok.panel("NEW SUPPLIER", max_width="600px") %}
         <form id="supplier-form" onsubmit="createSupplier(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required maxlength="255">
-            </div>
+            {{ ok.field("name", "NAME", required=true, attrs='maxlength="255"') }}
+            {{ ok.field("code", "CODE", placeholder="SUP001", help="Short unique code for quick reference", attrs='maxlength="50" class="form-input mono"') }}
 
-            <div class="form-group">
-                <label class="form-label" for="code">CODE</label>
-                <input type="text" id="code" name="code" class="form-input mono" maxlength="50" placeholder="SUP001">
-                <small class="text-muted">Short unique code for quick reference</small>
-            </div>
+            {% call ok.grid(cols=2) %}
+                {{ ok.field("email", "EMAIL", type="email", attrs='maxlength="255"') }}
+                {{ ok.field("phone", "PHONE", type="tel", attrs='maxlength="50"') }}
+            {% endcall %}
 
-            <div class="grid grid-2" style="gap: var(--space-md);">
-                <div class="form-group">
-                    <label class="form-label" for="email">EMAIL</label>
-                    <input type="email" id="email" name="email" class="form-input" maxlength="255">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="phone">PHONE</label>
-                    <input type="tel" id="phone" name="phone" class="form-input" maxlength="50">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="website">WEBSITE</label>
-                <input type="url" id="website" name="website" class="form-input" maxlength="255" placeholder="https://...">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="address">ADDRESS</label>
-                <textarea id="address" name="address" class="form-input" rows="3"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-input" rows="2"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="notes">NOTES</label>
-                <textarea id="notes" name="notes" class="form-input" rows="2"></textarea>
-            </div>
+            {{ ok.field("website", "WEBSITE", type="url", placeholder="https://...", attrs='maxlength="255"') }}
+            {{ ok.field("address", "ADDRESS", type="textarea", rows=3) }}
+            {{ ok.field("description", "DESCRIPTION", type="textarea", rows=2) }}
+            {{ ok.field("notes", "NOTES", type="textarea", rows=2) }}
 
             <div class="form-group">
                 <label class="form-checkbox">
@@ -61,15 +30,10 @@
                 </label>
             </div>
 
-            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
-
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/suppliers") }}
-                <button type="submit" class="btn btn-primary">CREATE SUPPLIER</button>
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/suppliers", submit_text="CREATE SUPPLIER") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function createSupplier(event) {

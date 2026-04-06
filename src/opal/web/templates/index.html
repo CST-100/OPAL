@@ -4,38 +4,28 @@
 {% block content %}
 <div class="grid grid-4">
     {{ ok.stat(parts_count, "PARTS", href="/parts") }}
-    {{ ok.stat(procedures_count, "PROCEDURES", href="/procedures") }}
-    {{ ok.stat(open_issues_count, "OPEN ISSUES", href="/issues?status=open", variant="warn" if open_issues_count > 0 else none) }}
-    {{ ok.stat(in_progress_count, "IN PROGRESS", href="/executions?status=in_progress", variant="info" if in_progress_count > 0 else none) }}
-</div>
-
-<div class="grid grid-4 mt-md">
-    {{ ok.stat(risks_count, "ACTIVE RISKS", href="/risks") }}
-    {{ ok.stat(high_risks_count, "HIGH RISKS", href="/risks?severity=high", variant="error" if high_risks_count > 0 else none) }}
     {{ ok.stat(low_stock_count, "LOW STOCK", href="/parts?low_stock=true", variant="warn" if low_stock_count > 0 else none) }}
     {{ ok.stat(expiring_soon_count, "EXPIRING SOON", href="/inventory?expiration=expiring", variant="warn" if expiring_soon_count > 0 else none) }}
-</div>
-
-<div class="grid grid-4 mt-md">
     {{ ok.stat(cal_overdue_count, "CAL OVERDUE", href="/inventory?calibration=overdue", variant="error" if cal_overdue_count > 0 else none) }}
 </div>
 
+<div class="grid grid-4 mt-md">
+    {{ ok.stat(procedures_count, "TEMPLATES", href="/procedures") }}
+    {{ ok.stat(in_progress_count, "EXECUTIONS IN PROGRESS", href="/executions?status=in_progress", variant="info" if in_progress_count > 0 else none) }}
+    {{ ok.stat(open_issues_count, "OPEN ISSUES", href="/issues?status=open", variant="warn" if open_issues_count > 0 else none) }}
+    {{ ok.stat(risks_count, "ACTIVE RISKS", href="/risks") }}
+</div>
+
 <div class="grid grid-2 mt-md">
-    <div class="panel">
-        <div class="panel-header">
-            <span>RECENT ACTIVITY</span>
-            <div class="panel-header-actions">
-                {{ ok.btn("VIEW ALL", href="/audit", size="sm") }}
-            </div>
-        </div>
-        <div class="panel-body" style="max-height: 300px; overflow-y: auto;">
+    {% call ok.panel("RECENT ACTIVITY", actions=ok.btn("VIEW ALL", href="/audit", size="sm")) %}
+        <div style="max-height: 300px; overflow-y: auto;">
             {% if recent_activity %}
-            <table class="data-table">
+            {% call ok.table() %}
                 <thead>
                     <tr>
-                        <th style="width: 80px;">ACTION</th>
-                        <th>ENTITY</th>
-                        <th style="width: 160px;">TIME</th>
+                        {{ ok.th("ACTION", width="80px") }}
+                        {{ ok.th("ENTITY") }}
+                        {{ ok.th("TIME", width="160px") }}
                     </tr>
                 </thead>
                 <tbody>
@@ -50,20 +40,18 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
             {% else %}
             {{ ok.empty("No recent activity") }}
             {% endif %}
         </div>
-    </div>
-    <div class="panel">
-        <div class="panel-header">KEYBOARD SHORTCUTS</div>
-        <div class="panel-body">
-            <table class="data-table">
+    {% endcall %}
+    {% call ok.panel("KEYBOARD SHORTCUTS") %}
+            {% call ok.table() %}
                 <thead>
                     <tr>
-                        <th style="width: 80px;">KEY</th>
-                        <th>ACTION</th>
+                        {{ ok.th("KEY", width="80px") }}
+                        {{ ok.th("ACTION") }}
                     </tr>
                 </thead>
                 <tbody>
@@ -124,14 +112,11 @@
                         <td>Toggle Theme</td>
                     </tr>
                 </tbody>
-            </table>
-        </div>
-    </div>
+            {% endcall %}
+    {% endcall %}
 </div>
 
-<div class="panel mt-md">
-    <div class="panel-header">QUICK ACTIONS</div>
-    <div class="panel-body">
+{% call ok.panel("QUICK ACTIONS", margin_top="var(--space-md)") %}
         <div style="display: flex; gap: var(--space-md); flex-wrap: wrap;">
             {{ ok.btn("+ NEW PART", href="/parts/new", variant="primary") }}
             {{ ok.btn("+ NEW PROCEDURE", href="/procedures/new", variant="primary") }}
@@ -140,6 +125,5 @@
             {{ ok.btn("+ NEW DATASET", href="/datasets/new", variant="primary") }}
             {{ ok.btn("START EXECUTION", href="/executions/new") }}
         </div>
-    </div>
-</div>
+{% endcall %}
 {% endblock %}

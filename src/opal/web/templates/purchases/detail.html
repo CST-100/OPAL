@@ -8,58 +8,36 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-2">
-    <div class="panel">
-        <div class="panel-header">
-            <span>{{ purchase.reference or ('PO-' ~ purchase.id) }}</span>
-            <div class="panel-header-actions">
-                {% if purchase.is_overdue %}
-                {{ ok.status("OVERDUE", "error") }}
-                {% endif %}
-                {{ ok.status(purchase.status|status_value|upper) }}
-            </div>
-        </div>
-        <div class="panel-body">
-            <table class="data-table">
-                <tr>
-                    <th style="width: 140px;">REFERENCE</th>
-                    <td class="mono">{{ purchase.reference or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>SUPPLIER</th>
-                    <td>
-                        {% if purchase.supplier_rel %}
-                        <a href="/suppliers/{{ purchase.supplier_rel.id }}">{{ purchase.supplier_rel.name }}</a>
-                        {% else %}
-                        {{ purchase.supplier }}
-                        {% endif %}
-                    </td>
-                </tr>
-                {% if purchase.supplier_reference %}
-                <tr>
-                    <th>SUPPLIER REF</th>
-                    <td class="mono">{{ purchase.supplier_reference }}</td>
-                </tr>
-                {% endif %}
-                <tr>
-                    <th>STATUS</th>
-                    <td>{{ purchase.status|status_value|upper }}</td>
-                </tr>
-                <tr>
-                    <th>TARGET DATE</th>
-                    <td class="mono {% if purchase.is_overdue %}text-red{% endif %}">{{ purchase.target_date.strftime('%Y-%m-%d') if purchase.target_date else '-' }}</td>
-                </tr>
-                {% if purchase.destination %}
-                <tr>
-                    <th>DESTINATION</th>
-                    <td class="mono">{{ purchase.destination }}</td>
-                </tr>
-                {% endif %}
-            </table>
+{% call ok.grid(cols=2) %}
+    {% call ok.panel(purchase.reference or ('PO-' ~ purchase.id), actions=('<span>' ~ (ok.status("OVERDUE", "error") if purchase.is_overdue else '') ~ ok.status(purchase.status|status_value|upper) ~ '</span>')) %}
+        {% call ok.table() %}
+            {{ ok.detail_row("REFERENCE", ok.mono(purchase.reference or '-'), th_width="140px") }}
+            <tr>
+                <th style="width: 140px;">SUPPLIER</th>
+                <td>
+                    {% if purchase.supplier_rel %}
+                    {{ ok.link(purchase.supplier_rel.name, "/suppliers/" ~ purchase.supplier_rel.id) }}
+                    {% else %}
+                    {{ purchase.supplier }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% if purchase.supplier_reference %}
+            {{ ok.detail_row("SUPPLIER REF", ok.mono(purchase.supplier_reference), th_width="140px") }}
+            {% endif %}
+            {{ ok.detail_row("STATUS", purchase.status|status_value|upper, th_width="140px") }}
+            <tr>
+                <th style="width: 140px;">TARGET DATE</th>
+                <td class="mono {% if purchase.is_overdue %}text-red{% endif %}">{{ purchase.target_date.strftime('%Y-%m-%d') if purchase.target_date else '-' }}</td>
+            </tr>
+            {% if purchase.destination %}
+            {{ ok.detail_row("DESTINATION", ok.mono(purchase.destination), th_width="140px") }}
+            {% endif %}
+        {% endcall %}
 
             <div style="margin-top: var(--space-lg);">
                 <div class="form-label">DATES</div>
-                <table class="data-table">
+                {% call ok.table() %}
                     <tr>
                         <th style="width: 140px;">CREATED</th>
                         <td>{{ ok.timestamp(purchase.created_at) }}</td>
@@ -75,7 +53,7 @@
                         <td>{{ ok.timestamp(purchase.received_at) }}</td>
                         <td>{% if purchase.received_by %}by {{ purchase.received_by.name }}{% endif %}</td>
                     </tr>
-                </table>
+                {% endcall %}
             </div>
             {% if purchase.notes %}
             <div style="margin-top: var(--space-md);">
@@ -94,37 +72,27 @@
                 {{ ok.btn("CANCEL PO", variant="danger", attrs='onclick="cancelPO()"') }}
                 {% endif %}
             </div>
-        </div>
-    </div>
+    {% endcall %}
 
-    <div class="panel">
-        <div class="panel-header">
-            <span>LINE ITEMS</span>
-            {% if purchase.status|status_value in ['draft', 'ordered'] %}
-            <div class="panel-header-actions">
-                {{ ok.btn("+ ADD LINE", variant="primary", attrs='onclick="showAddLine()"') }}
-            </div>
-            {% endif %}
-        </div>
-        <div class="panel-body">
+    {% call ok.panel("LINE ITEMS", actions=(ok.btn("+ ADD LINE", variant="primary", attrs='onclick="showAddLine()"') if purchase.status|status_value in ['draft', 'ordered'] else none)) %}
             {% if purchase.lines %}
-            <table class="data-table">
+            {% call ok.table() %}
                 <thead>
                     <tr>
-                        <th style="width: 60px;">PART</th>
-                        <th>NAME</th>
-                        <th style="width: 80px; text-align: right;">ORDERED</th>
-                        <th style="width: 80px; text-align: right;">RECEIVED</th>
-                        <th style="width: 100px;">STATUS</th>
+                        {{ ok.th("PART", width="60px") }}
+                        {{ ok.th("NAME") }}
+                        {{ ok.th("ORDERED", width="80px", align="right") }}
+                        {{ ok.th("RECEIVED", width="80px", align="right") }}
+                        {{ ok.th("STATUS", width="100px") }}
                     </tr>
                 </thead>
                 <tbody>
                     {% for line in purchase.lines %}
                     <tr>
-                        <td class="id-cell"><a href="/parts/{{ line.part_id }}">{{ line.part_id }}</a></td>
-                        <td><a href="/parts/{{ line.part_id }}">{{ line.part.name }}</a></td>
-                        <td class="mono" style="text-align: right;">{{ line.qty_ordered }}</td>
-                        <td class="mono" style="text-align: right;">{{ line.qty_received }}</td>
+                        <td>{{ ok.id_cell(line.part_id, "/parts/" ~ line.part_id) }}</td>
+                        <td>{{ ok.link(line.part.name, "/parts/" ~ line.part_id) }}</td>
+                        {{ ok.td(line.qty_ordered, mono=true, align="right") }}
+                        {{ ok.td(line.qty_received, mono=true, align="right") }}
                         <td>
                             {% if line.qty_received >= line.qty_ordered %}
                             {{ ok.status("COMPLETE", "ok") }}
@@ -137,37 +105,34 @@
                     </tr>
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
             {% else %}
             {{ ok.empty("No line items") }}
             {% endif %}
-        </div>
-    </div>
-</div>
+    {% endcall %}
+{% endcall %}
 
 {% if purchase.status|status_value in ['ordered', 'partial'] %}
-<div class="panel" style="margin-top: var(--space-md);">
-    <div class="panel-header"><span>RECEIVE ITEMS</span></div>
-    <div class="panel-body">
+{% call ok.panel("RECEIVE ITEMS", margin_top="var(--space-md)") %}
         <form id="receive-form" onsubmit="receiveItems(event)">
-            <table class="data-table">
+            {% call ok.table() %}
                 <thead>
                     <tr>
-                        <th>LINE</th>
-                        <th>PART</th>
-                        <th style="width: 80px;">OUTSTANDING</th>
-                        <th style="width: 100px;">RECEIVE QTY</th>
-                        <th style="width: 150px;">LOCATION *</th>
-                        <th style="width: 100px;">LOT</th>
+                        {{ ok.th("LINE") }}
+                        {{ ok.th("PART") }}
+                        {{ ok.th("OUTSTANDING", width="80px") }}
+                        {{ ok.th("RECEIVE QTY", width="100px") }}
+                        {{ ok.th("LOCATION *", width="150px") }}
+                        {{ ok.th("LOT", width="100px") }}
                     </tr>
                 </thead>
                 <tbody>
                     {% for line in purchase.lines %}
                     {% if line.qty_received < line.qty_ordered %}
                     <tr>
-                        <td class="mono">{{ line.id }}</td>
+                        <td>{{ ok.mono(line.id) }}</td>
                         <td>{{ line.part.name }}</td>
-                        <td class="mono" style="text-align: right;">{{ line.qty_ordered - line.qty_received }}</td>
+                        {{ ok.td(line.qty_ordered - line.qty_received, mono=true, align="right") }}
                         <td><input type="number" name="recv_{{ line.id }}_qty" class="form-input" step="0.0001" min="0" max="{{ line.qty_ordered - line.qty_received }}"></td>
                         <td><input type="text" name="recv_{{ line.id }}_loc" class="form-input" placeholder="Location"></td>
                         <td><input type="text" name="recv_{{ line.id }}_lot" class="form-input" placeholder="Lot #"></td>
@@ -175,23 +140,20 @@
                     {% endif %}
                     {% endfor %}
                 </tbody>
-            </table>
+            {% endcall %}
             <div style="display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-md);">
                 {{ ok.btn("FILL ALL", attrs='onclick="fillAllOutstanding()"') }}
                 {{ ok.btn("RECEIVE", variant="primary", type="submit") }}
             </div>
         </form>
         <div id="receive-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+{% endcall %}
 {% endif %}
 
 <!-- Add Line Modal -->
 <div id="add-line-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px;">
-        <div class="panel">
-            <div class="panel-header"><span>ADD LINE ITEM</span></div>
-            <div class="panel-body">
+        {% call ok.panel("ADD LINE ITEM") %}
                 <form id="add-line-form" onsubmit="addLine(event)">
                     <div class="form-group">
                         <label class="form-label" for="line-part-search">PART *</label>
@@ -229,8 +191,7 @@
                     </div>
                 </form>
                 <div id="line-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-            </div>
-        </div>
+        {% endcall %}
     </div>
 </div>
 

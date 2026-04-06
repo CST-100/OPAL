@@ -2,9 +2,9 @@
 {% if users_list %}
 {% for u in users_list %}
 <tr>
-    <td class="id-cell"><a href="/users/{{ u.id }}">{{ u.id }}</a></td>
+    <td>{{ ok.id_cell(u.id, "/users/" ~ u.id) }}</td>
     <td><a href="/users/{{ u.id }}">{{ u.name }}</a></td>
-    <td class="mono">{{ u.email or '-' }}</td>
+    <td>{{ ok.mono(u.email) }}</td>
     <td>
         {% if u.is_admin %}
         {{ ok.status("ADMIN", "warn") }}

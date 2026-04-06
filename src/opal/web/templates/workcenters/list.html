@@ -7,46 +7,19 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>WORKCENTERS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW WORKCENTER", href="/workcenters/new", variant="primary") }}
+{% call ok.panel("WORKCENTERS", actions=ok.btn("+ NEW WORKCENTER", href="/workcenters/new", variant="primary")) %}
+        <div class="toolbar">
+            {{ ok.toolbar_search(name="search", id="search-input", placeholder="Search workcenters...", hx_get="/workcenters/table", hx_target="#workcenters-table-body", hx_include="#status-filter") }}
+            {{ ok.toolbar_filter("is_active", [{"value": "", "label": "All status"}, {"value": "true", "label": "Active"}, {"value": "false", "label": "Inactive"}], value="true", id="status-filter", hx_get="/workcenters/table", hx_target="#workcenters-table-body", hx_include="#search-input") }}
         </div>
-    </div>
-    <div class="panel-body">
-        <div class="toolbar" style="margin-bottom: var(--space-md); display: flex; gap: var(--space-md);">
-            <input type="text"
-                   id="search-input"
-                   class="form-input"
-                   placeholder="Search workcenters..."
-                   style="max-width: 300px;"
-                   hx-get="/workcenters/table"
-                   hx-trigger="keyup changed delay:300ms, search"
-                   hx-target="#workcenters-table-body"
-                   hx-include="#status-filter"
-                   name="search">
-            <select id="status-filter"
-                    name="is_active"
-                    class="form-select"
-                    style="max-width: 150px;"
-                    hx-get="/workcenters/table"
-                    hx-trigger="change"
-                    hx-target="#workcenters-table-body"
-                    hx-include="#search-input">
-                <option value="">All status</option>
-                <option value="true" selected>Active</option>
-                <option value="false">Inactive</option>
-            </select>
-        </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 60px;">ID</th>
-                    <th style="width: 80px;">CODE</th>
-                    <th>NAME</th>
-                    <th>LOCATION</th>
-                    <th style="width: 80px;">STATUS</th>
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("CODE", width="80px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("LOCATION") }}
+                    {{ ok.th("STATUS", width="80px") }}
                 </tr>
             </thead>
             <tbody id="workcenters-table-body" hx-get="/workcenters/table?is_active=true" hx-trigger="load">
@@ -54,7 +27,6 @@
                     <td colspan="5" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

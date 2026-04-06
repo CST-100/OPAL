@@ -10,49 +10,24 @@
 {% block content %}
 <div class="grid grid-2">
     <!-- Left Column: Part Details -->
-    <div class="panel">
-        <div class="panel-header">
-            <span>PART #{{ part.id }}</span>
-            <div class="panel-header-actions">
+    {% set part_actions %}
                 {{ ok.btn("PRINT LABEL", attrs='onclick="window.open(\'/label?type=part&id=' ~ part.id ~ '\', \'_blank\', \'width=500,height=300\')"') }}
                 {{ ok.btn("EDIT", href="/parts/" ~ part.id ~ "/edit") }}
-                {{ ok.btn("DELETE", variant="danger", attrs='onclick="if(confirm(\'Delete this part?\')) { htmx.ajax(\'DELETE\', \'/api/parts/' ~ part.id ~ '\', {target: \'body\', swap: \'none\'}).then(() => window.location.href=\'/parts\') }"') }}
-            </div>
-        </div>
-        <div class="panel-body">
-            <table class="data-table">
+                {{ ok.confirm_btn("DELETE", message="Delete this part?", action="/api/parts/" ~ part.id, method="DELETE", redirect="/parts") }}
+    {% endset %}
+    {% call ok.panel("PART #" ~ part.id, actions=part_actions) %}
+            {% call ok.table() %}
+                {{ ok.detail_row("ID", ok.id_cell(part.id), th_width="180px") }}
                 <tr>
-                    <th style="width: 180px;">ID</th>
-                    <td>{{ ok.id_cell(part.id) }}</td>
-                </tr>
-                <tr>
-                    <th>INTERNAL PN</th>
+                    <th style="width: 180px;">INTERNAL PN</th>
                     <td class="mono"><strong>{{ part.internal_pn }}</strong></td>
                 </tr>
-                <tr>
-                    <th>EXTERNAL PN</th>
-                    <td>{{ ok.mono(part.external_pn) }}</td>
-                </tr>
-                <tr>
-                    <th>NAME</th>
-                    <td>{{ part.name }}</td>
-                </tr>
-                <tr>
-                    <th>CATEGORY</th>
-                    <td>{{ part.category or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>TIER</th>
-                    <td>{{ ok.mono('Tier ' ~ part.tier if part.tier is not none else '-') }}</td>
-                </tr>
-                <tr>
-                    <th>UNIT OF MEASURE</th>
-                    <td>{{ ok.mono(part.unit_of_measure or 'EA') }}</td>
-                </tr>
-                <tr>
-                    <th>TRACKING TYPE</th>
-                    <td>{{ ok.status(part.tracking_type.value|upper if part.tracking_type else 'BULK', "info" if part.tracking_type and part.tracking_type.value == 'serialized' else "default") }}</td>
-                </tr>
+                {{ ok.detail_row("EXTERNAL PN", ok.mono(part.external_pn), th_width="180px") }}
+                {{ ok.detail_row("NAME", part.name, th_width="180px") }}
+                {{ ok.detail_row("CATEGORY", part.category or '-', th_width="180px") }}
+                {{ ok.detail_row("TIER", ok.mono('Tier ' ~ part.tier if part.tier is not none else '-'), th_width="180px") }}
+                {{ ok.detail_row("UNIT OF MEASURE", ok.mono(part.unit_of_measure or 'EA'), th_width="180px") }}
+                {{ ok.detail_row("TRACKING TYPE", ok.status(part.tracking_type.value|upper if part.tracking_type else 'BULK', "info" if part.tracking_type and part.tracking_type.value == 'serialized' else "default"), th_width="180px") }}
                 <tr>
                     <th>QR CODE</th>
                     <td><img src="/api/parts/{{ part.id }}/qrcode" alt="QR Code" style="width: 80px; height: 80px; background: white; padding: 4px;"></td>
@@ -94,7 +69,7 @@
                     <td><a href="/parts/{{ part.parent_id }}" class="mono">{{ part.parent.internal_pn }}</a> - {{ part.parent.name }}</td>
                 </tr>
                 {% endif %}
-            </table>
+            {% endcall %}
 
             {% if part.description %}
             <div style="margin-top: var(--space-md);">
@@ -110,30 +85,16 @@
             </div>
             {% endif %}
 
-            <table class="data-table" style="margin-top: var(--space-lg);">
-                <tr>
-                    <th style="width: 180px;">CREATED</th>
-                    <td>{{ ok.timestamp(part.created_at) }}</td>
-                </tr>
-                <tr>
-                    <th>UPDATED</th>
-                    <td>{{ ok.timestamp(part.updated_at) }}</td>
-                </tr>
-            </table>
-        </div>
-    </div>
+            {% call ok.table() %}
+                {{ ok.detail_row("CREATED", ok.timestamp(part.created_at), th_width="180px") }}
+                {{ ok.detail_row("UPDATED", ok.timestamp(part.updated_at), th_width="180px") }}
+            {% endcall %}
+    {% endcall %}
 
     <!-- Right Column: Inventory & Related Data -->
     <div>
         <!-- Stock Summary Panel -->
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>STOCK SUMMARY</span>
-                <div class="panel-header-actions">
-                    {{ ok.btn("+ ADD INVENTORY", href="/inventory/new?part_id=" ~ part.id, variant="primary") }}
-                </div>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel("STOCK SUMMARY", actions=ok.btn("+ ADD INVENTORY", href="/inventory/new?part_id=" ~ part.id, variant="primary"), margin_top="0") %}
                 <div style="display: flex; justify-content: space-between; align-items: baseline;">
                     <div class="form-label">TOTAL QUANTITY</div>
                     <div style="font-family: var(--font-mono); font-size: 2rem; font-weight: 600;">
@@ -141,23 +102,18 @@
                     </div>
                 </div>
                 <div class="text-muted" style="text-align: right; font-family: var(--font-mono);">{{ part.unit_of_measure or 'EA' }}</div>
-            </div>
-        </div>
+        {% endcall %}
 
         <!-- Inventory Records Panel -->
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>INVENTORY RECORDS ({{ inventory_records | length }})</span>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel("INVENTORY RECORDS (" ~ (inventory_records | length) ~ ")") %}
                 {% if inventory_records %}
-                <table class="data-table">
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th>OPAL #</th>
-                            <th>LOCATION</th>
-                            <th style="text-align: right;">QTY</th>
-                            <th>LOT</th>
+                            {{ ok.th("OPAL #") }}
+                            {{ ok.th("LOCATION") }}
+                            {{ ok.th("QTY", align="right") }}
+                            {{ ok.th("LOT") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -170,32 +126,24 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
                 {% else %}
                 {{ ok.empty("No inventory records") }}
                 {% endif %}
-            </div>
-        </div>
+        {% endcall %}
 
         <!-- BOM Components (this part as assembly) -->
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>BOM COMPONENTS ({{ bom_lines | length }})</span>
-                <div class="panel-header-actions">
-                    {{ ok.btn("+ ADD COMPONENT", variant="primary", attrs='onclick="showAddComponent()"') }}
-                </div>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel("BOM COMPONENTS (" ~ (bom_lines | length) ~ ")", actions=ok.btn("+ ADD COMPONENT", variant="primary", attrs='onclick="showAddComponent()"')) %}
                 {% if bom_lines %}
-                <table class="data-table">
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th>COMPONENT PN</th>
-                            <th>NAME</th>
-                            <th style="text-align: right; width: 60px;">QTY</th>
-                            <th style="width: 120px;">REF DES</th>
-                            <th>NOTES</th>
-                            <th style="width: 120px;"></th>
+                            {{ ok.th("COMPONENT PN") }}
+                            {{ ok.th("NAME") }}
+                            {{ ok.th("QTY", width="60px", align="right") }}
+                            {{ ok.th("REF DES", width="120px") }}
+                            {{ ok.th("NOTES") }}
+                            {{ ok.th("", width="120px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -213,41 +161,31 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
                 {% else %}
                 {{ ok.empty("No BOM components defined") }}
                 {% endif %}
-            </div>
-        </div>
+        {% endcall %}
 
         {% if bom_lines %}
         <!-- BOM Tree -->
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>BOM TREE</span>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel("BOM TREE") %}
                 <div id="bom-tree" class="mono" style="font-size: 0.875rem;">
                     <span class="text-muted">Loading tree...</span>
                 </div>
-            </div>
-        </div>
+        {% endcall %}
         {% endif %}
 
         <!-- BOM Where Used (this part as component) -->
         {% if where_used %}
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>WHERE USED ({{ where_used | length }})</span>
-            </div>
-            <div class="panel-body">
-                <table class="data-table">
+        {% call ok.panel("WHERE USED (" ~ (where_used | length) ~ ")") %}
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th>ASSEMBLY PN</th>
-                            <th>ASSEMBLY NAME</th>
-                            <th style="text-align: right; width: 60px;">QTY</th>
-                            <th style="width: 120px;">REF DES</th>
+                            {{ ok.th("ASSEMBLY PN") }}
+                            {{ ok.th("ASSEMBLY NAME") }}
+                            {{ ok.th("QTY", width="60px", align="right") }}
+                            {{ ok.th("REF DES", width="120px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -260,31 +198,23 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
-            </div>
-        </div>
+                {% endcall %}
+        {% endcall %}
         {% endif %}
 
         <!-- Test Templates -->
-        <div class="panel" style="margin-bottom: var(--space-md);">
-            <div class="panel-header">
-                <span>TEST TEMPLATES ({{ test_templates | length }})</span>
-                <div class="panel-header-actions">
-                    {{ ok.btn("+ ADD TEST", variant="primary", attrs='onclick="showAddTest()"') }}
-                </div>
-            </div>
-            <div class="panel-body">
+        {% call ok.panel("TEST TEMPLATES (" ~ (test_templates | length) ~ ")", actions=ok.btn("+ ADD TEST", variant="primary", attrs='onclick="showAddTest()"')) %}
                 {% if test_templates %}
-                <table class="data-table">
+                {% call ok.table() %}
                     <thead>
                         <tr>
-                            <th>NAME</th>
-                            <th style="width: 80px;">TYPE</th>
-                            <th style="width: 70px;">REQUIRED</th>
-                            <th style="width: 80px;">MIN</th>
-                            <th style="width: 80px;">MAX</th>
-                            <th style="width: 60px;">UNIT</th>
-                            <th style="width: 60px;"></th>
+                            {{ ok.th("NAME") }}
+                            {{ ok.th("TYPE", width="80px") }}
+                            {{ ok.th("REQUIRED", width="70px") }}
+                            {{ ok.th("MIN", width="80px") }}
+                            {{ ok.th("MAX", width="80px") }}
+                            {{ ok.th("UNIT", width="60px") }}
+                            {{ ok.th("", width="60px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -302,28 +232,23 @@
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                {% endcall %}
                 {% else %}
                 {{ ok.empty("No test templates defined") }}
                 {% endif %}
-            </div>
-        </div>
+        {% endcall %}
     </div>
 </div>
 
 <!-- Where Used: Procedure Usage -->
 {% if kit_usages %}
-<div class="panel mt-md">
-    <div class="panel-header">
-        <span>PROCEDURE USAGE ({{ kit_usages | length }})</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("PROCEDURE USAGE (" ~ (kit_usages | length) ~ ")", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th>PROCEDURE</th>
-                    <th style="width: 100px; text-align: right;">QTY REQUIRED</th>
-                    <th style="width: 100px;">STATUS</th>
+                    {{ ok.th("PROCEDURE") }}
+                    {{ ok.th("QTY REQUIRED", width="100px", align="right") }}
+                    {{ ok.th("STATUS", width="100px") }}
                 </tr>
             </thead>
             <tbody>
@@ -335,25 +260,20 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endif %}
 
 <!-- Where Used: Step Usage -->
 {% if step_kit_usages %}
-<div class="panel mt-md">
-    <div class="panel-header">
-        <span>STEP USAGE ({{ step_kit_usages | length }})</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("STEP USAGE (" ~ (step_kit_usages | length) ~ ")", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th>PROCEDURE</th>
-                    <th>STEP</th>
-                    <th style="width: 100px; text-align: right;">QTY</th>
-                    <th style="width: 100px;">TYPE</th>
+                    {{ ok.th("PROCEDURE") }}
+                    {{ ok.th("STEP") }}
+                    {{ ok.th("QTY", width="100px", align="right") }}
+                    {{ ok.th("TYPE", width="100px") }}
                 </tr>
             </thead>
             <tbody>
@@ -366,25 +286,20 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endif %}
 
 <!-- Where Used: Consumption History -->
 {% if consumption_history %}
-<div class="panel mt-md">
-    <div class="panel-header">
-        <span>CONSUMPTION HISTORY ({{ consumption_history | length }}{% if consumption_history | length == 50 %}+{% endif %})</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table">
+{% call ok.panel("CONSUMPTION HISTORY (" ~ (consumption_history | length) ~ ('+' if consumption_history | length == 50 else '') ~ ")", margin_top="var(--space-md)") %}
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 160px;">TIMESTAMP</th>
-                    <th style="width: 80px; text-align: right;">QTY</th>
-                    <th>SOURCE</th>
-                    <th>NOTES</th>
+                    {{ ok.th("TIMESTAMP", width="160px") }}
+                    {{ ok.th("QTY", width="80px", align="right") }}
+                    {{ ok.th("SOURCE") }}
+                    {{ ok.th("NOTES") }}
                 </tr>
             </thead>
             <tbody>
@@ -403,9 +318,8 @@
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endif %}
 
 <!-- Add Test Template Modal -->

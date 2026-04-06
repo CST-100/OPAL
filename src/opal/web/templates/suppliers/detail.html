@@ -8,133 +8,80 @@
 {% endblock %}
 
 {% block content %}
-<div class="grid grid-2">
-    <div class="panel">
-        <div class="panel-header">
-            <span>SUPPLIER #{{ supplier.id }}</span>
-            <div class="panel-header-actions">
-                {{ ok.btn("EDIT", href="/suppliers/" ~ supplier.id ~ "/edit") }}
-            </div>
-        </div>
-        <div class="panel-body">
-            <table class="data-table">
-                <tr>
-                    <th style="width: 150px;">ID</th>
-                    <td class="id-cell mono">{{ supplier.id }}</td>
-                </tr>
-                <tr>
-                    <th>CODE</th>
-                    <td class="mono">{{ supplier.code or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>NAME</th>
-                    <td>{{ supplier.name }}</td>
-                </tr>
-                <tr>
-                    <th>STATUS</th>
-                    <td>
-                        {% if supplier.is_active %}
-                        {{ ok.status("ACTIVE", "ok") }}
-                        {% else %}
-                        {{ ok.status("INACTIVE", "inactive") }}
-                        {% endif %}
-                    </td>
-                </tr>
-            </table>
-
-            <div style="margin-top: var(--space-lg);">
-                <div class="form-label">CONTACT</div>
-                <table class="data-table">
-                    <tr>
-                        <th style="width: 150px;">EMAIL</th>
-                        <td>
-                            {% if supplier.email %}
-                            <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
-                            {% else %}-{% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>PHONE</th>
-                        <td class="mono">{{ supplier.phone or '-' }}</td>
-                    </tr>
-                    <tr>
-                        <th>WEBSITE</th>
-                        <td>
-                            {% if supplier.website %}
-                            <a href="{{ supplier.website }}" target="_blank">{{ supplier.website }}</a>
-                            {% else %}-{% endif %}
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            {% if supplier.address %}
-            <div style="margin-top: var(--space-md);">
-                <div class="form-label">ADDRESS</div>
-                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); white-space: pre-wrap;">{{ supplier.address }}</div>
-            </div>
-            {% endif %}
-
-            {% if supplier.description %}
-            <div style="margin-top: var(--space-md);">
-                <div class="form-label">DESCRIPTION</div>
-                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.description }}</div>
-            </div>
-            {% endif %}
-
-            {% if supplier.notes %}
-            <div style="margin-top: var(--space-md);">
-                <div class="form-label">NOTES</div>
-                <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.notes }}</div>
-            </div>
-            {% endif %}
-
-            <table class="data-table" style="margin-top: var(--space-lg);">
-                <tr>
-                    <th style="width: 150px;">CREATED</th>
-                    <td>{{ ok.timestamp(supplier.created_at) }}</td>
-                </tr>
-                <tr>
-                    <th>UPDATED</th>
-                    <td>{{ ok.timestamp(supplier.updated_at) }}</td>
-                </tr>
-            </table>
-        </div>
-    </div>
-
-    <div class="panel">
-        <div class="panel-header">
-            <span>PURCHASE ORDERS</span>
-            <div class="panel-header-actions">
-                {{ ok.btn("+ NEW PO", href="/purchases/new?supplier_id=" ~ supplier.id, variant="primary") }}
-            </div>
-        </div>
-        <div class="panel-body">
-            {% if purchases %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>REF</th>
-                        <th>STATUS</th>
-                        <th>ORDERED</th>
-                        <th style="text-align: right;">LINES</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for po in purchases %}
-                    <tr>
-                        <td class="mono"><a href="/purchases/{{ po.id }}">{{ po.reference or 'PO-' ~ po.id }}</a></td>
-                        <td>{{ ok.status(po.status | status_value | upper) }}</td>
-                        <td>{{ ok.timestamp(po.ordered_at) if po.ordered_at else '-' }}</td>
-                        <td class="mono" style="text-align: right;">{{ po.lines | length }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+{% call ok.grid(cols=2) %}
+    {% call ok.panel("SUPPLIER #" ~ supplier.id, actions=ok.btn("EDIT", href="/suppliers/" ~ supplier.id ~ "/edit")) %}
+        {% call ok.table() %}
+            {{ ok.detail_row("ID", ok.id_cell(supplier.id)) }}
+            {{ ok.detail_row("CODE", supplier.code or '-', mono=true) }}
+            {{ ok.detail_row("NAME", supplier.name) }}
+            {% if supplier.is_active %}
+            {{ ok.detail_row("STATUS", ok.status("ACTIVE", "ok")) }}
             {% else %}
-            {{ ok.empty("No purchase orders for this supplier") }}
+            {{ ok.detail_row("STATUS", ok.status("INACTIVE", "inactive")) }}
             {% endif %}
+        {% endcall %}
+
+        <div style="margin-top: var(--space-lg);">
+            <div class="form-label">CONTACT</div>
+            {% call ok.table() %}
+                {{ ok.detail_row("EMAIL", '<a href="mailto:' ~ supplier.email ~ '">' ~ supplier.email ~ '</a>' if supplier.email else '-') }}
+                {{ ok.detail_row("PHONE", supplier.phone or '-', mono=true) }}
+                {{ ok.detail_row("WEBSITE", ok.link(supplier.website, supplier.website, external=true) if supplier.website else '-') }}
+            {% endcall %}
         </div>
-    </div>
-</div>
+
+        {% if supplier.address %}
+        <div style="margin-top: var(--space-md);">
+            <div class="form-label">ADDRESS</div>
+            <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color); white-space: pre-wrap;">{{ supplier.address }}</div>
+        </div>
+        {% endif %}
+
+        {% if supplier.description %}
+        <div style="margin-top: var(--space-md);">
+            <div class="form-label">DESCRIPTION</div>
+            <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.description }}</div>
+        </div>
+        {% endif %}
+
+        {% if supplier.notes %}
+        <div style="margin-top: var(--space-md);">
+            <div class="form-label">NOTES</div>
+            <div style="padding: var(--space-sm); background: var(--bg-tertiary); border: 1px solid var(--border-color);">{{ supplier.notes }}</div>
+        </div>
+        {% endif %}
+
+        {% call ok.table() %}
+            {{ ok.detail_row("CREATED", ok.timestamp(supplier.created_at)) }}
+            {{ ok.detail_row("UPDATED", ok.timestamp(supplier.updated_at)) }}
+        {% endcall %}
+    {% endcall %}
+
+    {% call ok.panel("PURCHASE ORDERS", actions=ok.btn("+ NEW PO", href="/purchases/new?supplier_id=" ~ supplier.id, variant="primary")) %}
+        {% if purchases %}
+        {% call ok.table() %}
+            <thead>
+                <tr>
+                    {{ ok.th("REF") }}
+                    {{ ok.th("STATUS") }}
+                    {{ ok.th("ORDERED") }}
+                    {{ ok.th("LINES", align="right") }}
+                </tr>
+            </thead>
+            <tbody>
+                {% for po in purchases %}
+                <tr>
+                    <td>{{ ok.mono('<a href="/purchases/' ~ po.id ~ '">' ~ (po.reference or 'PO-' ~ po.id) ~ '</a>') }}</td>
+                    <td>{{ ok.status(po.status | status_value | upper) }}</td>
+                    <td>{{ ok.timestamp(po.ordered_at) if po.ordered_at else '-' }}</td>
+                    {{ ok.td(po.lines | length, mono=true, align="right") }}
+                </tr>
+                {% endfor %}
+            </tbody>
+        {% endcall %}
+        {% else %}
+        {{ ok.empty("No purchase orders for this supplier") }}
+        {% endif %}
+    {% endcall %}
+{% endcall %}
 {% endblock %}

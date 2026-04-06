@@ -9,11 +9,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px; margin: 0 auto;">
-    <div class="panel-header">
-        <span>EDIT PART #{{ part.id }}</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("EDIT PART #" ~ part.id, max_width="800px") %}
         <form id="part-form" onsubmit="event.preventDefault(); submitPartForm();">
             <div class="form-group">
                 <label class="form-label">INTERNAL PN (READ-ONLY)</label>
@@ -106,13 +102,9 @@
                 <textarea id="metadata" name="metadata" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.875rem; resize: none; overflow: hidden;" oninput="autoResize(this)">{{ part.metadata_ | tojson if part.metadata_ else '' }}</textarea>
             </div>
 
-            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/parts/" ~ part.id) }}
-                {{ ok.btn("SAVE CHANGES", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/parts/" ~ part.id, submit_text="SAVE CHANGES") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 function autoResize(textarea) {

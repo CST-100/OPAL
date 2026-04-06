@@ -8,17 +8,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 800px;">
-    <div class="panel-header">
-        <span>NEW TEMPLATE</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("NEW TEMPLATE", max_width="800px") %}
         <form id="new-procedure-form" onsubmit="createProcedure(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME <span class="text-red">*</span></label>
-                <input type="text" id="name" name="name" class="form-input" required placeholder="Procedure name">
-                <small class="form-help">e.g., Assembly PCB, Quality Inspection</small>
-            </div>
+            {{ ok.field("name", "NAME", required=true, placeholder="Procedure name", help="e.g., Assembly PCB, Quality Inspection") }}
 
             <div class="form-group">
                 <label class="form-label" for="description">DESCRIPTION</label>
@@ -26,15 +18,8 @@
                 <small class="form-help">Optional: Provide context and overview of the procedure</small>
             </div>
 
-            <div class="grid grid-2" style="gap: var(--space-md);">
-                <div class="form-group">
-                    <label class="form-label" for="procedure_type">TYPE</label>
-                    <select id="procedure_type" name="procedure_type" class="form-select">
-                        <option value="op">OP - Work Order (no output)</option>
-                        <option value="build">BUILD - Produces assembly</option>
-                    </select>
-                    <small class="form-help">Determines if this produces a finished part</small>
-                </div>
+            {% call ok.grid(cols=2, gap="var(--space-md)") %}
+                {{ ok.field("procedure_type", "TYPE", type="select", options=[{"value": "op", "label": "OP - Work Order (no output)"}, {"value": "build", "label": "BUILD - Produces assembly"}], help="Determines if this produces a finished part") }}
 
                 <div class="form-group">
                     <label class="form-label" for="workcenter_id">WORKCENTER</label>
@@ -46,7 +31,7 @@
                     </select>
                     <small class="form-help">Optional: Default location for this procedure</small>
                 </div>
-            </div>
+            {% endcall %}
 
             <div style="margin-top: var(--space-lg); padding-top: var(--space-md); border-top: 1px solid var(--border-color);">
                 <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: var(--space-md);">
@@ -54,15 +39,11 @@
                 </p>
             </div>
 
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end; margin-top: var(--space-lg);">
-                {{ ok.btn("CANCEL", href="/procedures") }}
-                {{ ok.btn("SAVE DRAFT", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/procedures", submit_text="SAVE DRAFT") }}
         </form>
 
-        <div id="form-error" class="text-red" style="margin-top: var(--space-md); display: none;"></div>
-    </div>
-</div>
+        {{ ok.form_messages() }}
+{% endcall %}
 
 <script>
 function autoResize(textarea) {

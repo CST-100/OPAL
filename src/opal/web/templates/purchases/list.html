@@ -7,14 +7,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>PURCHASE ORDERS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW PO", href="/purchases/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("PURCHASE ORDERS", actions=ok.btn("+ NEW PO", href="/purchases/new", variant="primary")) %}
         <div class="toolbar">
             <select id="status-filter"
                     name="status"
@@ -28,15 +21,15 @@
                 {% endfor %}
             </select>
         </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 100px;">REFERENCE</th>
-                    <th>SUPPLIER</th>
-                    <th style="width: 100px;">STATUS</th>
-                    <th style="width: 100px;">TARGET</th>
-                    <th style="width: 60px;">LINES</th>
-                    <th style="width: 160px;">CREATED</th>
+                    {{ ok.th("REFERENCE", width="100px") }}
+                    {{ ok.th("SUPPLIER") }}
+                    {{ ok.th("STATUS", width="100px") }}
+                    {{ ok.th("TARGET", width="100px") }}
+                    {{ ok.th("LINES", width="60px") }}
+                    {{ ok.th("CREATED", width="160px") }}
                 </tr>
             </thead>
             <tbody id="purchases-table-body" hx-get="/purchases/table" hx-trigger="load">
@@ -44,7 +37,6 @@
                     <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

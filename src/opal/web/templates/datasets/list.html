@@ -7,42 +7,34 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>DATASETS</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("+ NEW DATASET", href="/datasets/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("DATASETS", actions=ok.btn("+ NEW DATASET", href="/datasets/new", variant="primary")) %}
         <div class="toolbar">
-            <input type="text" id="search" placeholder="Search datasets..." class="form-input toolbar-search"
-                   hx-get="/datasets/table" hx-trigger="keyup changed delay:300ms" hx-target="#datasets-table"
-                   hx-include="[name='procedure_id']">
-            <select name="procedure_id" class="form-select toolbar-filter"
-                    hx-get="/datasets/table" hx-trigger="change" hx-target="#datasets-table"
-                    hx-include="#search">
-                <option value="">All procedures</option>
-                {% for p in procedures %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
-                {% endfor %}
-            </select>
+            {{ ok.toolbar_search(name="search", id="search", placeholder="Search datasets...", hx_get="/datasets/table", hx_target="#datasets-table", hx_include="[name='procedure_id']") }}
+            <div class="toolbar-filter">
+                <select name="procedure_id" class="form-select"
+                        hx-get="/datasets/table" hx-trigger="change" hx-target="#datasets-table"
+                        hx-include="#search">
+                    <option value="">All procedures</option>
+                    {% for p in procedures %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
 
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 50px;">ID</th>
-                    <th>NAME</th>
-                    <th style="width: 200px;">PROCEDURE</th>
-                    <th style="width: 100px;">POINTS</th>
-                    <th style="width: 160px;">UPDATED</th>
+                    {{ ok.th("ID", width="50px") }}
+                    {{ ok.th("NAME") }}
+                    {{ ok.th("PROCEDURE", width="200px") }}
+                    {{ ok.th("POINTS", width="100px") }}
+                    {{ ok.th("UPDATED", width="160px") }}
                 </tr>
             </thead>
             <tbody id="datasets-table" hx-get="/datasets/table" hx-trigger="load">
                 <tr><td colspan="5" class="text-muted">Loading...</td></tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

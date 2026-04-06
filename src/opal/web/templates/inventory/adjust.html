@@ -9,66 +9,39 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px; margin: 0 auto;">
-    <div class="panel-header">
-        <span>ADJUST QUANTITY</span>
-    </div>
-    <div class="panel-body">
-        <table class="data-table" style="margin-bottom: var(--space-lg);">
+{% call ok.panel("ADJUST QUANTITY", max_width="600px") %}
+        {% call ok.table() %}
+            {{ ok.detail_row("OPAL #", ok.mono(record.opal_number or '-'), th_width="140px") }}
+            {{ ok.detail_row("PART", ok.link(record.part.name, "/parts/" ~ record.part_id), th_width="140px") }}
+            {{ ok.detail_row("LOCATION", ok.mono(record.location), th_width="140px") }}
             <tr>
-                <th style="width: 140px;">OPAL #</th>
-                <td class="mono">{{ record.opal_number or '-' }}</td>
-            </tr>
-            <tr>
-                <th>PART</th>
-                <td><a href="/parts/{{ record.part_id }}">{{ record.part.name }}</a></td>
-            </tr>
-            <tr>
-                <th>LOCATION</th>
-                <td class="mono">{{ record.location }}</td>
-            </tr>
-            <tr>
-                <th>CURRENT QTY</th>
+                <th style="width: 140px;">CURRENT QTY</th>
                 <td class="mono" style="font-size: 1.2rem; font-weight: 600;">{{ '%g' % record.quantity }}</td>
             </tr>
-            <tr>
-                <th>TRACKING</th>
-                <td>{{ ok.status(record.part.tracking_type.value | upper if record.part.tracking_type else 'BULK') }}</td>
-            </tr>
-        </table>
+            {{ ok.detail_row("TRACKING", ok.status(record.part.tracking_type.value | upper if record.part.tracking_type else 'BULK'), th_width="140px") }}
+        {% endcall %}
 
-        <form id="adjust-form" onsubmit="event.preventDefault(); submitAdjust();">
-            <div class="form-group">
-                <label class="form-label" for="reason">REASON <span class="text-red">*</span></label>
-                <select id="reason" name="reason" class="form-select" required>
-                    <option value="">Select reason...</option>
-                    <option value="cycle_count">CYCLE COUNT - Physical count correction</option>
-                    <option value="damage">DAMAGE - Damaged stock (negative)</option>
-                    <option value="scrap">SCRAP - Scrapped stock (negative)</option>
-                    <option value="found">FOUND - Found stock (positive)</option>
-                    <option value="correction">CORRECTION - General correction</option>
-                </select>
-            </div>
+        <form id="adjust-form" onsubmit="event.preventDefault(); submitAdjust();" style="margin-top: var(--space-lg);">
+            {{ ok.field("reason", "REASON", type="select", required=true, placeholder="Select reason...", options=[
+                {"value": "cycle_count", "label": "CYCLE COUNT - Physical count correction"},
+                {"value": "damage", "label": "DAMAGE - Damaged stock (negative)"},
+                {"value": "scrap", "label": "SCRAP - Scrapped stock (negative)"},
+                {"value": "found", "label": "FOUND - Found stock (positive)"},
+                {"value": "correction", "label": "CORRECTION - General correction"}
+            ]) }}
 
             <div class="form-group">
-                <label class="form-label" for="adjustment">ADJUSTMENT <span class="text-red">*</span></label>
+                <label class="form-label" for="adjustment">ADJUSTMENT *</label>
                 <input type="number" id="adjustment" name="adjustment" class="form-input"
                        step="0.0001" required placeholder="e.g. -5 to remove, +3 to add">
                 <small class="form-help">Positive to add, negative to subtract. New qty: <span id="new-qty" class="mono">{{ '%g' % record.quantity }}</span></small>
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="notes">NOTES</label>
-                <textarea id="notes" name="notes" class="form-input" rows="3" placeholder="Optional notes about this adjustment"></textarea>
-            </div>
+            {{ ok.field("notes", "NOTES", type="textarea", rows=3, placeholder="Optional notes about this adjustment") }}
 
-            <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/inventory/opal/" ~ record.opal_number) }}
-                {{ ok.btn("APPLY ADJUSTMENT", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_actions(cancel_href="/inventory/opal/" ~ record.opal_number, submit_text="APPLY ADJUSTMENT") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 const currentQty = {{ record.quantity }};

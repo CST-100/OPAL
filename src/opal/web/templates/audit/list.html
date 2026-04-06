@@ -7,64 +7,39 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>AUDIT LOG</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("AUDIT LOG") %}
         <div class="toolbar">
-            <select id="table-filter"
-                    name="table_name"
-                    class="form-select toolbar-filter"
-                    hx-get="/audit/table"
-                    hx-trigger="change"
-                    hx-target="#audit-table-body"
-                    hx-include="#action-filter, #date-from, #date-to">
-                <option value="">All entities</option>
-                {% for tn in table_names %}
-                <option value="{{ tn }}">{{ TABLE_DISPLAY_NAMES.get(tn, tn) }}</option>
-                {% endfor %}
-            </select>
-            <select id="action-filter"
-                    name="action"
-                    class="form-select toolbar-filter"
-                    hx-get="/audit/table"
-                    hx-trigger="change"
-                    hx-target="#audit-table-body"
-                    hx-include="#table-filter, #date-from, #date-to">
-                <option value="">All actions</option>
-                <option value="create">CREATE</option>
-                <option value="update">UPDATE</option>
-                <option value="delete">DELETE</option>
-            </select>
-            <input type="date"
-                   id="date-from"
-                   name="date_from"
-                   class="form-input toolbar-filter"
-                   hx-get="/audit/table"
-                   hx-trigger="change"
-                   hx-target="#audit-table-body"
-                   hx-include="#table-filter, #action-filter, #date-to"
-                   placeholder="From">
-            <input type="date"
-                   id="date-to"
-                   name="date_to"
-                   class="form-input toolbar-filter"
-                   hx-get="/audit/table"
-                   hx-trigger="change"
-                   hx-target="#audit-table-body"
-                   hx-include="#table-filter, #action-filter, #date-from"
-                   placeholder="To">
+            <div class="toolbar-filter">
+                <select id="table-filter" name="table_name" class="form-select"
+                        hx-get="/audit/table" hx-trigger="change" hx-target="#audit-table-body"
+                        hx-include="#action-filter, #date-from, #date-to">
+                    <option value="">All entities</option>
+                    {% for tn in table_names %}
+                    <option value="{{ tn }}">{{ TABLE_DISPLAY_NAMES.get(tn, tn) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {{ ok.toolbar_filter("action", [{"value": "", "label": "All actions"}, {"value": "create", "label": "CREATE"}, {"value": "update", "label": "UPDATE"}, {"value": "delete", "label": "DELETE"}], id="action-filter", hx_get="/audit/table", hx_target="#audit-table-body", hx_include="#table-filter, #date-from, #date-to") }}
+            <div class="toolbar-filter">
+                <input type="date" id="date-from" name="date_from" class="form-input"
+                       hx-get="/audit/table" hx-trigger="change" hx-target="#audit-table-body"
+                       hx-include="#table-filter, #action-filter, #date-to" placeholder="From">
+            </div>
+            <div class="toolbar-filter">
+                <input type="date" id="date-to" name="date_to" class="form-input"
+                       hx-get="/audit/table" hx-trigger="change" hx-target="#audit-table-body"
+                       hx-include="#table-filter, #action-filter, #date-from" placeholder="To">
+            </div>
         </div>
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 80px;">ACTION</th>
-                    <th style="width: 140px;">ENTITY</th>
-                    <th style="width: 60px;">ID</th>
-                    <th>SUMMARY</th>
-                    <th style="width: 100px;">USER</th>
-                    <th style="width: 180px;">TIME</th>
+                    {{ ok.th("ACTION", width="80px") }}
+                    {{ ok.th("ENTITY", width="140px") }}
+                    {{ ok.th("ID", width="60px") }}
+                    {{ ok.th("SUMMARY") }}
+                    {{ ok.th("USER", width="100px") }}
+                    {{ ok.th("TIME", width="180px") }}
                 </tr>
             </thead>
             <tbody id="audit-table-body" hx-get="/audit/table" hx-trigger="load">
@@ -72,7 +47,6 @@
                     <td colspan="6" class="text-muted">Loading...</td>
                 </tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

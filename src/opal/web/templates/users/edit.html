@@ -11,20 +11,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header"><span>EDIT USER #{{ user.id }}</span></div>
-    <div class="panel-body">
+{% call ok.panel("EDIT USER #" ~ user.id, max_width="600px") %}
         <form id="user-form" onsubmit="updateUser(event)">
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required maxlength="255" value="{{ user.name }}">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="email">EMAIL</label>
-                <input type="email" id="email" name="email" class="form-input" maxlength="255" value="{{ user.email or '' }}">
-                <small class="text-muted">Optional - for contact purposes</small>
-            </div>
+            {{ ok.field("name", "NAME", value=user.name, required=true, attrs='maxlength="255"') }}
+            {{ ok.field("email", "EMAIL", type="email", value=user.email or '', help="Optional - for contact purposes", attrs='maxlength="255"') }}
 
             {% if is_admin %}
             <div class="form-group">
@@ -44,15 +34,10 @@
             </div>
             {% endif %}
 
-            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
-
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/users/" ~ user.id) }}
-                {{ ok.btn("SAVE CHANGES", variant="primary", type="submit") }}
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/users/" ~ user.id, submit_text="SAVE CHANGES") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function updateUser(event) {

@@ -7,54 +7,39 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <span>RISK REGISTER</span>
-        <div class="panel-header-actions">
-            {{ ok.btn("MATRIX VIEW", href="/risks/matrix") }}
-            {{ ok.btn("+ NEW RISK", href="/risks/new", variant="primary") }}
-        </div>
-    </div>
-    <div class="panel-body">
-        <div class="filter-bar" style="margin-bottom: var(--space-md);">
-            <input type="text" id="search" placeholder="Search risks..." class="form-input" style="width: 200px;"
-                   hx-get="/risks/table" hx-trigger="keyup changed delay:300ms" hx-target="#risks-table"
-                   hx-include="[name='status'], [name='severity']">
-            <select name="status" class="form-select" style="width: 150px;"
-                    hx-get="/risks/table" hx-trigger="change" hx-target="#risks-table"
-                    hx-include="[name='severity'], #search">
-                <option value="">All statuses</option>
-                {% for s in statuses %}
-                <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
-                {% endfor %}
-            </select>
-            <select name="severity" class="form-select" style="width: 150px;"
-                    hx-get="/risks/table" hx-trigger="change" hx-target="#risks-table"
-                    hx-include="[name='status'], #search">
-                <option value="">All severities</option>
-                <option value="low">LOW (1-5)</option>
-                <option value="medium">MEDIUM (6-12)</option>
-                <option value="high">HIGH (13-25)</option>
-            </select>
+{% set actions %}{{ ok.btn("MATRIX VIEW", href="/risks/matrix") }} {{ ok.btn("+ NEW RISK", href="/risks/new", variant="primary") }}{% endset %}
+{% call ok.panel("RISK REGISTER", actions=actions) %}
+        <div class="toolbar">
+            {{ ok.toolbar_search(name="search", id="search", placeholder="Search risks...", hx_get="/risks/table", hx_target="#risks-table", hx_include="[name='status'], [name='severity']") }}
+            <div class="toolbar-filter">
+                <select name="status" class="form-select"
+                        hx-get="/risks/table" hx-trigger="change" hx-target="#risks-table"
+                        hx-include="[name='severity'], #search">
+                    <option value="">All statuses</option>
+                    {% for s in statuses %}
+                    <option value="{{ s }}">{{ s | upper | replace('_', ' ') }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {{ ok.toolbar_filter("severity", [{"value": "", "label": "All severities"}, {"value": "low", "label": "LOW (1-5)"}, {"value": "medium", "label": "MEDIUM (6-12)"}, {"value": "high", "label": "HIGH (13-25)"}], hx_get="/risks/table", hx_target="#risks-table", hx_include="[name='status'], #search") }}
         </div>
 
-        <table class="data-table">
+        {% call ok.table() %}
             <thead>
                 <tr>
-                    <th style="width: 50px;">ID</th>
-                    <th>TITLE</th>
-                    <th style="width: 100px;">STATUS</th>
-                    <th style="width: 60px;">PROB</th>
-                    <th style="width: 60px;">IMPACT</th>
-                    <th style="width: 80px;">SCORE</th>
-                    <th style="width: 100px;">SEVERITY</th>
-                    <th style="width: 160px;">UPDATED</th>
+                    {{ ok.th("ID", width="50px") }}
+                    {{ ok.th("TITLE") }}
+                    {{ ok.th("STATUS", width="100px") }}
+                    {{ ok.th("PROB", width="60px") }}
+                    {{ ok.th("IMPACT", width="60px") }}
+                    {{ ok.th("SCORE", width="80px") }}
+                    {{ ok.th("SEVERITY", width="100px") }}
+                    {{ ok.th("UPDATED", width="160px") }}
                 </tr>
             </thead>
             <tbody id="risks-table" hx-get="/risks/table" hx-trigger="load">
                 <tr><td colspan="8" class="text-muted">Loading...</td></tr>
             </tbody>
-        </table>
-    </div>
-</div>
+        {% endcall %}
+{% endcall %}
 {% endblock %}

@@ -8,11 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px; margin: 0 auto;">
-    <div class="panel-header">
-        <span>ADD INVENTORY</span>
-    </div>
-    <div class="panel-body">
+{% call ok.panel("ADD INVENTORY", max_width="600px") %}
         <form id="inventory-form" onsubmit="event.preventDefault(); submitInventoryForm();">
             <!-- Part Selection -->
             <div class="form-group">
@@ -51,17 +47,11 @@
             </div>
 
             <!-- Quantity -->
-            <div class="form-group">
-                <label class="form-label" for="quantity">QUANTITY *</label>
-                <input type="number" id="quantity" name="quantity" class="form-input" required min="1" step="1" value="1">
-                <small class="form-help" id="quantity-help">
-                    {% if selected_part and selected_part.tracking_type and selected_part.tracking_type.value == 'SERIALIZED' %}
-                    For serialized parts, this creates separate inventory records (e.g., qty 5 = 5 individual OPALs)
-                    {% else %}
-                    Number of units to add
-                    {% endif %}
-                </small>
-            </div>
+            {{ ok.field("quantity", "QUANTITY", type="number", value="1", required=true, help=(
+                "For serialized parts, this creates separate inventory records (e.g., qty 5 = 5 individual OPALs)"
+                if selected_part and selected_part.tracking_type and selected_part.tracking_type.value == 'SERIALIZED'
+                else "Number of units to add"
+            ), attrs='min="1" step="1" id="quantity-help-field"') }}
 
             <!-- Location -->
             <div class="form-group">
@@ -80,11 +70,7 @@
             {{ ok.field("lot_number", "LOT NUMBER", placeholder="Optional: Supplier lot or batch number") }}
 
             <!-- Expiration Date (optional) -->
-            <div class="form-group">
-                <label class="form-label" for="expiration_date">EXPIRATION DATE</label>
-                <input type="date" id="expiration_date" name="expiration_date" class="form-input">
-                <small class="form-help">For perishable materials (adhesives, solder paste, etc.)</small>
-            </div>
+            {{ ok.field("expiration_date", "EXPIRATION DATE", type="date", help="For perishable materials (adhesives, solder paste, etc.)") }}
 
             <div style="margin-top: var(--space-lg); display: flex; gap: var(--space-sm); justify-content: flex-end;">
                 {% if selected_part %}
@@ -97,8 +83,7 @@
         </form>
 
         <div id="result-message" style="display: none; margin-top: var(--space-md); padding: var(--space-md); border: 1px solid var(--border-color);"></div>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 function selectPart(element) {

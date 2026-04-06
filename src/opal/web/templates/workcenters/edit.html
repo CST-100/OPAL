@@ -9,30 +9,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel" style="max-width: 600px;">
-    <div class="panel-header"><span>EDIT WORKCENTER: {{ workcenter.code }}</span></div>
-    <div class="panel-body">
+{% call ok.panel("EDIT WORKCENTER: " ~ workcenter.code, max_width="600px") %}
         <form id="workcenter-form" onsubmit="updateWorkcenter(event)">
-            <div class="form-group">
-                <label class="form-label" for="code">CODE *</label>
-                <input type="text" id="code" name="code" class="form-input mono" required maxlength="50" value="{{ workcenter.code }}">
-                <small class="text-muted">Short unique code for the workcenter</small>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="name">NAME *</label>
-                <input type="text" id="name" name="name" class="form-input" required maxlength="255" value="{{ workcenter.name }}">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="location">LOCATION</label>
-                <input type="text" id="location" name="location" class="form-input" maxlength="255" value="{{ workcenter.location or '' }}" placeholder="Physical location or building">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label" for="description">DESCRIPTION</label>
-                <textarea id="description" name="description" class="form-input" rows="3">{{ workcenter.description or '' }}</textarea>
-            </div>
+            {{ ok.field("code", "CODE", value=workcenter.code, required=true, help="Short unique code for the workcenter", attrs='maxlength="50" class="form-input mono"') }}
+            {{ ok.field("name", "NAME", value=workcenter.name, required=true, attrs='maxlength="255"') }}
+            {{ ok.field("location", "LOCATION", value=workcenter.location or '', placeholder="Physical location or building", attrs='maxlength="255"') }}
+            {{ ok.field("description", "DESCRIPTION", type="textarea", value=workcenter.description or '', rows=3) }}
 
             <div class="form-group">
                 <label class="form-checkbox">
@@ -41,15 +23,10 @@
                 </label>
             </div>
 
-            <div id="form-error" class="text-red" style="margin-bottom: var(--space-md); display: none;"></div>
-
-            <div style="display: flex; gap: var(--space-md); justify-content: flex-end;">
-                {{ ok.btn("CANCEL", href="/workcenters/" ~ workcenter.id) }}
-                <button type="submit" class="btn btn-primary">SAVE CHANGES</button>
-            </div>
+            {{ ok.form_messages() }}
+            {{ ok.form_actions(cancel_href="/workcenters/" ~ workcenter.id, submit_text="SAVE CHANGES") }}
         </form>
-    </div>
-</div>
+{% endcall %}
 
 <script>
 async function updateWorkcenter(event) {

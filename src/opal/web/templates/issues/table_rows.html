@@ -2,7 +2,7 @@
 {% if issues %}
 {% for issue in issues %}
 <tr>
-    <td class="id-cell"><a href="/issues/{{ issue.id }}">{{ issue.issue_number or issue.id }}</a></td>
+    <td>{{ ok.id_cell(issue.issue_number or issue.id, "/issues/" ~ issue.id) }}</td>
     <td>
         {{ ok.status(issue.issue_type | upper | replace('_', ' '), "error" if issue.issue_type == 'non_conformance' else ("warn" if issue.issue_type == 'bug' else ("info" if issue.issue_type == 'improvement' else "draft"))) }}
     </td>
