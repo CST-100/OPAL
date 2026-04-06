@@ -181,37 +181,70 @@ class OpalLauncher(App):
 
         self._log(f"Starting server on {host}:{port}...")
 
-        try:
-            self._server_process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "uvicorn",
-                    "opal.api.app:app",
-                    "--host",
-                    host,
-                    "--port",
-                    str(port),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+        if getattr(sys, "frozen", False):
+            # Running as PyInstaller bundle — start uvicorn in-process on a thread
+            self._log_thread = Thread(
+                target=self._run_uvicorn_inprocess,
+                args=(host, port),
+                daemon=True,
             )
-        except FileNotFoundError:
-            self._log("ERROR: Could not find Python executable to start server.")
-            self._update_status("stopped")
-            self._set_button_states(False)
-            return
-        except Exception as e:
-            self._log(f"ERROR: Failed to start server: {e}")
-            self._update_status("stopped")
-            self._set_button_states(False)
-            return
+            self._log_thread.start()
+        else:
+            try:
+                self._server_process = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m",
+                        "uvicorn",
+                        "opal.api.app:app",
+                        "--host",
+                        host,
+                        "--port",
+                        str(port),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
+            except FileNotFoundError:
+                self._log("ERROR: Could not find Python executable to start server.")
+                self._update_status("stopped")
+                self._set_button_states(False)
+                return
+            except Exception as e:
+                self._log(f"ERROR: Failed to start server: {e}")
+                self._update_status("stopped")
+                self._set_button_states(False)
+                return
 
-        # Stream output in a background thread
-        self._log_thread = Thread(target=self._stream_output, daemon=True)
-        self._log_thread.start()
+            # Stream output in a background thread
+            self._log_thread = Thread(target=self._stream_output, daemon=True)
+            self._log_thread.start()
+
+    def _run_uvicorn_inprocess(self, host: str, port: int) -> None:
+        """Run uvicorn in the current process (for PyInstaller bundles)."""
+        import uvicorn
+
+        self._uvicorn_server: uvicorn.Server | None = None
+        try:
+            config = uvicorn.Config(
+                "opal.api.app:create_app",
+                factory=True,
+                host=host,
+                port=port,
+                log_level="info",
+            )
+            server = uvicorn.Server(config)
+            self._uvicorn_server = server
+            self.call_from_thread(self._log, f"Server starting on http://{host}:{port}")
+            self.call_from_thread(self._update_status, "running")
+            server.run()
+        except Exception as e:
+            self.call_from_thread(self._log, f"ERROR: Server failed: {e}")
+        finally:
+            self._uvicorn_server = None
+            self.call_from_thread(self._on_server_exited, 0)
 
     def _stream_output(self) -> None:
         """Read server stdout/stderr and post to the log widget."""
@@ -250,11 +283,20 @@ class OpalLauncher(App):
 
     def _stop_server(self) -> None:
         """Stop the running server process."""
+        self._stopping = True
+
+        # In-process uvicorn (frozen mode)
+        uvicorn_server = getattr(self, "_uvicorn_server", None)
+        if uvicorn_server is not None:
+            self._log("Stopping server...")
+            uvicorn_server.should_exit = True
+            return
+
+        # Subprocess mode
         if self._server_process is None:
             self._log("Server is not running.")
             return
 
-        self._stopping = True
         self._log("Stopping server...")
 
         try:
