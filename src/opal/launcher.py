@@ -43,7 +43,11 @@ class OpalLauncher(App):
 
     TITLE = "OPAL"
     SUB_TITLE = "Operations, Procedures, Assets, Logistics"
-    CSS_PATH = "launcher.tcss"
+    CSS_PATH = (
+        Path(getattr(sys, "_MEIPASS", ""), "opal", "launcher.tcss")
+        if getattr(sys, "frozen", False)
+        else "launcher.tcss"
+    )
 
     BINDINGS = [
         Binding("s", "start_server", "Start", show=True),

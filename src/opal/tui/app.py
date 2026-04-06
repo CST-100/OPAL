@@ -3,6 +3,9 @@
 A Textual-based terminal user interface for OPAL.
 """
 
+import sys
+from pathlib import Path
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Header
@@ -30,7 +33,11 @@ class OpalApp(App):
 
     TITLE = "OPAL"
     SUB_TITLE = "Operations, Procedures, Assets, Logistics"
-    CSS_PATH = "styles.tcss"
+    CSS_PATH = (
+        Path(getattr(sys, "_MEIPASS", ""), "opal", "tui", "styles.tcss")
+        if getattr(sys, "frozen", False)
+        else "styles.tcss"
+    )
 
     COMMANDS = {OpalCommands}
 
