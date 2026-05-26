@@ -34,6 +34,7 @@
                             {{ ok.th("NAME") }}
                             {{ ok.th("TYPE") }}
                             {{ ok.th("UNIT") }}
+                            {{ ok.th("CHART", width="60px") }}
                         </tr>
                     </thead>
                     <tbody>
@@ -42,6 +43,7 @@
                             <td>{{ field.name }}</td>
                             <td>{{ ok.mono(field.type) }}</td>
                             <td>{{ ok.mono(field.unit if field.unit else '-') }}</td>
+                            <td>{{ ok.mono("YES" if field.chart else "-") }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

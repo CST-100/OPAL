@@ -1,5 +1,13 @@
 <div>
-{% call ok.panel(instance.work_order_number or "EXECUTION #" ~ instance.id, actions=ok.status(inst_status | upper | replace('_', ' '))) %}
+{% set instance_actions %}
+    {{ ok.status(inst_status | upper | replace('_', ' ')) }}
+    {% if inst_status == 'completed' %}
+        {{ ok.btn("BUILD REPORT", href="/executions/" ~ instance.id ~ "/report", attrs='target="_blank" rel="noopener"') }}
+    {% else %}
+        {{ ok.btn("BUILD REPORT", attrs='disabled title="Available once the work order is COMPLETED"') }}
+    {% endif %}
+{% endset %}
+{% call ok.panel(instance.work_order_number or "EXECUTION #" ~ instance.id, actions=instance_actions) %}
     {% call ok.table() %}
         {{ ok.detail_row("PROCEDURE", ok.link(instance.procedure.name, "/procedures/" ~ instance.procedure_id), th_width="160px") }}
         {{ ok.detail_row("VERSION", ok.mono("v" ~ version.version_number) if version else "-", th_width="160px") }}
@@ -92,9 +100,13 @@
         </div>
     </div>
     <div class="panel-body">
-        {% if inst_status in ['pending', 'in_progress'] %}
-        <div style="margin-bottom: var(--space-md); display: flex; gap: var(--space-sm); align-items: center;">
-            <input type="file" id="attachment-file" class="form-input" style="flex: 1;">
+        {% if inst_status in ['pending', 'in_progress', 'completed'] %}
+        <div style="margin-bottom: var(--space-md); display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap;">
+            <input type="file" id="attachment-file" class="form-input" style="flex: 1; min-width: 200px;">
+            <label style="display: inline-flex; align-items: center; gap: var(--space-xs); white-space: nowrap; font-size: 0.85rem;" title="Mark as a closeout photo for the build report">
+                <input type="checkbox" id="attachment-closeout">
+                <span class="mono">CLOSEOUT</span>
+            </label>
             {{ ok.btn("UPLOAD", variant="primary", attrs='onclick="uploadAttachment()"') }}
         </div>
         {% endif %}

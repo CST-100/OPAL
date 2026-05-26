@@ -59,6 +59,10 @@ def cmd_migrate(args: argparse.Namespace) -> None:
 
     from opal.config import get_active_settings
 
+    # Honor --project / --database so migrations can target any project's DB,
+    # not just whatever the ambient environment points to.
+    _setup_project(args)
+
     # Find project root by looking for alembic.ini
     opal_dir = Path(__file__).resolve().parent.parent.parent
     if not (opal_dir / "alembic.ini").exists():
@@ -234,6 +238,7 @@ def main() -> None:
     )
     migrate_parser.add_argument("--revision", type=str, help="Target revision")
     migrate_parser.add_argument("--message", "-m", type=str, help="Migration message")
+    add_project_args(migrate_parser)
     migrate_parser.set_defaults(func=cmd_migrate)
 
     # seed command

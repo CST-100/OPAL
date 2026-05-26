@@ -21,7 +21,7 @@ class Attachment(Base, IdMixin, TimestampMixin):
         String(20),
         nullable=True,
         index=True,
-        comment="'inline' = embedded in markdown content; 'reference' = downloadable doc; null = legacy/unscoped",
+        comment="'inline' = embedded in markdown content; 'reference' = downloadable doc; 'closeout' = end-item closeout photo surfaced in build reports; null = legacy/unscoped",
     )
 
     # Optional links - attachment can belong to instance, step, issue, procedure, or neither

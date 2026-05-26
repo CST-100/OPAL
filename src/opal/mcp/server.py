@@ -3,25 +3,34 @@
 import json
 import logging
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
+from sqlalchemy import func
 
 from opal.config import get_active_project, get_active_settings
-from opal.core.designators import generate_issue_number
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
+from opal.core.designators import generate_issue_number, generate_risk_number
 from opal.db.base import SessionLocal
 from opal.db.models import (
     BOMLine,
     Issue,
+    Kit,
     MasterProcedure,
     Part,
     PartRequirement,
+    ProcedureOutput,
+    ProcedureStep,
+    ProcedureVersion,
     Risk,
+    StepDependency,
+    StepKit,
 )
 from opal.db.models.issue import IssuePriority, IssueStatus, IssueType
-from opal.db.models.procedure import ProcedureStatus, ProcedureStep
+from opal.db.models.procedure import ProcedureStatus, ProcedureType, UsageType
 from opal.db.models.risk import RiskStatus
 
 logger = logging.getLogger(__name__)
@@ -181,7 +190,12 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="create_procedure",
-            description="Create a new procedure (draft status)",
+            description=(
+                "Create a new master procedure template in draft status. "
+                "procedure_type is 'op' (work order, no output) or 'build' "
+                "(produces an assembly via ProcedureOutput). Status is always "
+                "'draft' until published via the web UI / publish endpoint."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -193,13 +207,30 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Procedure description (optional)",
                     },
+                    "procedure_type": {
+                        "type": "string",
+                        "enum": ["op", "build"],
+                        "description": (
+                            "'op' = work order with no part output (default); "
+                            "'build' = produces an assembly. Outputs are configured "
+                            "separately via the web UI / API."
+                        ),
+                        "default": "op",
+                    },
                 },
                 "required": ["name"],
             },
         ),
         Tool(
             name="add_procedure_step",
-            description="Add a step to an existing procedure",
+            description=(
+                "Add a step (OP) to a draft procedure. Without parent_step_id, "
+                "creates a top-level OP numbered 1, 2, 3... (or C1, C2, C3... if "
+                "is_contingency=true). With parent_step_id, creates a sub-step "
+                "numbered <parent>.<N> that inherits is_contingency from its "
+                "parent. step_number, level, and order are calculated server-side "
+                "and cannot be overridden."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -215,12 +246,407 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Step instructions (markdown supported)",
                     },
-                    "step_number": {
-                        "type": "string",
-                        "description": "Step number (e.g., '1', '2.1', 'C1' for contingency)",
+                    "parent_step_id": {
+                        "type": "integer",
+                        "description": (
+                            "Parent OP ID. Omit for a top-level OP; set to create "
+                            "a sub-step (level=1) under the given OP."
+                        ),
+                    },
+                    "is_contingency": {
+                        "type": "boolean",
+                        "description": (
+                            "Top-level only: mark as a contingency OP (numbered "
+                            "C1, C2...) that runs only when an NC is logged. "
+                            "Ignored for sub-steps — they inherit from their parent."
+                        ),
+                        "default": False,
+                    },
+                    "requires_signoff": {
+                        "type": "boolean",
+                        "description": "Step requires sign-off to complete (default false)",
+                        "default": False,
+                    },
+                    "estimated_duration_minutes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Estimated duration in minutes (optional)",
+                    },
+                    "required_data_schema": {
+                        "type": "object",
+                        "description": (
+                            "JSON schema describing data to capture at this step "
+                            "(measurements, readings, etc). Optional."
+                        ),
                     },
                 },
                 "required": ["procedure_id", "title"],
+            },
+        ),
+        Tool(
+            name="get_procedure",
+            description=(
+                "Get a procedure with its full hierarchical step tree, kit, "
+                "outputs, dependencies, and current version pointer."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer", "description": "The procedure ID"},
+                },
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="update_procedure",
+            description=(
+                "Update a procedure's metadata: name, description, status "
+                "(draft/active/deprecated), or procedure_type (op/build). "
+                "Note: published versions are immutable; this only edits the "
+                "master template."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "status": {"type": "string", "enum": ["draft", "active", "deprecated"]},
+                    "procedure_type": {"type": "string", "enum": ["op", "build"]},
+                },
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="delete_procedure",
+            description="Soft-delete a procedure (sets deleted_at). Audit-logged.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                },
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="update_step",
+            description=(
+                "Update a step's title, instructions, is_contingency, "
+                "requires_signoff, estimated_duration_minutes, or "
+                "required_data_schema. Step_number, level, parent, and order "
+                "are not editable here — use reorder_steps for ordering."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "instructions": {"type": "string"},
+                    "is_contingency": {"type": "boolean"},
+                    "requires_signoff": {"type": "boolean"},
+                    "estimated_duration_minutes": {"type": "integer", "minimum": 1},
+                    "required_data_schema": {"type": "object"},
+                },
+                "required": ["procedure_id", "step_id"],
+            },
+        ),
+        Tool(
+            name="delete_step",
+            description=(
+                "Hard-delete a step (and its sub-steps via cascade). Renumbers "
+                "remaining steps so step_numbers stay contiguous (1, 2, 3..., "
+                "C1, C2..., <parent>.N)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                },
+                "required": ["procedure_id", "step_id"],
+            },
+        ),
+        Tool(
+            name="reorder_steps",
+            description=(
+                "Reorder every step in the procedure. step_ids must be the "
+                "exact set of all current step IDs (including sub-steps) in "
+                "the new global order. step_number labels are recomputed to "
+                "match the new ordering."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "All step IDs of the procedure, in the new order.",
+                    },
+                },
+                "required": ["procedure_id", "step_ids"],
+            },
+        ),
+        Tool(
+            name="list_step_dependencies",
+            description=(
+                "List all op-level prerequisite edges in a procedure as "
+                "{step_id, depends_on_step_id} pairs. Dependencies only apply "
+                "to top-level OPs (sub-steps inherit their parent's gating)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                },
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="set_step_dependencies",
+            description=(
+                "Replace the full prerequisite list for a top-level OP. "
+                "Validates same-procedure scope, op-level only (no sub-steps "
+                "on either side), no self-loops, and no cycles. Pass an empty "
+                "depends_on to clear all prereqs for the step."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer", "description": "The dependent (gated) OP"},
+                    "depends_on": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Step IDs that must complete before step_id can start.",
+                    },
+                },
+                "required": ["procedure_id", "step_id", "depends_on"],
+            },
+        ),
+        Tool(
+            name="get_kit",
+            description=(
+                "Get the procedure-level Kit (Bill of Materials of parts that "
+                "will be consumed by an execution of this procedure)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"procedure_id": {"type": "integer"}},
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="add_kit_item",
+            description=(
+                "Add a part to the procedure-level Kit. Fails if the part is "
+                "already on the kit (use update_kit_item to change quantity)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                    "quantity_required": {"type": "number", "exclusiveMinimum": 0},
+                },
+                "required": ["procedure_id", "part_id", "quantity_required"],
+            },
+        ),
+        Tool(
+            name="update_kit_item",
+            description="Update a Kit item's required quantity.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "kit_id": {"type": "integer"},
+                    "quantity_required": {"type": "number", "exclusiveMinimum": 0},
+                },
+                "required": ["procedure_id", "kit_id", "quantity_required"],
+            },
+        ),
+        Tool(
+            name="remove_kit_item",
+            description="Remove a part from the procedure-level Kit (by part_id).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                },
+                "required": ["procedure_id", "part_id"],
+            },
+        ),
+        Tool(
+            name="get_outputs",
+            description=(
+                "Get the output parts a build-type procedure produces. "
+                "Returns [] for op-type procedures."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"procedure_id": {"type": "integer"}},
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="add_output",
+            description=(
+                "Add an output part (assembly produced) to a build-type "
+                "procedure. Note: the canonical add-output handler also "
+                "auto-populates the Kit from the part's BOMLine children; "
+                "this tool does the same to stay consistent."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                    "quantity_produced": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "default": 1,
+                    },
+                },
+                "required": ["procedure_id", "part_id"],
+            },
+        ),
+        Tool(
+            name="update_output",
+            description="Update the quantity_produced for an output part (by part_id).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                    "quantity_produced": {"type": "number", "exclusiveMinimum": 0},
+                },
+                "required": ["procedure_id", "part_id", "quantity_produced"],
+            },
+        ),
+        Tool(
+            name="remove_output",
+            description="Remove an output part from a procedure (by part_id).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                },
+                "required": ["procedure_id", "part_id"],
+            },
+        ),
+        Tool(
+            name="get_step_kit",
+            description=(
+                "Get the parts required at a specific step (StepKit). Each "
+                "item has a usage_type: 'consume' (inventory decremented at "
+                "step completion) or 'tooling' (GSE/fixtures, returned)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                },
+                "required": ["procedure_id", "step_id"],
+            },
+        ),
+        Tool(
+            name="add_step_kit_item",
+            description="Add a part to a step's kit.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                    "quantity_required": {"type": "number", "exclusiveMinimum": 0},
+                    "usage_type": {
+                        "type": "string",
+                        "enum": ["consume", "tooling"],
+                        "default": "consume",
+                    },
+                    "notes": {"type": "string"},
+                },
+                "required": ["procedure_id", "step_id", "part_id", "quantity_required"],
+            },
+        ),
+        Tool(
+            name="update_step_kit_item",
+            description="Update a step kit item's quantity, usage_type, or notes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                    "step_kit_id": {"type": "integer"},
+                    "quantity_required": {"type": "number", "exclusiveMinimum": 0},
+                    "usage_type": {"type": "string", "enum": ["consume", "tooling"]},
+                    "notes": {"type": "string"},
+                },
+                "required": ["procedure_id", "step_id", "step_kit_id"],
+            },
+        ),
+        Tool(
+            name="remove_step_kit_item",
+            description="Remove a part from a step's kit (by part_id).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "step_id": {"type": "integer"},
+                    "part_id": {"type": "integer"},
+                },
+                "required": ["procedure_id", "step_id", "part_id"],
+            },
+        ),
+        Tool(
+            name="publish_version",
+            description=(
+                "Publish the current draft as a new immutable ProcedureVersion "
+                "snapshot. Bumps current_version_id and flips status to "
+                "'active'. Fails if the procedure has no steps. Snapshot "
+                "includes steps (with hierarchy), step kits, dependencies "
+                "(emitted as prereq `order` values for execution lookup), "
+                "procedure kit, and outputs."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"procedure_id": {"type": "integer"}},
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="list_versions",
+            description="List all published versions of a procedure (newest first).",
+            inputSchema={
+                "type": "object",
+                "properties": {"procedure_id": {"type": "integer"}},
+                "required": ["procedure_id"],
+            },
+        ),
+        Tool(
+            name="clone_procedure",
+            description=(
+                "Clone a procedure into a new draft. Copies all steps "
+                "(hierarchy preserved). Step kits, procedure kit, and outputs "
+                "are copied conditionally. The clone starts at version 0 in "
+                "draft status."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "procedure_id": {"type": "integer"},
+                    "new_name": {
+                        "type": "string",
+                        "description": "Optional new name (default: 'Copy of <source name>')",
+                    },
+                    "copy_kit": {"type": "boolean", "default": True},
+                    "copy_outputs": {"type": "boolean", "default": True},
+                },
+                "required": ["procedure_id"],
             },
         ),
         # Issues
@@ -495,10 +921,56 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         # Procedures
         elif name == "list_procedures":
             return await _list_procedures(db, arguments)
+        elif name == "get_procedure":
+            return await _get_procedure(db, arguments)
         elif name == "create_procedure":
             return await _create_procedure(db, arguments)
+        elif name == "update_procedure":
+            return await _update_procedure(db, arguments)
+        elif name == "delete_procedure":
+            return await _delete_procedure(db, arguments)
         elif name == "add_procedure_step":
             return await _add_procedure_step(db, arguments)
+        elif name == "update_step":
+            return await _update_step(db, arguments)
+        elif name == "delete_step":
+            return await _delete_step(db, arguments)
+        elif name == "reorder_steps":
+            return await _reorder_steps(db, arguments)
+        elif name == "list_step_dependencies":
+            return await _list_step_dependencies(db, arguments)
+        elif name == "set_step_dependencies":
+            return await _set_step_dependencies(db, arguments)
+        elif name == "get_kit":
+            return await _get_kit(db, arguments)
+        elif name == "add_kit_item":
+            return await _add_kit_item(db, arguments)
+        elif name == "update_kit_item":
+            return await _update_kit_item(db, arguments)
+        elif name == "remove_kit_item":
+            return await _remove_kit_item(db, arguments)
+        elif name == "get_outputs":
+            return await _get_outputs(db, arguments)
+        elif name == "add_output":
+            return await _add_output(db, arguments)
+        elif name == "update_output":
+            return await _update_output(db, arguments)
+        elif name == "remove_output":
+            return await _remove_output(db, arguments)
+        elif name == "get_step_kit":
+            return await _get_step_kit(db, arguments)
+        elif name == "add_step_kit_item":
+            return await _add_step_kit_item(db, arguments)
+        elif name == "update_step_kit_item":
+            return await _update_step_kit_item(db, arguments)
+        elif name == "remove_step_kit_item":
+            return await _remove_step_kit_item(db, arguments)
+        elif name == "publish_version":
+            return await _publish_version(db, arguments)
+        elif name == "list_versions":
+            return await _list_versions(db, arguments)
+        elif name == "clone_procedure":
+            return await _clone_procedure(db, arguments)
 
         # Issues
         elif name == "list_issues":
@@ -692,6 +1164,8 @@ async def _create_part(db, args: dict) -> list[TextContent]:
         parent_id=parent_id,
     )
     db.add(part)
+    db.flush()
+    log_create(db, part)
     db.commit()
     db.refresh(part)
 
@@ -845,13 +1319,25 @@ async def _list_procedures(db, args: dict) -> list[TextContent]:
 
 
 async def _create_procedure(db, args: dict) -> list[TextContent]:
-    """Create a new procedure."""
+    """Create a new master procedure template (draft status)."""
+    raw_type = args.get("procedure_type", "op")
+    try:
+        procedure_type = ProcedureType(raw_type)
+    except ValueError:
+        return json_response(
+            {"error": f"Invalid procedure_type {raw_type!r}; expected 'op' or 'build'"}
+        )
+
     procedure = MasterProcedure(
         name=args["name"],
         description=args.get("description"),
-        status=ProcedureStatus.DRAFT,
+        procedure_type=procedure_type.value,
+        status=ProcedureStatus.DRAFT.value,
     )
     db.add(procedure)
+    db.flush()
+
+    log_create(db, procedure)
     db.commit()
     db.refresh(procedure)
 
@@ -862,14 +1348,43 @@ async def _create_procedure(db, args: dict) -> list[TextContent]:
             "procedure": {
                 "id": procedure.id,
                 "name": procedure.name,
-                "status": "draft",
+                "description": procedure.description,
+                "procedure_type": procedure_type.value,
+                "status": ProcedureStatus.DRAFT.value,
             },
         }
     )
 
 
+def _calculate_step_number(db, procedure_id: int, parent_step_id: int | None, is_contingency: bool):
+    """Calculate the next step_number — mirrors the canonical API helper.
+
+    Top-level normal ops: 1, 2, 3...
+    Top-level contingency ops: C1, C2, C3...
+    Sub-steps: <parent.step_number>.<N>
+    """
+    if parent_step_id:
+        parent = db.query(ProcedureStep).filter(ProcedureStep.id == parent_step_id).first()
+        if not parent:
+            return None
+        sub_count = (
+            db.query(func.count(ProcedureStep.id))
+            .filter(ProcedureStep.parent_step_id == parent_step_id)
+            .scalar()
+        )
+        return f"{parent.step_number}.{sub_count + 1}"
+
+    sibling_query = db.query(func.count(ProcedureStep.id)).filter(
+        ProcedureStep.procedure_id == procedure_id,
+        ProcedureStep.parent_step_id.is_(None),
+        ProcedureStep.is_contingency.is_(is_contingency),
+    )
+    sibling_count = sibling_query.scalar()
+    return f"C{sibling_count + 1}" if is_contingency else str(sibling_count + 1)
+
+
 async def _add_procedure_step(db, args: dict) -> list[TextContent]:
-    """Add a step to a procedure."""
+    """Add an OP (top-level) or sub-step to a procedure."""
     procedure = (
         db.query(MasterProcedure)
         .filter(
@@ -882,29 +1397,78 @@ async def _add_procedure_step(db, args: dict) -> list[TextContent]:
     if not procedure:
         return json_response({"error": f"Procedure {args['procedure_id']} not found"})
 
-    # Determine step order
-    existing_steps = len(procedure.steps)
-    step_number = args.get("step_number", str(existing_steps + 1))
+    parent_step_id = args.get("parent_step_id")
+    if parent_step_id:
+        parent = (
+            db.query(ProcedureStep)
+            .filter(
+                ProcedureStep.id == parent_step_id,
+                ProcedureStep.procedure_id == procedure.id,
+            )
+            .first()
+        )
+        if not parent:
+            return json_response(
+                {"error": f"Parent step {parent_step_id} not found in procedure {procedure.id}"}
+            )
+        # Sub-steps inherit contingency status from parent and are always level=1.
+        is_contingency = parent.is_contingency
+        level = 1
+    else:
+        is_contingency = bool(args.get("is_contingency", False))
+        level = 0
+
+    step_number = _calculate_step_number(db, procedure.id, parent_step_id, is_contingency)
+    if step_number is None:
+        return json_response({"error": f"Parent step {parent_step_id} not found"})
+
+    max_order = (
+        db.query(func.max(ProcedureStep.order))
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .scalar()
+    )
+    next_order = (max_order or 0) + 1
 
     step = ProcedureStep(
         procedure_id=procedure.id,
+        parent_step_id=parent_step_id,
+        order=next_order,
+        step_number=step_number,
+        level=level,
         title=args["title"],
         instructions=args.get("instructions"),
-        step_number=step_number,
-        order=existing_steps + 1,
+        required_data_schema=args.get("required_data_schema"),
+        is_contingency=is_contingency,
+        requires_signoff=bool(args.get("requires_signoff", False)),
+        estimated_duration_minutes=args.get("estimated_duration_minutes"),
     )
     db.add(step)
+    db.flush()
+
+    log_create(db, step)
     db.commit()
     db.refresh(step)
 
     return json_response(
         {
             "success": True,
-            "message": f"Added step '{step.title}' to procedure '{procedure.name}'",
+            "message": (
+                f"Added {'sub-step' if level else 'OP'} {step.step_number} "
+                f"'{step.title}' to procedure '{procedure.name}'"
+            ),
             "step": {
                 "id": step.id,
+                "procedure_id": step.procedure_id,
+                "parent_step_id": step.parent_step_id,
                 "step_number": step.step_number,
+                "level": step.level,
+                "order": step.order,
                 "title": step.title,
+                "instructions": step.instructions,
+                "is_contingency": step.is_contingency,
+                "requires_signoff": step.requires_signoff,
+                "estimated_duration_minutes": step.estimated_duration_minutes,
+                "required_data_schema": step.required_data_schema,
             },
         }
     )
@@ -954,6 +1518,8 @@ async def _create_issue(db, args: dict) -> list[TextContent]:
         priority=IssuePriority(priority),
     )
     db.add(issue)
+    db.flush()
+    log_create(db, issue)
     db.commit()
     db.refresh(issue)
 
@@ -1005,6 +1571,7 @@ async def _list_risks(db, args: dict) -> list[TextContent]:
 async def _create_risk(db, args: dict) -> list[TextContent]:
     """Create a new risk."""
     risk = Risk(
+        risk_number=generate_risk_number(db),
         title=args["title"],
         description=args.get("description"),
         probability=args["probability"],
@@ -1013,15 +1580,18 @@ async def _create_risk(db, args: dict) -> list[TextContent]:
         status=RiskStatus.IDENTIFIED,
     )
     db.add(risk)
+    db.flush()
+    log_create(db, risk)
     db.commit()
     db.refresh(risk)
 
     return json_response(
         {
             "success": True,
-            "message": f"Created risk '{risk.title}' with ID {risk.id}",
+            "message": f"Created risk '{risk.title}' ({risk.risk_number}) with ID {risk.id}",
             "risk": {
                 "id": risk.id,
+                "risk_number": risk.risk_number,
                 "title": risk.title,
                 "probability": risk.probability,
                 "impact": risk.impact,
@@ -1238,6 +1808,8 @@ async def _assign_requirement(db, args: dict) -> list[TextContent]:
         notes=args.get("notes"),
     )
     db.add(pr)
+    db.flush()
+    log_create(db, pr)
     db.commit()
     db.refresh(pr)
 
@@ -1262,11 +1834,13 @@ async def _verify_requirement(db, args: dict) -> list[TextContent]:
     if not pr:
         return json_response({"error": f"Part requirement {args['part_requirement_id']} not found"})
 
+    old_values = get_model_dict(pr)
     pr.status = "verified"
     pr.verified_at = datetime.now(UTC)
     if args.get("notes"):
         pr.notes = args["notes"]
 
+    log_update(db, pr, old_values)
     db.commit()
     db.refresh(pr)
 
@@ -1376,6 +1950,8 @@ async def _add_component(db, args: dict) -> list[TextContent]:
         reference_designator=args.get("reference_designator"),
     )
     db.add(line)
+    db.flush()
+    log_create(db, line)
     db.commit()
     db.refresh(line)
 
@@ -1403,6 +1979,7 @@ async def _remove_component(db, args: dict) -> list[TextContent]:
     component_name = line.component.name
     assembly_name = line.assembly.name
 
+    log_delete(db, line)
     db.delete(line)
     db.commit()
 
@@ -1410,6 +1987,1148 @@ async def _remove_component(db, args: dict) -> list[TextContent]:
         {
             "success": True,
             "message": f"Removed '{component_name}' from '{assembly_name}' BOM",
+        }
+    )
+
+
+# ============ PROCEDURE: READ / UPDATE / DELETE / RENUMBER ============
+
+
+def _serialize_step(step: ProcedureStep) -> dict:
+    return {
+        "id": step.id,
+        "procedure_id": step.procedure_id,
+        "parent_step_id": step.parent_step_id,
+        "order": step.order,
+        "step_number": step.step_number,
+        "level": step.level,
+        "title": step.title,
+        "instructions": step.instructions,
+        "required_data_schema": step.required_data_schema,
+        "is_contingency": step.is_contingency,
+        "requires_signoff": step.requires_signoff,
+        "estimated_duration_minutes": step.estimated_duration_minutes,
+        "workcenter_id": step.workcenter_id,
+    }
+
+
+def _build_step_tree(steps: list[ProcedureStep]) -> list[dict]:
+    """Build the hierarchical step tree, mirroring the canonical helper."""
+    children_map: dict[int | None, list[ProcedureStep]] = {}
+    for s in steps:
+        children_map.setdefault(s.parent_step_id, []).append(s)
+    for kids in children_map.values():
+        kids.sort(key=lambda s: s.order)
+
+    def build(node: ProcedureStep) -> dict:
+        d = _serialize_step(node)
+        d["sub_steps"] = [build(c) for c in children_map.get(node.id, [])]
+        return d
+
+    return [build(s) for s in children_map.get(None, [])]
+
+
+def _renumber_procedure_steps(steps: list[ProcedureStep]) -> None:
+    """Recompute step_numbers from current `order` values.
+
+    Mirrors src/opal/api/routes/procedures.py:_renumber_procedure_steps.
+    Top-level normal -> 1, 2, 3...; top-level contingency -> C1, C2...;
+    sub-steps -> <parent_step_number>.<N>.
+    """
+    top_level = sorted([s for s in steps if s.parent_step_id is None], key=lambda s: s.order)
+    normal_idx = 0
+    contingency_idx = 0
+    for op in top_level:
+        if op.is_contingency:
+            contingency_idx += 1
+            op.step_number = f"C{contingency_idx}"
+        else:
+            normal_idx += 1
+            op.step_number = str(normal_idx)
+    children: dict[int, list[ProcedureStep]] = {}
+    for s in steps:
+        if s.parent_step_id is not None:
+            children.setdefault(s.parent_step_id, []).append(s)
+    for parent_id, kids in children.items():
+        parent = next((s for s in steps if s.id == parent_id), None)
+        if parent is None:
+            continue
+        kids.sort(key=lambda s: s.order)
+        for i, kid in enumerate(kids, start=1):
+            kid.step_number = f"{parent.step_number}.{i}"
+
+
+def _load_procedure(db, procedure_id: int) -> MasterProcedure | None:
+    return (
+        db.query(MasterProcedure)
+        .filter(MasterProcedure.id == procedure_id, MasterProcedure.deleted_at.is_(None))
+        .first()
+    )
+
+
+async def _get_procedure(db, args: dict) -> list[TextContent]:
+    """Return a procedure with its full hierarchical step tree, kit, outputs, and deps."""
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    steps = (
+        db.query(ProcedureStep)
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .order_by(ProcedureStep.order)
+        .all()
+    )
+    deps = (
+        db.query(StepDependency)
+        .join(ProcedureStep, StepDependency.step_id == ProcedureStep.id)
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .all()
+    )
+    kit_items = db.query(Kit).filter(Kit.procedure_id == procedure.id).all()
+    outputs = db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == procedure.id).all()
+
+    return json_response(
+        {
+            "id": procedure.id,
+            "name": procedure.name,
+            "description": procedure.description,
+            "procedure_type": procedure.procedure_type.value
+            if hasattr(procedure.procedure_type, "value")
+            else procedure.procedure_type,
+            "status": procedure.status.value
+            if hasattr(procedure.status, "value")
+            else procedure.status,
+            "current_version_id": procedure.current_version_id,
+            "step_count": len(steps),
+            "steps": _build_step_tree(steps),
+            "dependencies": [
+                {"step_id": d.step_id, "depends_on_step_id": d.depends_on_step_id} for d in deps
+            ],
+            "kit": [
+                {
+                    "id": k.id,
+                    "part_id": k.part_id,
+                    "part_name": k.part.name,
+                    "quantity_required": float(k.quantity_required),
+                }
+                for k in kit_items
+            ],
+            "outputs": [
+                {
+                    "id": o.id,
+                    "part_id": o.part_id,
+                    "part_name": o.part.name,
+                    "quantity_produced": float(o.quantity_produced),
+                }
+                for o in outputs
+            ],
+        }
+    )
+
+
+async def _update_procedure(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    old_values = get_model_dict(procedure)
+    if "name" in args:
+        procedure.name = args["name"]
+    if "description" in args:
+        procedure.description = args["description"]
+    if "status" in args:
+        try:
+            procedure.status = ProcedureStatus(args["status"]).value
+        except ValueError:
+            return json_response({"error": f"Invalid status {args['status']!r}"})
+    if "procedure_type" in args:
+        try:
+            procedure.procedure_type = ProcedureType(args["procedure_type"]).value
+        except ValueError:
+            return json_response({"error": f"Invalid procedure_type {args['procedure_type']!r}"})
+
+    log_update(db, procedure, old_values)
+    db.commit()
+    db.refresh(procedure)
+
+    return json_response(
+        {
+            "success": True,
+            "message": f"Updated procedure {procedure.id}",
+            "procedure": {
+                "id": procedure.id,
+                "name": procedure.name,
+                "description": procedure.description,
+                "procedure_type": procedure.procedure_type.value
+                if hasattr(procedure.procedure_type, "value")
+                else procedure.procedure_type,
+                "status": procedure.status.value
+                if hasattr(procedure.status, "value")
+                else procedure.status,
+            },
+        }
+    )
+
+
+async def _delete_procedure(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    procedure.deleted_at = datetime.now(UTC)
+    log_delete(db, procedure)
+    db.commit()
+    return json_response({"success": True, "message": f"Soft-deleted procedure {procedure.id}"})
+
+
+async def _update_step(db, args: dict) -> list[TextContent]:
+    step = (
+        db.query(ProcedureStep)
+        .filter(
+            ProcedureStep.id == args["step_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not step:
+        return json_response(
+            {"error": (f"Step {args['step_id']} not found in procedure {args['procedure_id']}")}
+        )
+
+    old_values = get_model_dict(step)
+    if "title" in args:
+        step.title = args["title"]
+    if "instructions" in args:
+        step.instructions = args["instructions"]
+    if "is_contingency" in args:
+        step.is_contingency = bool(args["is_contingency"])
+    if "requires_signoff" in args:
+        step.requires_signoff = bool(args["requires_signoff"])
+    if "estimated_duration_minutes" in args:
+        step.estimated_duration_minutes = args["estimated_duration_minutes"]
+    if "required_data_schema" in args:
+        step.required_data_schema = args["required_data_schema"]
+
+    log_update(db, step, old_values)
+    db.commit()
+    db.refresh(step)
+
+    return json_response(
+        {"success": True, "message": f"Updated step {step.id}", "step": _serialize_step(step)}
+    )
+
+
+async def _delete_step(db, args: dict) -> list[TextContent]:
+    step = (
+        db.query(ProcedureStep)
+        .filter(
+            ProcedureStep.id == args["step_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not step:
+        return json_response({"error": f"Step {args['step_id']} not found"})
+
+    deleted_order = step.order
+    log_delete(db, step)
+    db.delete(step)
+    db.flush()
+
+    # Pull remaining steps after the deleted-cascade flush and renumber.
+    remaining = (
+        db.query(ProcedureStep).filter(ProcedureStep.procedure_id == args["procedure_id"]).all()
+    )
+    for s in remaining:
+        if s.order > deleted_order:
+            s.order -= 1
+    _renumber_procedure_steps(remaining)
+    db.commit()
+
+    return json_response(
+        {
+            "success": True,
+            "message": f"Deleted step {args['step_id']} and renumbered remaining steps",
+            "remaining_step_count": len(remaining),
+        }
+    )
+
+
+async def _reorder_steps(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    steps = db.query(ProcedureStep).filter(ProcedureStep.procedure_id == procedure.id).all()
+    step_map = {s.id: s for s in steps}
+    requested = list(args["step_ids"])
+    if set(requested) != set(step_map.keys()):
+        return json_response(
+            {
+                "error": (
+                    "step_ids must be the exact set of all step IDs in the procedure "
+                    f"(got {len(requested)} ids, procedure has {len(step_map)} steps)"
+                )
+            }
+        )
+
+    for i, sid in enumerate(requested, start=1):
+        step_map[sid].order = i
+    _renumber_procedure_steps(steps)
+    db.commit()
+
+    ordered = (
+        db.query(ProcedureStep)
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .order_by(ProcedureStep.order)
+        .all()
+    )
+    return json_response(
+        {
+            "success": True,
+            "message": f"Reordered {len(ordered)} steps",
+            "steps": [_serialize_step(s) for s in ordered],
+        }
+    )
+
+
+# ============ STEP DEPENDENCIES ============
+
+
+async def _list_step_dependencies(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    rows = (
+        db.query(StepDependency)
+        .join(ProcedureStep, StepDependency.step_id == ProcedureStep.id)
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .all()
+    )
+    return json_response(
+        {
+            "procedure_id": procedure.id,
+            "count": len(rows),
+            "dependencies": [
+                {"step_id": d.step_id, "depends_on_step_id": d.depends_on_step_id} for d in rows
+            ],
+        }
+    )
+
+
+async def _set_step_dependencies(db, args: dict) -> list[TextContent]:
+    """Replace the prerequisite list for a top-level OP. Mirrors the canonical
+    set_step_dependencies handler — same-procedure scope, op-level only, no
+    self-loops, no cycles."""
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    target_id: int = args["step_id"]
+    target = (
+        db.query(ProcedureStep)
+        .filter(ProcedureStep.id == target_id, ProcedureStep.procedure_id == procedure.id)
+        .first()
+    )
+    if not target:
+        return json_response({"error": f"Step {target_id} not found in procedure {procedure.id}"})
+    if target.parent_step_id is not None:
+        return json_response({"error": "Dependencies are only allowed on top-level operations"})
+
+    requested = list(dict.fromkeys(args["depends_on"]))
+    if target_id in requested:
+        return json_response({"error": "A step cannot depend on itself"})
+
+    if requested:
+        prereqs = db.query(ProcedureStep).filter(ProcedureStep.id.in_(requested)).all()
+        prereq_map = {p.id: p for p in prereqs}
+        for pid in requested:
+            p = prereq_map.get(pid)
+            if p is None or p.procedure_id != procedure.id:
+                return json_response({"error": f"Step {pid} is not in this procedure"})
+            if p.parent_step_id is not None:
+                return json_response(
+                    {"error": f"Step {pid} is a sub-step; only OPs can be prerequisites"}
+                )
+
+    existing = db.query(StepDependency).all()
+    adj: dict[int, set[int]] = {}
+    for d in existing:
+        if d.step_id == target_id:
+            continue
+        adj.setdefault(d.depends_on_step_id, set()).add(d.step_id)
+    for pid in requested:
+        adj.setdefault(pid, set()).add(target_id)
+
+    def reachable_from(start: int) -> set[int]:
+        seen = {start}
+        stack = [start]
+        while stack:
+            cur = stack.pop()
+            for nxt in adj.get(cur, ()):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    stack.append(nxt)
+        return seen
+
+    downstream = reachable_from(target_id)
+    cycle = downstream & set(requested)
+    if cycle:
+        return json_response(
+            {
+                "error": (
+                    f"Cycle: step {target_id} already gates {sorted(cycle)}; cannot depend on them."
+                )
+            }
+        )
+
+    current = db.query(StepDependency).filter(StepDependency.step_id == target_id).all()
+    for d in current:
+        log_delete(db, d)
+        db.delete(d)
+    db.flush()
+    for pid in requested:
+        new_dep = StepDependency(step_id=target_id, depends_on_step_id=pid)
+        db.add(new_dep)
+        db.flush()
+        log_create(db, new_dep)
+    db.commit()
+    return json_response(
+        {
+            "success": True,
+            "message": (
+                f"Set {len(requested)} prerequisite(s) for step {target_id}"
+                if requested
+                else f"Cleared prerequisites for step {target_id}"
+            ),
+            "step_id": target_id,
+            "depends_on": requested,
+        }
+    )
+
+
+# ============ KIT (procedure-level BOM) ============
+
+
+async def _get_kit(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    items = (
+        db.query(Kit).join(Part).filter(Kit.procedure_id == procedure.id).order_by(Part.name).all()
+    )
+    return json_response(
+        {
+            "procedure_id": procedure.id,
+            "count": len(items),
+            "kit": [
+                {
+                    "id": k.id,
+                    "part_id": k.part_id,
+                    "part_name": k.part.name,
+                    "part_external_pn": k.part.external_pn,
+                    "quantity_required": float(k.quantity_required),
+                }
+                for k in items
+            ],
+        }
+    )
+
+
+async def _add_kit_item(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    part = db.query(Part).filter(Part.id == args["part_id"], Part.deleted_at.is_(None)).first()
+    if not part:
+        return json_response({"error": f"Part {args['part_id']} not found"})
+
+    existing = (
+        db.query(Kit)
+        .filter(Kit.procedure_id == procedure.id, Kit.part_id == args["part_id"])
+        .first()
+    )
+    if existing:
+        return json_response(
+            {"error": f"Part {args['part_id']} already in kit (use update_kit_item)"}
+        )
+
+    item = Kit(
+        procedure_id=procedure.id,
+        part_id=args["part_id"],
+        quantity_required=Decimal(str(args["quantity_required"])),
+    )
+    db.add(item)
+    db.flush()
+    log_create(db, item)
+    db.commit()
+    db.refresh(item)
+    return json_response(
+        {
+            "success": True,
+            "message": f"Added '{part.name}' to procedure {procedure.id} kit",
+            "kit_item": {
+                "id": item.id,
+                "part_id": item.part_id,
+                "quantity_required": float(item.quantity_required),
+            },
+        }
+    )
+
+
+async def _update_kit_item(db, args: dict) -> list[TextContent]:
+    item = (
+        db.query(Kit)
+        .filter(Kit.id == args["kit_id"], Kit.procedure_id == args["procedure_id"])
+        .first()
+    )
+    if not item:
+        return json_response({"error": f"Kit item {args['kit_id']} not found"})
+
+    old_values = get_model_dict(item)
+    item.quantity_required = Decimal(str(args["quantity_required"]))
+    log_update(db, item, old_values)
+    db.commit()
+    db.refresh(item)
+    return json_response(
+        {
+            "success": True,
+            "message": f"Updated kit item {item.id} quantity to {item.quantity_required}",
+            "kit_item": {
+                "id": item.id,
+                "part_id": item.part_id,
+                "quantity_required": float(item.quantity_required),
+            },
+        }
+    )
+
+
+async def _remove_kit_item(db, args: dict) -> list[TextContent]:
+    item = (
+        db.query(Kit)
+        .filter(Kit.procedure_id == args["procedure_id"], Kit.part_id == args["part_id"])
+        .first()
+    )
+    if not item:
+        return json_response(
+            {
+                "error": (
+                    f"Kit item for part {args['part_id']} not found in "
+                    f"procedure {args['procedure_id']}"
+                )
+            }
+        )
+
+    log_delete(db, item)
+    db.delete(item)
+    db.commit()
+    return json_response({"success": True, "message": f"Removed part {args['part_id']} from kit"})
+
+
+# ============ PROCEDURE OUTPUTS (build-type) ============
+
+
+async def _get_outputs(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    outputs = db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == procedure.id).all()
+    return json_response(
+        {
+            "procedure_id": procedure.id,
+            "procedure_type": procedure.procedure_type.value
+            if hasattr(procedure.procedure_type, "value")
+            else procedure.procedure_type,
+            "count": len(outputs),
+            "outputs": [
+                {
+                    "id": o.id,
+                    "part_id": o.part_id,
+                    "part_name": o.part.name,
+                    "part_external_pn": o.part.external_pn,
+                    "quantity_produced": float(o.quantity_produced),
+                }
+                for o in outputs
+            ],
+        }
+    )
+
+
+async def _add_output(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    part = db.query(Part).filter(Part.id == args["part_id"], Part.deleted_at.is_(None)).first()
+    if not part:
+        return json_response({"error": f"Part {args['part_id']} not found"})
+
+    existing = (
+        db.query(ProcedureOutput)
+        .filter(
+            ProcedureOutput.procedure_id == procedure.id,
+            ProcedureOutput.part_id == args["part_id"],
+        )
+        .first()
+    )
+    if existing:
+        return json_response(
+            {"error": f"Part {args['part_id']} already in outputs (use update_output)"}
+        )
+
+    qty = Decimal(str(args.get("quantity_produced", 1)))
+    output = ProcedureOutput(
+        procedure_id=procedure.id, part_id=args["part_id"], quantity_produced=qty
+    )
+    db.add(output)
+    db.flush()
+    log_create(db, output)
+
+    # Mirror canonical add_output: auto-populate the procedure kit from the
+    # output part's direct BOM children (single-level).
+    bom_lines = db.query(BOMLine).filter(BOMLine.assembly_id == args["part_id"]).all()
+    auto_added = 0
+    auto_bumped = 0
+    for bom_line in bom_lines:
+        kit_qty = Decimal(str(bom_line.quantity)) * qty
+        existing_kit = (
+            db.query(Kit)
+            .filter(Kit.procedure_id == procedure.id, Kit.part_id == bom_line.component_id)
+            .first()
+        )
+        if existing_kit:
+            old_values = get_model_dict(existing_kit)
+            existing_kit.quantity_required += kit_qty
+            log_update(db, existing_kit, old_values)
+            auto_bumped += 1
+        else:
+            new_kit = Kit(
+                procedure_id=procedure.id,
+                part_id=bom_line.component_id,
+                quantity_required=kit_qty,
+            )
+            db.add(new_kit)
+            db.flush()
+            log_create(db, new_kit)
+            auto_added += 1
+
+    db.commit()
+    db.refresh(output)
+    return json_response(
+        {
+            "success": True,
+            "message": (
+                f"Added output '{part.name}' (qty {qty}) to procedure "
+                f"{procedure.id}; auto-added {auto_added} kit item(s), bumped {auto_bumped}"
+            ),
+            "output": {
+                "id": output.id,
+                "part_id": output.part_id,
+                "quantity_produced": float(output.quantity_produced),
+            },
+            "kit_auto_added": auto_added,
+            "kit_auto_bumped": auto_bumped,
+        }
+    )
+
+
+async def _update_output(db, args: dict) -> list[TextContent]:
+    output = (
+        db.query(ProcedureOutput)
+        .filter(
+            ProcedureOutput.procedure_id == args["procedure_id"],
+            ProcedureOutput.part_id == args["part_id"],
+        )
+        .first()
+    )
+    if not output:
+        return json_response(
+            {
+                "error": (
+                    f"Output for part {args['part_id']} not found in procedure "
+                    f"{args['procedure_id']}"
+                )
+            }
+        )
+
+    old_values = get_model_dict(output)
+    output.quantity_produced = Decimal(str(args["quantity_produced"]))
+    log_update(db, output, old_values)
+    db.commit()
+    db.refresh(output)
+    return json_response(
+        {
+            "success": True,
+            "message": f"Updated output quantity to {output.quantity_produced}",
+            "output": {
+                "id": output.id,
+                "part_id": output.part_id,
+                "quantity_produced": float(output.quantity_produced),
+            },
+        }
+    )
+
+
+async def _remove_output(db, args: dict) -> list[TextContent]:
+    output = (
+        db.query(ProcedureOutput)
+        .filter(
+            ProcedureOutput.procedure_id == args["procedure_id"],
+            ProcedureOutput.part_id == args["part_id"],
+        )
+        .first()
+    )
+    if not output:
+        return json_response(
+            {
+                "error": (
+                    f"Output for part {args['part_id']} not found in procedure "
+                    f"{args['procedure_id']}"
+                )
+            }
+        )
+
+    log_delete(db, output)
+    db.delete(output)
+    db.commit()
+    return json_response({"success": True, "message": f"Removed output part {args['part_id']}"})
+
+
+# ============ STEP KIT (step-level BOM) ============
+
+
+async def _get_step_kit(db, args: dict) -> list[TextContent]:
+    step = (
+        db.query(ProcedureStep)
+        .filter(
+            ProcedureStep.id == args["step_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not step:
+        return json_response({"error": f"Step {args['step_id']} not found"})
+
+    return json_response(
+        {
+            "procedure_id": step.procedure_id,
+            "step_id": step.id,
+            "step_number": step.step_number,
+            "count": len(step.step_kits),
+            "items": [
+                {
+                    "id": sk.id,
+                    "part_id": sk.part_id,
+                    "part_name": sk.part.name,
+                    "part_external_pn": sk.part.external_pn,
+                    "quantity_required": float(sk.quantity_required),
+                    "usage_type": sk.usage_type.value
+                    if hasattr(sk.usage_type, "value")
+                    else sk.usage_type,
+                    "notes": sk.notes,
+                }
+                for sk in step.step_kits
+            ],
+        }
+    )
+
+
+async def _add_step_kit_item(db, args: dict) -> list[TextContent]:
+    step = (
+        db.query(ProcedureStep)
+        .filter(
+            ProcedureStep.id == args["step_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not step:
+        return json_response({"error": f"Step {args['step_id']} not found"})
+
+    part = db.query(Part).filter(Part.id == args["part_id"], Part.deleted_at.is_(None)).first()
+    if not part:
+        return json_response({"error": f"Part {args['part_id']} not found"})
+
+    existing = (
+        db.query(StepKit)
+        .filter(StepKit.step_id == step.id, StepKit.part_id == args["part_id"])
+        .first()
+    )
+    if existing:
+        return json_response(
+            {
+                "error": (
+                    f"Part {args['part_id']} already in step {step.id} kit "
+                    "(use update_step_kit_item)"
+                )
+            }
+        )
+
+    try:
+        usage = UsageType(args.get("usage_type", "consume"))
+    except ValueError:
+        return json_response({"error": f"Invalid usage_type {args.get('usage_type')!r}"})
+
+    sk = StepKit(
+        step_id=step.id,
+        part_id=args["part_id"],
+        quantity_required=Decimal(str(args["quantity_required"])),
+        usage_type=usage,
+        notes=args.get("notes"),
+    )
+    db.add(sk)
+    db.flush()
+    log_create(db, sk)
+    db.commit()
+    db.refresh(sk)
+    return json_response(
+        {
+            "success": True,
+            "message": (
+                f"Added '{part.name}' ({usage.value}, qty "
+                f"{sk.quantity_required}) to step {step.step_number}"
+            ),
+            "step_kit_item": {
+                "id": sk.id,
+                "step_id": sk.step_id,
+                "part_id": sk.part_id,
+                "quantity_required": float(sk.quantity_required),
+                "usage_type": usage.value,
+                "notes": sk.notes,
+            },
+        }
+    )
+
+
+async def _update_step_kit_item(db, args: dict) -> list[TextContent]:
+    sk = (
+        db.query(StepKit)
+        .join(ProcedureStep)
+        .filter(
+            StepKit.id == args["step_kit_id"],
+            StepKit.step_id == args["step_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not sk:
+        return json_response({"error": f"Step kit item {args['step_kit_id']} not found"})
+
+    old_values = get_model_dict(sk)
+    if "quantity_required" in args:
+        sk.quantity_required = Decimal(str(args["quantity_required"]))
+    if "usage_type" in args:
+        try:
+            sk.usage_type = UsageType(args["usage_type"])
+        except ValueError:
+            return json_response({"error": f"Invalid usage_type {args['usage_type']!r}"})
+    if "notes" in args:
+        sk.notes = args["notes"]
+
+    log_update(db, sk, old_values)
+    db.commit()
+    db.refresh(sk)
+    return json_response(
+        {
+            "success": True,
+            "message": f"Updated step kit item {sk.id}",
+            "step_kit_item": {
+                "id": sk.id,
+                "part_id": sk.part_id,
+                "quantity_required": float(sk.quantity_required),
+                "usage_type": sk.usage_type.value
+                if hasattr(sk.usage_type, "value")
+                else sk.usage_type,
+                "notes": sk.notes,
+            },
+        }
+    )
+
+
+async def _remove_step_kit_item(db, args: dict) -> list[TextContent]:
+    sk = (
+        db.query(StepKit)
+        .join(ProcedureStep)
+        .filter(
+            StepKit.step_id == args["step_id"],
+            StepKit.part_id == args["part_id"],
+            ProcedureStep.procedure_id == args["procedure_id"],
+        )
+        .first()
+    )
+    if not sk:
+        return json_response(
+            {
+                "error": (
+                    f"Step kit item for part {args['part_id']} not found on step {args['step_id']}"
+                )
+            }
+        )
+
+    log_delete(db, sk)
+    db.delete(sk)
+    db.commit()
+    return json_response(
+        {"success": True, "message": f"Removed part {args['part_id']} from step kit"}
+    )
+
+
+# ============ PUBLISH + VERSIONS + CLONE ============
+
+
+async def _publish_version(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    steps = (
+        db.query(ProcedureStep)
+        .filter(ProcedureStep.procedure_id == procedure.id)
+        .order_by(ProcedureStep.order)
+        .all()
+    )
+    if not steps:
+        return json_response({"error": "Cannot publish procedure with no steps"})
+
+    max_version = (
+        db.query(func.max(ProcedureVersion.version_number))
+        .filter(ProcedureVersion.procedure_id == procedure.id)
+        .scalar()
+    )
+    next_version = (max_version or 0) + 1
+
+    step_ids = [s.id for s in steps]
+    all_step_kits = db.query(StepKit).filter(StepKit.step_id.in_(step_ids)).all()
+    step_kit_map: dict[int, list[StepKit]] = {}
+    for sk in all_step_kits:
+        step_kit_map.setdefault(sk.step_id, []).append(sk)
+
+    all_deps = db.query(StepDependency).filter(StepDependency.step_id.in_(step_ids)).all()
+    step_id_to_order = {s.id: s.order for s in steps}
+    depends_on_map: dict[int, list[int]] = {}
+    for d in all_deps:
+        prereq_order = step_id_to_order.get(d.depends_on_step_id)
+        if prereq_order is not None:
+            depends_on_map.setdefault(d.step_id, []).append(prereq_order)
+
+    def step_to_dict(step: ProcedureStep) -> dict:
+        return {
+            "id": step.id,
+            "order": step.order,
+            "step_number": step.step_number,
+            "level": step.level,
+            "parent_step_id": step.parent_step_id,
+            "title": step.title,
+            "instructions": step.instructions,
+            "required_data_schema": step.required_data_schema,
+            "is_contingency": step.is_contingency,
+            "requires_signoff": step.requires_signoff,
+            "estimated_duration_minutes": step.estimated_duration_minutes,
+            "workcenter_id": step.workcenter_id,
+            "depends_on": sorted(depends_on_map.get(step.id, [])),
+            "step_kit": [
+                {
+                    "part_id": sk.part_id,
+                    "part_name": sk.part.name,
+                    "quantity_required": float(sk.quantity_required),
+                    "usage_type": sk.usage_type.value
+                    if hasattr(sk.usage_type, "value")
+                    else sk.usage_type,
+                    "notes": sk.notes,
+                }
+                for sk in step_kit_map.get(step.id, [])
+            ],
+        }
+
+    kit_items = db.query(Kit).filter(Kit.procedure_id == procedure.id).all()
+    output_items = (
+        db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == procedure.id).all()
+    )
+
+    content = {
+        "procedure_name": procedure.name,
+        "procedure_description": procedure.description,
+        "steps": [step_to_dict(s) for s in steps],
+        "kit_items": [
+            {"part_id": k.part_id, "quantity_required": float(k.quantity_required)}
+            for k in kit_items
+        ],
+        "output_items": [
+            {"part_id": o.part_id, "quantity_produced": float(o.quantity_produced)}
+            for o in output_items
+        ],
+    }
+
+    version = ProcedureVersion(
+        procedure_id=procedure.id,
+        version_number=next_version,
+        content=content,
+        created_by_id=None,
+    )
+    db.add(version)
+    db.flush()
+
+    procedure.current_version_id = version.id
+    procedure.status = ProcedureStatus.ACTIVE.value
+
+    log_create(db, version)
+    db.commit()
+    db.refresh(version)
+
+    return json_response(
+        {
+            "success": True,
+            "message": (
+                f"Published procedure {procedure.id} as v{next_version} (status -> active)"
+            ),
+            "version": {
+                "id": version.id,
+                "procedure_id": version.procedure_id,
+                "version_number": version.version_number,
+                "step_count": len(steps),
+            },
+        }
+    )
+
+
+async def _list_versions(db, args: dict) -> list[TextContent]:
+    procedure = _load_procedure(db, args["procedure_id"])
+    if not procedure:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    versions = (
+        db.query(ProcedureVersion)
+        .filter(ProcedureVersion.procedure_id == procedure.id)
+        .order_by(ProcedureVersion.version_number.desc())
+        .all()
+    )
+    return json_response(
+        {
+            "procedure_id": procedure.id,
+            "current_version_id": procedure.current_version_id,
+            "count": len(versions),
+            "versions": [
+                {
+                    "id": v.id,
+                    "version_number": v.version_number,
+                    "created_at": v.created_at.isoformat(),
+                    "created_by_id": v.created_by_id,
+                    "is_current": v.id == procedure.current_version_id,
+                }
+                for v in versions
+            ],
+        }
+    )
+
+
+async def _clone_procedure(db, args: dict) -> list[TextContent]:
+    source = _load_procedure(db, args["procedure_id"])
+    if not source:
+        return json_response({"error": f"Procedure {args['procedure_id']} not found"})
+
+    clone_name = args.get("new_name") or f"Copy of {source.name}"
+    new_procedure = MasterProcedure(
+        name=clone_name,
+        description=source.description,
+        procedure_type=source.procedure_type.value
+        if hasattr(source.procedure_type, "value")
+        else source.procedure_type,
+        status=ProcedureStatus.DRAFT.value,
+        current_version_id=None,
+    )
+    db.add(new_procedure)
+    db.flush()
+
+    step_id_map: dict[int, int] = {}
+    source_steps = (
+        db.query(ProcedureStep)
+        .filter(ProcedureStep.procedure_id == source.id)
+        .order_by(ProcedureStep.order)
+        .all()
+    )
+
+    for s in source_steps:
+        new_step = ProcedureStep(
+            procedure_id=new_procedure.id,
+            order=s.order,
+            step_number=s.step_number,
+            level=s.level,
+            parent_step_id=None,
+            title=s.title,
+            instructions=s.instructions,
+            required_data_schema=s.required_data_schema,
+            is_contingency=s.is_contingency,
+            requires_signoff=s.requires_signoff,
+            estimated_duration_minutes=s.estimated_duration_minutes,
+            workcenter_id=s.workcenter_id,
+        )
+        db.add(new_step)
+        db.flush()
+        step_id_map[s.id] = new_step.id
+
+    for s in source_steps:
+        if s.parent_step_id and s.parent_step_id in step_id_map:
+            new_step = db.query(ProcedureStep).filter(ProcedureStep.id == step_id_map[s.id]).first()
+            if new_step:
+                new_step.parent_step_id = step_id_map[s.parent_step_id]
+
+    copy_kit = bool(args.get("copy_kit", True))
+    copy_outputs = bool(args.get("copy_outputs", True))
+
+    if copy_kit:
+        for s in source_steps:
+            for sk in db.query(StepKit).filter(StepKit.step_id == s.id).all():
+                db.add(
+                    StepKit(
+                        step_id=step_id_map[s.id],
+                        part_id=sk.part_id,
+                        quantity_required=sk.quantity_required,
+                        usage_type=sk.usage_type,
+                        notes=sk.notes,
+                    )
+                )
+        for k in db.query(Kit).filter(Kit.procedure_id == source.id).all():
+            db.add(
+                Kit(
+                    procedure_id=new_procedure.id,
+                    part_id=k.part_id,
+                    quantity_required=k.quantity_required,
+                )
+            )
+
+    if copy_outputs:
+        for o in db.query(ProcedureOutput).filter(ProcedureOutput.procedure_id == source.id).all():
+            db.add(
+                ProcedureOutput(
+                    procedure_id=new_procedure.id,
+                    part_id=o.part_id,
+                    quantity_produced=o.quantity_produced,
+                )
+            )
+
+    log_create(db, new_procedure)
+    db.commit()
+    db.refresh(new_procedure)
+
+    return json_response(
+        {
+            "success": True,
+            "message": (f"Cloned procedure {source.id} -> {new_procedure.id} ('{clone_name}')"),
+            "procedure": {
+                "id": new_procedure.id,
+                "name": new_procedure.name,
+                "procedure_type": new_procedure.procedure_type.value
+                if hasattr(new_procedure.procedure_type, "value")
+                else new_procedure.procedure_type,
+                "status": "draft",
+                "step_count": len(source_steps),
+                "copied_kit": copy_kit,
+                "copied_outputs": copy_outputs,
+            },
         }
     )
 

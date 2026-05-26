@@ -2075,6 +2075,208 @@ async def executions_detail(
     return templates.TemplateResponse("executions/detail.html", context)
 
 
+@router.get("/executions/{instance_id}/report", response_class=HTMLResponse)
+async def executions_report(request: Request, db: DbSession, instance_id: int) -> HTMLResponse:
+    """Standalone, printable build report for a completed work order."""
+    import base64
+    import io
+    from datetime import UTC, datetime
+
+    import segno
+
+    from opal.db.models.attachment import Attachment
+    from opal.db.models.inventory import InventoryProduction
+    from opal.db.models.procedure import ProcedureOutput
+
+    instance = db.query(ProcedureInstance).filter(ProcedureInstance.id == instance_id).first()
+    if not instance:
+        return templates.TemplateResponse(
+            "errors/404.html",
+            {"request": request, "message": f"Execution {instance_id} not found"},
+            status_code=404,
+        )
+
+    inst_status = instance.status.value if hasattr(instance.status, "value") else instance.status
+    if inst_status != "completed":
+        return HTMLResponse(
+            f"<h1>Build report unavailable</h1>"
+            f"<p>Work order is currently <b>{inst_status.upper()}</b>. "
+            f"Reports are only generated for COMPLETED work orders.</p>"
+            f'<p><a href="/executions/{instance_id}">Back to execution</a></p>',
+            status_code=400,
+        )
+
+    version = db.query(ProcedureVersion).filter(ProcedureVersion.id == instance.version_id).first()
+    procedure = (
+        db.query(MasterProcedure).filter(MasterProcedure.id == instance.procedure_id).first()
+    )
+
+    # QR back to the execution detail page.
+    url = f"{request.base_url}executions/{instance_id}"
+    qr = segno.make(url)
+    qr_buf = io.BytesIO()
+    qr.save(qr_buf, kind="svg", scale=3, border=1)
+    qr_data_uri = "data:image/svg+xml;base64," + base64.b64encode(qr_buf.getvalue()).decode()
+
+    # End items: ProcedureOutput defines what this procedure produces; productions
+    # are the actual produced units (serial + OPAL number).
+    output_items = (
+        db.query(ProcedureOutput)
+        .filter(ProcedureOutput.procedure_id == instance.procedure_id)
+        .all()
+    )
+    productions = (
+        db.query(InventoryProduction)
+        .filter(InventoryProduction.procedure_instance_id == instance_id)
+        .all()
+    )
+
+    # Map step_number -> version step (for human-readable data labels).
+    version_steps = version.content.get("steps", []) if version else []
+    version_steps_by_order = {s["order"]: s for s in version_steps}
+
+    # Sorted step executions for the operations table + data collects.
+    step_execs = sorted(instance.step_executions, key=lambda se: se.step_number)
+
+    def _se_status(se) -> str:
+        return se.status.value if hasattr(se.status, "value") else se.status
+
+    ops_summary = []
+    for se in step_execs:
+        vs = version_steps_by_order.get(se.step_number)
+        title = se.title or (vs.get("title") if vs else None) or "(untitled)"
+        ops_summary.append(
+            {
+                "step_number": se.step_number_str or str(se.step_number),
+                "title": title,
+                "status": _se_status(se),
+                "started_at": se.started_at,
+                "completed_at": se.completed_at,
+                "operator": se.completed_by_user.name if se.completed_by_user else None,
+                "signoff": se.signed_off_by_user.name if se.signed_off_by_user else None,
+                "signoff_at": se.signed_off_at,
+            }
+        )
+
+    # Data collects: per step, resolve field name -> human label from the schema.
+    data_collects = []
+    for se in step_execs:
+        if not se.data_captured:
+            continue
+        vs = version_steps_by_order.get(se.step_number)
+        schema = se.required_data_schema or (vs.get("required_data_schema") if vs else None) or {}
+        field_defs = {f["name"]: f for f in schema.get("fields", []) if "name" in f}
+
+        rows = []
+        for field_name, value in se.data_captured.items():
+            field_def = field_defs.get(field_name, {})
+            label = field_def.get("label") or field_name
+            unit = field_def.get("unit")
+            if isinstance(value, bool):
+                display = "YES" if value else "NO"
+            elif value is None or value == "":
+                display = "-"
+            elif isinstance(value, list):
+                if value:
+                    display = f"{len(value)} image(s) (" + ", ".join(f"#{v}" for v in value) + ")"
+                else:
+                    display = "-"
+            else:
+                display = str(value)
+            rows.append({"label": label, "value": display, "unit": unit})
+
+        if rows:
+            data_collects.append(
+                {
+                    "step_number": se.step_number_str or str(se.step_number),
+                    "step_title": se.title or (vs.get("title") if vs else None) or "(untitled)",
+                    "rows": rows,
+                }
+            )
+
+    # Datasets with chart-enabled fields whose points are tied to this WO.
+    step_exec_ids = {se.id for se in step_execs}
+    chart_datasets: list[dict] = []
+    if step_exec_ids:
+        points = (
+            db.query(DataPoint)
+            .filter(DataPoint.step_execution_id.in_(step_exec_ids))
+            .order_by(DataPoint.recorded_at.asc())
+            .all()
+        )
+        points_by_ds: dict[int, list[DataPoint]] = {}
+        for p in points:
+            points_by_ds.setdefault(p.dataset_id, []).append(p)
+
+        if points_by_ds:
+            datasets = (
+                db.query(Dataset)
+                .filter(Dataset.id.in_(points_by_ds.keys()), Dataset.deleted_at.is_(None))
+                .all()
+            )
+            for ds in datasets:
+                fields = (ds.schema or {}).get("fields", []) or []
+                chart_fields = [
+                    f
+                    for f in fields
+                    if f.get("chart") is True and f.get("type") == "number" and f.get("name")
+                ]
+                if not chart_fields:
+                    continue
+                points_for_ds = points_by_ds.get(ds.id, [])
+                points_json = [
+                    {"recorded_at": p.recorded_at.isoformat(), "values": p.values}
+                    for p in points_for_ds
+                ]
+                chart_datasets.append(
+                    {
+                        "dataset": ds,
+                        "chart_fields": chart_fields,
+                        "all_fields": fields,
+                        "points": points_for_ds,
+                        "points_json": points_json,
+                    }
+                )
+
+    # Linked issues on this WO.
+    issues = (
+        db.query(Issue)
+        .filter(Issue.procedure_instance_id == instance.id, Issue.deleted_at.is_(None))
+        .order_by(Issue.created_at.asc())
+        .all()
+    )
+
+    # Closeout photos only.
+    closeout_attachments = (
+        db.query(Attachment)
+        .filter(
+            Attachment.procedure_instance_id == instance.id,
+            Attachment.kind == "closeout",
+        )
+        .order_by(Attachment.created_at.asc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "executions/report.html",
+        {
+            "request": request,
+            "instance": instance,
+            "version": version,
+            "procedure": procedure,
+            "qr_data_uri": qr_data_uri,
+            "output_items": output_items,
+            "productions": productions,
+            "ops_summary": ops_summary,
+            "data_collects": data_collects,
+            "chart_datasets": chart_datasets,
+            "issues": issues,
+            "closeout_attachments": closeout_attachments,
+            "generated_at": datetime.now(UTC),
+        },
+    )
+
+
 # ============ ISSUES ============
 
 

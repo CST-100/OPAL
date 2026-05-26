@@ -799,10 +799,13 @@ function renderAttachments(attachments) {
     if (!container || !countEl) return;
     countEl.textContent = attachments.length;
     if (attachments.length === 0) { container.innerHTML = '<span class="text-muted">No attachments</span>'; return; }
-    let html = '<table class="data-table"><thead><tr><th>FILENAME</th><th style="width:100px;">SIZE</th><th style="width:120px;">TYPE</th><th style="width:180px;">UPLOADED</th><th style="width:60px;"></th></tr></thead><tbody>';
+    let html = '<table class="data-table"><thead><tr><th>FILENAME</th><th style="width:100px;">SIZE</th><th style="width:120px;">TYPE</th><th style="width:90px;">CLOSEOUT</th><th style="width:180px;">UPLOADED</th><th style="width:60px;"></th></tr></thead><tbody>';
     for (const att of attachments) {
         const sizeKb = (att.size_bytes / 1024).toFixed(1);
-        html += `<tr><td><a href="/api/attachments/${att.id}/download" class="mono">${escapeHtml(att.original_filename)}</a></td><td class="mono" style="text-align:right;">${sizeKb} KB</td><td class="mono">${escapeHtml(att.mime_type)}</td><td class="timestamp">${att.created_at.replace('T', ' ').substring(0, 19)}Z</td><td><button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteAttachment(${att.id})">X</button></td></tr>`;
+        const isCloseout = att.kind === 'closeout';
+        const closeoutLabel = isCloseout ? 'YES' : '-';
+        const closeoutAction = isCloseout ? 'unset' : 'set';
+        html += `<tr><td><a href="/api/attachments/${att.id}/download" class="mono">${escapeHtml(att.original_filename)}</a></td><td class="mono" style="text-align:right;">${sizeKb} KB</td><td class="mono">${escapeHtml(att.mime_type)}</td><td class="mono"><button class="btn btn-sm" onclick="toggleCloseout(${att.id}, '${closeoutAction}')" title="Toggle closeout flag">${closeoutLabel}</button></td><td class="timestamp">${att.created_at.replace('T', ' ').substring(0, 19)}Z</td><td><button class="btn btn-sm" style="color:var(--accent-red);" onclick="deleteAttachment(${att.id})">X</button></td></tr>`;
     }
     html += '</tbody></table>';
     container.innerHTML = html;
@@ -811,16 +814,37 @@ function renderAttachments(attachments) {
 async function uploadAttachment() {
     const fileInput = document.getElementById('attachment-file');
     if (!fileInput.files.length) { alert('Please select a file'); return; }
+    const closeoutBox = document.getElementById('attachment-closeout');
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
     formData.append('procedure_instance_id', instanceId);
+    if (closeoutBox && closeoutBox.checked) {
+        formData.append('kind', 'closeout');
+    }
     try {
         const headers = {};
         const userId = localStorage.getItem('opal_user_id');
         if (userId) headers['X-User-Id'] = userId;
         const response = await fetch('/api/attachments/upload', { method: 'POST', headers, body: formData });
-        if (response.ok) { fileInput.value = ''; loadAttachments(); }
+        if (response.ok) {
+            fileInput.value = '';
+            if (closeoutBox) closeoutBox.checked = false;
+            loadAttachments();
+        }
         else { const error = await response.json(); alert('Error: ' + (error.detail || 'Failed to upload file')); }
+    } catch (e) { alert('Network error: ' + e.message); }
+}
+
+async function toggleCloseout(attachmentId, action) {
+    const newKind = action === 'set' ? 'closeout' : null;
+    try {
+        const response = await fetch(`/api/attachments/${attachmentId}`, {
+            method: 'PATCH',
+            headers: getHeaders(),
+            body: JSON.stringify({ kind: newKind }),
+        });
+        if (response.ok) { loadAttachments(); }
+        else { const error = await response.json(); alert('Error: ' + (error.detail || 'Failed to update attachment')); }
     } catch (e) { alert('Network error: ' + e.message); }
 }
 

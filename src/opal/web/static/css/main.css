@@ -1967,23 +1967,32 @@ textarea.md-image-target.md-drop-target {
     color: var(--text-muted);
 }
 
-/* Light theme */
+/* Light theme — Catppuccin Latte (https://catppuccin.com/palette).
+ * Page bg uses Mantle so cards (bg-secondary = Base) read as lighter/elevated,
+ * preserving the existing OPAL pattern where cards "rise" out of the page. */
 :root[data-theme="light"] {
-    --bg-primary: #f5f5f5;
-    --bg-secondary: #ffffff;
-    --bg-tertiary: #e8e8e8;
-    --border-color: #ccc;
-    --border-light: #ddd;
+    --bg-primary: #e6e9ef;   /* Mantle  — page background */
+    --bg-secondary: #eff1f5; /* Base    — cards, panels */
+    --bg-tertiary: #dce0e8;  /* Crust   — insets, table headers, buttons */
+    --border-color: #bcc0cc; /* Surface1 — visible borders */
+    --border-light: #ccd0da; /* Surface0 — subtle borders */
 
-    --text-primary: #1a1a1a;
-    --text-secondary: #555;
-    --text-muted: #999;
+    --text-primary: #4c4f69;   /* Text     */
+    --text-secondary: #5c5f77; /* Subtext1 */
+    --text-muted: #8c8fa1;     /* Overlay1 */
 
-    --accent-blue: #2563eb;
-    --accent-green: #16a34a;
-    --accent-yellow: #d97706;
-    --accent-red: #dc2626;
-    --accent-orange: #c2410c;
+    --accent-blue: #1e66f5;    /* Blue   */
+    --accent-green: #40a02b;   /* Green  */
+    --accent-yellow: #df8e1d;  /* Yellow */
+    --accent-red: #d20f39;     /* Red    */
+    --accent-orange: #fe640b;  /* Peach  */
+
+    /* Diff tints retinted for the Latte accents so they still look like
+     * the right hue against a light background. */
+    --diff-added-bg: rgba(64, 160, 43, 0.12);
+    --diff-removed-bg: rgba(210, 15, 57, 0.10);
+    --diff-modified-bg: rgba(223, 142, 29, 0.14);
+    --diff-changed-bg: rgba(223, 142, 29, 0.20);
 }
 
 :root[data-theme="light"] ::selection {

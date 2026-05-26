@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BUILD REPORT - {{ instance.work_order_number or ('Execution #' ~ instance.id) }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            font-size: 11pt;
+            color: #000;
+            background: #fff;
+            line-height: 1.4;
+            padding: 0.5in;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #000;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .header-left h1 {
+            font-size: 16pt;
+            font-weight: 700;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .header-meta { font-size: 9pt; }
+        .header-meta td { padding: 2px 8px 2px 0; vertical-align: top; }
+        .header-meta .label { font-weight: 700; text-transform: uppercase; }
+        .header-right { text-align: right; }
+        .qr-code img { width: 80px; height: 80px; }
+
+        h2 {
+            font-size: 12pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            padding-bottom: 4px;
+            margin-top: 20px;
+            margin-bottom: 8px;
+        }
+        h3 {
+            font-size: 10pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-top: 12px;
+            margin-bottom: 4px;
+        }
+
+        table.dense {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10pt;
+            margin-bottom: 12px;
+        }
+        table.dense th, table.dense td {
+            border: 1px solid #000;
+            padding: 4px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        table.dense th {
+            background: #e0e0e0;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9pt;
+        }
+        td.num { text-align: right; }
+
+        .data-collect-block {
+            border: 1px solid #000;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+        .data-collect-header {
+            background: #e0e0e0;
+            padding: 6px 10px;
+            font-weight: 700;
+            font-size: 11pt;
+            border-bottom: 1px solid #000;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .data-collect-header .step-number {
+            font-size: 13pt;
+            min-width: 30px;
+        }
+        .data-collect-body { padding: 0; }
+        .data-collect-body table.dense { margin-bottom: 0; border: none; }
+        .data-collect-body table.dense th,
+        .data-collect-body table.dense td { border-left: none; border-right: none; }
+
+        .chart-block {
+            border: 1px solid #000;
+            margin-bottom: 16px;
+            page-break-inside: avoid;
+            padding: 10px;
+        }
+        .chart-block .chart-canvas-wrap {
+            height: 240px;
+            margin-bottom: 8px;
+        }
+        .chart-block canvas { width: 100% !important; height: 100% !important; }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .photo-card {
+            border: 1px solid #000;
+            padding: 6px;
+            page-break-inside: avoid;
+        }
+        .photo-card img {
+            display: block;
+            max-width: 100%;
+            max-height: 360px;
+            margin: 0 auto;
+        }
+        .photo-card .caption {
+            margin-top: 4px;
+            font-size: 9pt;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        .empty {
+            font-size: 10pt;
+            color: #555;
+            padding: 6px 0;
+            font-style: italic;
+        }
+
+        .footer-signatures {
+            margin-top: 32px;
+            border-top: 3px solid #000;
+            padding-top: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .sig-block {
+            text-align: center;
+            min-width: 200px;
+        }
+        .sig-line {
+            border-bottom: 1px solid #000;
+            height: 40px;
+            margin-bottom: 4px;
+        }
+        .sig-label {
+            font-size: 9pt;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        a { color: #000; text-decoration: underline; }
+
+        @media print {
+            body { padding: 0; }
+            h2 { page-break-after: avoid; }
+            .data-collect-block, .chart-block, .photo-card { page-break-inside: avoid; }
+            @page { margin: 0.5in; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>BUILD REPORT</h1>
+            <table class="header-meta">
+                <tr>
+                    <td class="label">Work Order:</td>
+                    <td>{{ instance.work_order_number or ('#' ~ instance.id) }}</td>
+                    <td class="label" style="padding-left: 24px;">Status:</td>
+                    <td>{{ instance.status.value.upper() if instance.status.value is defined else instance.status }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Procedure:</td>
+                    <td>{{ procedure.name if procedure else '-' }}{% if version %} v{{ version.version_number }}{% endif %}</td>
+                    <td class="label" style="padding-left: 24px;">Started:</td>
+                    <td>{{ instance.started_at.strftime('%Y-%m-%dT%H:%M:%SZ') if instance.started_at else '-' }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Operator:</td>
+                    <td>{{ instance.started_by_user.name if instance.started_by_user else '-' }}</td>
+                    <td class="label" style="padding-left: 24px;">Completed:</td>
+                    <td>{{ instance.completed_at.strftime('%Y-%m-%dT%H:%M:%SZ') if instance.completed_at else '-' }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Generated:</td>
+                    <td colspan="3">{{ generated_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="header-right">
+            <div class="qr-code"><img src="{{ qr_data_uri }}" alt="QR Code"></div>
+            <div style="font-size: 8pt; margin-top: 4px;">OPAL BUILD REPORT</div>
+        </div>
+    </div>
+
+    {# ============ END ITEMS ============ #}
+    <h2>END ITEM</h2>
+    {% if productions or output_items %}
+    <table class="dense">
+        <thead>
+            <tr>
+                <th>PART</th>
+                <th style="width: 140px;">INTERNAL PN</th>
+                <th style="width: 140px;">OPAL #</th>
+                <th style="width: 140px;">SERIAL</th>
+                <th style="width: 80px;">QTY</th>
+                <th style="width: 100px;">STATUS</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in productions %}
+            <tr>
+                <td>{{ p.inventory_record.part.name if p.inventory_record and p.inventory_record.part else '-' }}</td>
+                <td>{{ p.inventory_record.part.internal_pn if p.inventory_record and p.inventory_record.part else '-' }}</td>
+                <td>{{ p.produced_opal_number or '-' }}</td>
+                <td>{{ p.serial_number or '-' }}</td>
+                <td class="num">{{ p.quantity }}</td>
+                <td>{{ p.status.value.upper() if p.status.value is defined else p.status }}</td>
+            </tr>
+            {% endfor %}
+            {% if not productions %}
+            {% for o in output_items %}
+            <tr>
+                <td>{{ o.part.name if o.part else '-' }}</td>
+                <td>{{ o.part.internal_pn if o.part else '-' }}</td>
+                <td>-</td>
+                <td>-</td>
+                <td class="num">{{ o.quantity_produced }}</td>
+                <td>PLANNED</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No end items produced by this work order.</div>
+    {% endif %}
+
+    {# ============ OPERATIONS SUMMARY ============ #}
+    <h2>OPERATIONS SUMMARY</h2>
+    {% if ops_summary %}
+    <table class="dense">
+        <thead>
+            <tr>
+                <th style="width: 60px;">STEP</th>
+                <th>TITLE</th>
+                <th style="width: 100px;">STATUS</th>
+                <th style="width: 150px;">STARTED</th>
+                <th style="width: 150px;">COMPLETED</th>
+                <th style="width: 120px;">OPERATOR</th>
+                <th style="width: 120px;">SIGNOFF</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for op in ops_summary %}
+            <tr>
+                <td>{{ op.step_number }}</td>
+                <td>{{ op.title }}</td>
+                <td>{{ op.status.upper().replace('_', ' ') }}</td>
+                <td>{{ op.started_at.strftime('%Y-%m-%dT%H:%M:%SZ') if op.started_at else '-' }}</td>
+                <td>{{ op.completed_at.strftime('%Y-%m-%dT%H:%M:%SZ') if op.completed_at else '-' }}</td>
+                <td>{{ op.operator or '-' }}</td>
+                <td>{{ op.signoff or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No operations recorded.</div>
+    {% endif %}
+
+    {# ============ DATA COLLECTS ============ #}
+    <h2>DATA COLLECTS</h2>
+    {% if data_collects %}
+        {% for dc in data_collects %}
+        <div class="data-collect-block">
+            <div class="data-collect-header">
+                <span class="step-number">{{ dc.step_number }}</span>
+                <span>{{ dc.step_title }}</span>
+            </div>
+            <div class="data-collect-body">
+                <table class="dense">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%;">FIELD</th>
+                            <th>VALUE</th>
+                            <th style="width: 80px;">UNIT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in dc.rows %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td>{{ row.value }}</td>
+                            <td>{{ row.unit or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="empty">No data was captured during this work order.</div>
+    {% endif %}
+
+    {# ============ DATASET CHARTS ============ #}
+    <h2>DATASET CHARTS</h2>
+    {% if chart_datasets %}
+        {% for cds in chart_datasets %}
+            {% for field in cds.chart_fields %}
+            <div class="chart-block">
+                <h3>{{ cds.dataset.name }} - {{ field.label or field.name }}{% if field.unit %} ({{ field.unit }}){% endif %}</h3>
+                <div class="chart-canvas-wrap">
+                    <canvas id="chart-{{ cds.dataset.id }}-{{ loop.index0 }}"
+                            data-points='{{ cds.points_json | tojson }}'
+                            data-field='{{ field.name }}'
+                            data-label='{{ (field.label or field.name) ~ (' (' ~ field.unit ~ ')' if field.unit else '') }}'
+                            class="chart-canvas"></canvas>
+                </div>
+                <table class="dense">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">RECORDED</th>
+                            {% for f in cds.all_fields %}
+                            <th>{{ (f.label or f.name) | upper }}{% if f.unit %} ({{ f.unit }}){% endif %}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in cds.points %}
+                        <tr>
+                            <td>{{ p.recorded_at.strftime('%Y-%m-%dT%H:%M:%SZ') }}</td>
+                            {% for f in cds.all_fields %}
+                            <td>{{ p.values.get(f.name, '-') }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+    <div class="empty">No dataset fields are enabled for charting on this work order's data.</div>
+    {% endif %}
+
+    {# ============ ISSUE TICKETS ============ #}
+    <h2>ISSUE TICKETS</h2>
+    {% if issues %}
+    <table class="dense">
+        <thead>
+            <tr>
+                <th style="width: 90px;">ISSUE #</th>
+                <th style="width: 110px;">TYPE</th>
+                <th style="width: 80px;">PRIORITY</th>
+                <th style="width: 110px;">STATUS</th>
+                <th>TITLE</th>
+                <th>ROOT CAUSE</th>
+                <th style="width: 110px;">DISPOSITION</th>
+                <th style="width: 150px;">OPENED</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for iss in issues %}
+            <tr>
+                <td>{{ iss.issue_number }}</td>
+                <td>{{ (iss.issue_type.value if iss.issue_type.value is defined else iss.issue_type).upper().replace('_', ' ') }}</td>
+                <td>{{ (iss.priority.value if iss.priority.value is defined else iss.priority).upper() }}</td>
+                <td>{{ (iss.status.value if iss.status.value is defined else iss.status).upper().replace('_', ' ') }}</td>
+                <td>{{ iss.title }}</td>
+                <td>{{ (iss.root_cause or '-')[:200] }}{% if iss.root_cause and iss.root_cause|length > 200 %}...{% endif %}</td>
+                <td>{{ (iss.disposition_type.value if iss.disposition_type and iss.disposition_type.value is defined else (iss.disposition_type or '-')) | upper | replace('_', ' ') }}</td>
+                <td>{{ iss.created_at.strftime('%Y-%m-%dT%H:%M:%SZ') if iss.created_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No issues were logged against this work order.</div>
+    {% endif %}
+
+    {# ============ CLOSEOUT PHOTOS ============ #}
+    <h2>CLOSEOUT PHOTOS</h2>
+    {% if closeout_attachments %}
+    <div class="photo-grid">
+        {% for att in closeout_attachments %}
+        <div class="photo-card">
+            <img src="/api/attachments/{{ att.id }}/download" alt="{{ att.original_filename }}">
+            <div class="caption">
+                {{ att.original_filename }}<br>
+                {{ att.created_at.strftime('%Y-%m-%dT%H:%M:%SZ') if att.created_at else '' }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">No closeout photos attached. Photos can be marked closeout from the execution detail page.</div>
+    {% endif %}
+
+    {# ============ FOOTER SIGNATURES ============ #}
+    <div class="footer-signatures">
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">OPERATOR</div>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">INSPECTOR</div>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-label">DATE</div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            document.querySelectorAll('canvas.chart-canvas').forEach(function (canvas) {
+                let raw;
+                try { raw = JSON.parse(canvas.dataset.points || '[]'); }
+                catch (e) { raw = []; }
+                const fieldName = canvas.dataset.field;
+                const labelText = canvas.dataset.label || fieldName;
+
+                const labels = raw.map(function (p) {
+                    return new Date(p.recorded_at).toISOString().replace('T', ' ').substring(0, 19) + 'Z';
+                });
+                const values = raw.map(function (p) {
+                    const v = p.values ? p.values[fieldName] : null;
+                    return (typeof v === 'number') ? v : (v == null ? null : Number(v));
+                });
+
+                new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: labelText,
+                            data: values,
+                            borderColor: '#000',
+                            backgroundColor: 'rgba(0, 0, 0, 0.08)',
+                            tension: 0.1,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#000'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: false,
+                        plugins: {
+                            legend: { labels: { color: '#000' } }
+                        },
+                        scales: {
+                            x: { ticks: { color: '#000' }, grid: { color: '#ccc' } },
+                            y: { ticks: { color: '#000' }, grid: { color: '#ccc' } }
+                        }
+                    }
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

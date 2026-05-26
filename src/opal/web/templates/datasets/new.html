@@ -26,7 +26,7 @@
             <div class="form-group">
                 <label class="form-label">SCHEMA FIELDS</label>
                 <div id="schema-fields">
-                    <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+                    <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); align-items: center;">
                         <input type="text" class="form-input field-name" placeholder="Field name" style="flex: 2;">
                         <select class="form-select field-type" style="flex: 1;">
                             <option value="number">Number</option>
@@ -35,6 +35,10 @@
                             <option value="date">Date</option>
                         </select>
                         <input type="text" class="form-input field-unit" placeholder="Unit (optional)" style="flex: 1;">
+                        <label style="display: inline-flex; align-items: center; gap: var(--space-xs); white-space: nowrap; font-size: 0.85rem;" title="Render this field as a chart in build reports (numeric fields only)">
+                            <input type="checkbox" class="field-chart">
+                            <span class="mono">CHART</span>
+                        </label>
                         {{ ok.btn("X", attrs='type="button" onclick="removeField(this)" style="padding: 0 var(--space-sm);"') }}
                     </div>
                 </div>
@@ -50,7 +54,7 @@
 function addField() {
     const container = document.getElementById('schema-fields');
     const fieldHtml = `
-        <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);">
+        <div class="schema-field" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); align-items: center;">
             <input type="text" class="form-input field-name" placeholder="Field name" style="flex: 2;">
             <select class="form-select field-type" style="flex: 1;">
                 <option value="number">Number</option>
@@ -59,6 +63,10 @@ function addField() {
                 <option value="date">Date</option>
             </select>
             <input type="text" class="form-input field-unit" placeholder="Unit (optional)" style="flex: 1;">
+            <label style="display: inline-flex; align-items: center; gap: var(--space-xs); white-space: nowrap; font-size: 0.85rem;" title="Render this field as a chart in build reports (numeric fields only)">
+                <input type="checkbox" class="field-chart">
+                <span class="mono">CHART</span>
+            </label>
             <button type="button" class="btn" onclick="removeField(this)" style="padding: 0 var(--space-sm);">X</button>
         </div>
     `;
@@ -75,9 +83,11 @@ function buildSchema() {
         const name = row.querySelector('.field-name').value.trim();
         const type = row.querySelector('.field-type').value;
         const unit = row.querySelector('.field-unit').value.trim();
+        const chartBox = row.querySelector('.field-chart');
         if (name) {
             const field = { name, type };
             if (unit) field.unit = unit;
+            if (chartBox && chartBox.checked && type === 'number') field.chart = true;
             fields.push(field);
         }
     });

@@ -9,12 +9,15 @@ from pydantic import BaseModel
 
 from opal.api.deps import CurrentUserId, DbSession
 from opal.config import get_active_settings
-from opal.core.audit import log_create, log_delete
+from opal.core.audit import get_model_dict, log_create, log_delete, log_update
 from opal.db.models.attachment import Attachment
 from opal.db.models.execution import ProcedureInstance, StepExecution
 from opal.db.models.issue import Issue
 
 router = APIRouter(prefix="/attachments", tags=["attachments"])
+
+
+ALLOWED_KINDS: set[str | None] = {None, "inline", "reference", "closeout"}
 
 
 class AttachmentResponse(BaseModel):
@@ -33,6 +36,12 @@ class AttachmentResponse(BaseModel):
     created_at: str
 
     model_config = {"from_attributes": True}
+
+
+class AttachmentPatchRequest(BaseModel):
+    """Partial update payload for an attachment."""
+
+    kind: str | None = None
 
 
 def _attachment_to_response(att: Attachment) -> AttachmentResponse:
@@ -68,6 +77,12 @@ async def upload_attachment(
     procedure template. `procedure_id` scopes inline images used in step
     instructions so they're cleaned up when the procedure is deleted.
     """
+    if kind is not None and kind not in ALLOWED_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid kind '{kind}'. Allowed: {sorted(k for k in ALLOWED_KINDS if k)}",
+        )
+
     settings = get_active_settings()
 
     # Validate MIME type
@@ -205,6 +220,33 @@ async def list_attachments(
 
     attachments = query.order_by(Attachment.created_at.desc()).limit(200).all()
     return [_attachment_to_response(a) for a in attachments]
+
+
+@router.patch("/{attachment_id}", response_model=AttachmentResponse)
+async def patch_attachment(
+    db: DbSession,
+    attachment_id: int,
+    payload: AttachmentPatchRequest,
+    user_id: CurrentUserId,
+) -> AttachmentResponse:
+    """Update mutable fields on an attachment (currently just `kind`)."""
+    attachment = db.query(Attachment).filter(Attachment.id == attachment_id).first()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    new_kind = payload.kind
+    if new_kind is not None and new_kind not in ALLOWED_KINDS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid kind '{new_kind}'. Allowed: {sorted(k for k in ALLOWED_KINDS if k)}",
+        )
+
+    old_values = get_model_dict(attachment)
+    attachment.kind = new_kind
+    log_update(db, attachment, old_values, user_id)
+    db.commit()
+    db.refresh(attachment)
+    return _attachment_to_response(attachment)
 
 
 @router.delete("/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
