@@ -30,6 +30,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     settings.ensure_directories()
 
+    # Overlay DB-stored AppSetting values (Onshape credentials edited via
+    # /settings/onshape) on top of env-loaded settings before we read any
+    # integration config.
+    from opal.config import apply_db_overlay, get_active_settings
+    from opal.db.base import SessionLocal
+
+    with contextlib.suppress(Exception), SessionLocal() as _db:
+        apply_db_overlay(_db)
+    settings = get_active_settings()
+
     # Start Onshape polling if enabled
     polling_task: asyncio.Task | None = None
     if settings.onshape_enabled and settings.onshape_poll_interval_minutes > 0:

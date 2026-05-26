@@ -105,6 +105,7 @@
 {# ── ONSHAPE INTEGRATION ── #}
 {% if onshape_enabled %}
 {% set onshape_actions %}
+            {% if is_admin %}<a class="btn" href="/settings/onshape/configure">EDIT</a>{% endif %}
             <button class="btn"
                     hx-post="/settings/onshape/sync/pull"
                     hx-target="#onshape-sync-result"
@@ -142,6 +143,16 @@
                 <span class="text-muted">Loading...</span>
             </div>
         </div>
+{% endcall %}
+{% else %}
+{% set onshape_actions %}
+            {% if is_admin %}<a class="btn btn-primary" href="/settings/onshape/configure">CONFIGURE</a>{% endif %}
+{% endset %}
+{% call ok.panel("ONSHAPE INTEGRATION", actions=onshape_actions, margin_top="var(--space-md)") %}
+        <p class="text-muted">
+            Onshape integration is {{ ok.status("DISABLED", "default") }}.
+            {% if is_admin %}Click <strong>CONFIGURE</strong> to enter API credentials.{% else %}An admin must configure API credentials.{% endif %}
+        </p>
 {% endcall %}
 {% endif %}
 

@@ -383,6 +383,10 @@ class OnshapeClient:
 
     # ── API Methods ───────────────────────────────────────────────────
 
+    def get_session_info(self) -> dict:
+        """Return current API session info. Use as a credential smoke-test."""
+        return self._request("GET", "/api/v6/users/sessioninfo")
+
     def get_document(self, document_id: str) -> OnshapeDocument:
         """Get document metadata."""
         data = self._request("GET", f"/api/v6/documents/{document_id}")

@@ -10,6 +10,8 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
     from opal.project import ProjectConfig
 
 
@@ -226,3 +228,73 @@ def get_active_settings() -> Settings:
 def get_active_project() -> "ProjectConfig | None":
     """Get the currently active project configuration."""
     return _active_project
+
+
+# Subset of Settings fields editable from the in-app settings UI. The DB
+# overlay only touches these; everything else stays env-driven.
+_DB_OVERLAY_FIELDS: tuple[str, ...] = (
+    "onshape_access_key",
+    "onshape_secret_key",
+    "onshape_base_url",
+    "onshape_poll_interval_minutes",
+    "onshape_webhook_secret",
+)
+
+
+def apply_db_overlay(db: "Session") -> Settings:
+    """Overlay DB-stored AppSetting values onto the active Settings.
+
+    Reads every row from the ``app_setting`` table and, for each key listed
+    in :data:`_DB_OVERLAY_FIELDS`, replaces the matching field on the active
+    Settings instance. Rebuilds ``_runtime_settings`` so future
+    ``get_active_settings()`` callers see the overlay. Idempotent — safe to
+    call after any settings edit.
+    """
+    global _runtime_settings
+
+    from opal.db.models.app_setting import AppSetting
+
+    base = get_active_settings()
+    overrides: dict[str, object] = {}
+    rows = db.query(AppSetting).filter(AppSetting.key.in_(_DB_OVERLAY_FIELDS)).all()
+    for row in rows:
+        if row.value is None:
+            continue
+        field = Settings.model_fields.get(row.key)
+        if field is None:
+            continue
+        # Coerce text → field type. int is the only non-str we currently overlay.
+        if field.annotation is int:
+            try:
+                overrides[row.key] = int(row.value)
+            except ValueError:
+                continue
+        else:
+            overrides[row.key] = row.value
+
+    if not overrides:
+        return base
+
+    merged = base.model_dump()
+    merged.update(overrides)
+    _runtime_settings = Settings(**merged)
+    return _runtime_settings
+
+
+def set_app_setting(db: "Session", key: str, value: str | None) -> None:
+    """Upsert a single AppSetting row. Caller commits."""
+    from opal.db.models.app_setting import AppSetting
+
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    if row is None:
+        row = AppSetting(key=key, value=value)
+        db.add(row)
+    else:
+        row.value = value
+
+
+def get_app_setting(db: "Session", key: str) -> str | None:
+    from opal.db.models.app_setting import AppSetting
+
+    row = db.query(AppSetting).filter(AppSetting.key == key).first()
+    return row.value if row else None

@@ -1,0 +1,7 @@
+{% if test_result %}
+<div style="text-align: right;
+            color: {% if test_result.ok %}var(--accent-green){% else %}var(--accent-red){% endif %};
+            font-weight: 600;">
+    {{ test_result.message }}
+</div>
+{% endif %}

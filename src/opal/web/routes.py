@@ -3078,6 +3078,133 @@ async def settings_page(request: Request, db: DbSession) -> HTMLResponse:
     return templates.TemplateResponse("settings/index.html", context)
 
 
+def _onshape_form_context(request: Request, db: DbSession) -> dict[str, Any]:
+    """Build the template context for the Onshape configure form."""
+    from opal.config import get_active_settings
+
+    s = get_active_settings()
+    context = get_base_context(request, db, "Onshape - OPAL")
+    context["onshape_enabled"] = s.onshape_enabled
+    context["form"] = {
+        "access_key": s.onshape_access_key,
+        "base_url": s.onshape_base_url,
+        "poll_interval_minutes": s.onshape_poll_interval_minutes,
+        "has_secret_key": bool(s.onshape_secret_key),
+        "has_webhook_secret": bool(s.onshape_webhook_secret),
+    }
+    return context
+
+
+@router.get("/settings/onshape/configure", response_class=HTMLResponse, response_model=None)
+async def settings_onshape_configure_form(
+    request: Request, db: DbSession
+) -> HTMLResponse | RedirectResponse:
+    """Render the Onshape credentials form (admin only)."""
+    if redirect := _require_admin_web(request, db):
+        return redirect
+    context = _onshape_form_context(request, db)
+    context["save_result"] = None
+    context["test_result"] = None
+    return templates.TemplateResponse("settings/onshape_configure.html", context)
+
+
+@router.post("/settings/onshape/configure", response_class=HTMLResponse, response_model=None)
+async def settings_onshape_configure_save(
+    request: Request,
+    db: DbSession,
+    access_key: str = Form(default=""),
+    secret_key: str = Form(default=""),
+    base_url: str = Form(default="https://cad.onshape.com"),
+    poll_interval_minutes: int = Form(default=15),
+    webhook_secret: str = Form(default=""),
+    clear_secret_key: bool = Form(default=False),
+    clear_webhook_secret: bool = Form(default=False),
+) -> HTMLResponse | RedirectResponse:
+    """Persist Onshape credentials. Blank secret fields keep existing values
+    unless the matching ``clear_*`` checkbox was sent."""
+    if redirect := _require_admin_web(request, db):
+        return redirect
+
+    from opal.config import apply_db_overlay, get_active_settings, set_app_setting
+
+    current = get_active_settings()
+
+    new_secret: str | None
+    if clear_secret_key:
+        new_secret = ""
+    elif secret_key:
+        new_secret = secret_key
+    else:
+        new_secret = current.onshape_secret_key
+
+    new_webhook: str | None
+    if clear_webhook_secret:
+        new_webhook = ""
+    elif webhook_secret:
+        new_webhook = webhook_secret
+    else:
+        new_webhook = current.onshape_webhook_secret
+
+    set_app_setting(db, "onshape_access_key", access_key.strip())
+    set_app_setting(db, "onshape_secret_key", new_secret)
+    set_app_setting(db, "onshape_base_url", base_url.strip() or "https://cad.onshape.com")
+    set_app_setting(db, "onshape_poll_interval_minutes", str(max(0, poll_interval_minutes)))
+    set_app_setting(db, "onshape_webhook_secret", new_webhook)
+    db.commit()
+    apply_db_overlay(db)
+
+    context = _onshape_form_context(request, db)
+    context["save_result"] = {"ok": True, "message": "Onshape settings saved."}
+    context["test_result"] = None
+    return templates.TemplateResponse("settings/onshape_configure.html", context)
+
+
+@router.post("/settings/onshape/test", response_class=HTMLResponse)
+async def settings_onshape_test(request: Request, db: DbSession) -> HTMLResponse:
+    """Run a credential smoke-test against the saved Onshape config.
+    Returns an HTMX banner partial."""
+    if redirect := _require_admin_web(request, db):
+        return redirect
+
+    from opal.config import get_active_settings
+    from opal.integrations.onshape.client import OnshapeApiError, OnshapeClient
+
+    s = get_active_settings()
+    if not s.onshape_enabled:
+        result = {"ok": False, "message": "Access key and secret key are required."}
+    else:
+        import json as _json
+
+        try:
+            client = OnshapeClient(
+                access_key=s.onshape_access_key,
+                secret_key=s.onshape_secret_key,
+                base_url=s.onshape_base_url,
+            )
+            try:
+                info = client.get_session_info()
+            finally:
+                client.close()
+            name = info.get("name") or info.get("email") or "session OK"
+            result = {"ok": True, "message": f"Connected as {name}."}
+        except OnshapeApiError as err:
+            result = {"ok": False, "message": f"Onshape API {err.status_code}: {err.detail}"}
+        except _json.JSONDecodeError:
+            # Onshape returns an HTML login page (HTTP 200) for bad credentials,
+            # which trips the JSON decoder before we ever see a 4xx.
+            result = {
+                "ok": False,
+                "message": "Authentication failed — check that the access and secret keys are correct.",
+            }
+        except Exception as err:
+            result = {"ok": False, "message": f"Connection failed: {err}"}
+
+    return templates.TemplateResponse(
+        "settings/_onshape_test_banner.html",
+        {"request": request, "test_result": result},
+    )
+
+
 @router.get("/settings/onshape/sync-log", response_class=HTMLResponse)
 async def settings_onshape_sync_log(request: Request, db: DbSession) -> HTMLResponse:
     """HTMX partial: recent Onshape sync log entries."""

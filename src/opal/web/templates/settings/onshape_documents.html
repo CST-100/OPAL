@@ -3,12 +3,12 @@
 {# HTMX partial: Onshape registered documents table + add form #}
 <div id="onshape-documents">
     {% if onshape_doc_error %}
-    <div class="alert alert-error" style="margin-bottom: var(--space-md);">
+    <div style="margin-bottom: var(--space-md); color: var(--accent-red); font-weight: 600;">
         {{ onshape_doc_error }}
     </div>
     {% endif %}
     {% if onshape_doc_success %}
-    <div class="alert alert-success" style="margin-bottom: var(--space-md);">
+    <div style="margin-bottom: var(--space-md); color: var(--accent-green); font-weight: 600;">
         {{ onshape_doc_success }}
     </div>
     {% endif %}

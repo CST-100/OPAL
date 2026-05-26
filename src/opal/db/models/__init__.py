@@ -1,5 +1,6 @@
 """Database models."""
 
+from opal.db.models.app_setting import AppSetting
 from opal.db.models.attachment import Attachment
 from opal.db.models.audit import AuditLog
 from opal.db.models.dataset import DataPoint, Dataset
@@ -35,6 +36,7 @@ from opal.db.models.user import User
 from opal.db.models.workcenter import Workcenter
 
 __all__ = [
+    "AppSetting",
     "AssemblyComponent",
     "Attachment",
     "AuditLog",

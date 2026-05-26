@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+{% import 'opalkit/_macros.html' as ok %}
+
+{% block breadcrumbs %}
+{{ ok.crumb("HOME", "/") }}
+{{ ok.crumb("SETTINGS", "/settings") }}
+{{ ok.crumb("ONSHAPE") }}
+{% endblock %}
+
+{% block content %}
+{% set status_badge %}
+{%- if onshape_enabled -%}{{ ok.status("ENABLED", "ok") }}{%- else -%}{{ ok.status("DISABLED", "default") }}{%- endif -%}
+{% endset %}
+
+{% set panel_actions %}
+<button type="button" class="btn"
+        hx-post="/settings/onshape/test"
+        hx-target="#onshape-test-banner"
+        hx-indicator="#onshape-test-spinner"
+        {% if not onshape_enabled %}disabled title="Save credentials before testing"{% endif %}>
+    TEST CONNECTION
+    <span id="onshape-test-spinner" class="htmx-indicator" style="margin-left: 4px;">...</span>
+</button>
+{% endset %}
+
+{% call ok.panel("ONSHAPE INTEGRATION", actions=panel_actions, max_width="800px") %}
+
+    {% call ok.table() %}
+        {{ ok.detail_row("STATUS", status_badge) }}
+    {% endcall %}
+
+    <p class="text-muted" style="margin: var(--space-md) 0;">
+        Credentials are stored in the local database and override any values from <code>.env</code>.
+        Generate an API key pair at <a href="https://dev-portal.onshape.com" target="_blank" rel="noopener">dev-portal.onshape.com</a>.
+    </p>
+
+    <form method="post" action="/settings/onshape/configure">
+
+        <div class="form-group">
+            <label class="form-label" for="access_key">ACCESS KEY</label>
+            <input type="text" name="access_key" id="access_key" class="form-input mono"
+                   value="{{ form.access_key }}" autocomplete="off"
+                   placeholder="32-character access key">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="secret_key">SECRET KEY</label>
+            <input type="password" name="secret_key" id="secret_key" class="form-input mono"
+                   autocomplete="new-password"
+                   placeholder="{% if form.has_secret_key %}stored — leave blank to keep{% else %}48-character secret key{% endif %}">
+            {% if form.has_secret_key %}
+            <small class="form-help" style="display: flex; align-items: center; gap: var(--space-xs);">
+                <input type="checkbox" name="clear_secret_key" value="true" id="clear_secret_key">
+                <label for="clear_secret_key">Clear stored secret</label>
+            </small>
+            {% endif %}
+        </div>
+
+        <div class="grid grid-2" style="gap: var(--space-md);">
+            <div class="form-group">
+                <label class="form-label" for="base_url">API BASE URL</label>
+                <input type="text" name="base_url" id="base_url" class="form-input mono"
+                       value="{{ form.base_url }}" placeholder="https://cad.onshape.com">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="poll_interval_minutes">POLL INTERVAL (MIN)</label>
+                <input type="number" name="poll_interval_minutes" id="poll_interval_minutes"
+                       class="form-input mono" min="0" step="1"
+                       value="{{ form.poll_interval_minutes }}">
+                <small class="form-help">0 disables auto-pull. Polling restart requires a server restart.</small>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="webhook_secret">WEBHOOK SECRET</label>
+            <input type="password" name="webhook_secret" id="webhook_secret" class="form-input mono"
+                   autocomplete="new-password"
+                   placeholder="{% if form.has_webhook_secret %}stored — leave blank to keep{% else %}HMAC shared secret (optional){% endif %}">
+            {% if form.has_webhook_secret %}
+            <small class="form-help" style="display: flex; align-items: center; gap: var(--space-xs);">
+                <input type="checkbox" name="clear_webhook_secret" value="true" id="clear_webhook_secret">
+                <label for="clear_webhook_secret">Clear stored secret</label>
+            </small>
+            {% endif %}
+        </div>
+
+        {{ ok.form_actions(cancel_href="/settings", submit_text="SAVE") }}
+
+        {% if save_result %}
+        <div style="margin-top: var(--space-md); text-align: right;
+                    color: {% if save_result.ok %}var(--accent-green){% else %}var(--accent-red){% endif %};
+                    font-weight: 600;">
+            {{ save_result.message }}
+        </div>
+        {% endif %}
+
+    </form>
+
+    <div id="onshape-test-banner" style="margin-top: var(--space-md);">
+        {% if test_result %}
+        {% include "settings/_onshape_test_banner.html" %}
+        {% endif %}
+    </div>
+
+{% endcall %}
+{% endblock %}
